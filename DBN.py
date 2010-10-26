@@ -84,7 +84,7 @@ class DBN(object):
             if i == 0 : 
                 layer_input = self.x
             else:
-                layer_input = self.sigmoid_layers[i-1].output
+                layer_input = self.sigmoid_layers[-1].output
 
             sigmoid_layer = HiddenLayer(rng   = numpy_rng, 
                                            input = layer_input, 
