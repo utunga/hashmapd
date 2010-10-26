@@ -28,7 +28,6 @@ import theano.tensor as T
 
 
 from logistic_sgd import LogisticRegression
-from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 
 class HiddenLayer(object):

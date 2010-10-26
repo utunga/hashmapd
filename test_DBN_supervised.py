@@ -7,6 +7,7 @@ import theano
 import theano.tensor as T
 from DBN_supervised import DBN
 from theano.tensor.shared_randomstreams import RandomStreams
+#from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 TRUNCATED_MNIST_FILE = "data/truncated_mnist.pkl.gz"
 NUM_PIXELS = 784; 
@@ -69,8 +70,8 @@ def load_model(dbn):
     save_file.close();
     return dbn;
     
-def test_DBN( finetune_lr = 0.1, pretraining_epochs = 10, \
-              pretrain_lr = 0.01, k = 1, training_epochs = 10, \
+def test_DBN( finetune_lr = 0.1, pretraining_epochs = 100, \
+              pretrain_lr = 0.01, k = 1, training_epochs = 100, \
               dataset='data/truncated_mnist.pkl.gz', batch_size = 10, n_ins=784):
     """
     Demonstrates how to train and test a Deep Belief Network.
@@ -108,7 +109,7 @@ def test_DBN( finetune_lr = 0.1, pretraining_epochs = 10, \
     print '... building the model'
     # construct the Deep Belief Network
     dbn = DBN(numpy_rng = numpy_rng, n_ins = n_ins, 
-              hidden_layers_sizes = [10,10,10],
+              hidden_layers_sizes = [100,100,100],
               n_outs = 10)
     
 

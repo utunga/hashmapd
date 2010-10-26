@@ -38,8 +38,8 @@ import PIL.Image
 
 from utils import tile_raster_images
 
-#from theano.tensor.shared_randomstreams import RandomStreams
-from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
+from theano.tensor.shared_randomstreams import RandomStreams
+#from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 
 class dA(object):
