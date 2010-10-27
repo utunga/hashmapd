@@ -100,7 +100,7 @@ class RBMSoftmax(object):
 
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''
-        wx_b = T.dot(v_sample, self.W) + self.hbias
+        wx_b = T.nnet.softmax(T.dot(v_sample, self.W) + self.hbias)
         vbias_term = T.dot(v_sample, self.vbias)
         hidden_term = T.sum(T.log(1+T.exp(wx_b)),axis = 1)
         return -hidden_term - vbias_term
@@ -114,7 +114,7 @@ class RBMSoftmax(object):
         this symbolic variable will be needed to write down a more
         stable computational graph (see details in the reconstruction cost function)
         '''
-        pre_sigmoid_activation = T.dot(vis, self.W) + self.hbias
+        pre_sigmoid_activation = T.nnet.softmax(T.dot(vis, self.W) + self.hbias)
         return [pre_sigmoid_activation, T.nnet.sigmoid(pre_sigmoid_activation)]
 
     def sample_h_given_v(self, v0_sample):
@@ -138,10 +138,10 @@ class RBMSoftmax(object):
         this symbolic variable will be needed to write down a more
         stable computational graph (see details in the reconstruction cost function)
         '''
-        pre_sigmoid_activation = T.dot(hid, self.W.T) + self.vbias
+        #pre_sigmoid_activation = T.dot(hid, self.W.T) + self.vbias
         
         #MKT tried to change it to the following but strange and bad things happen when you do
-        #pre_sigmoid_activation = T.nnet.softmax(T.dot(hid, self.W.T) + self.vbias)[0]
+        pre_sigmoid_activation = T.nnet.softmax(T.dot(hid, self.W.T) + self.vbias)
         return [pre_sigmoid_activation,T.nnet.sigmoid(pre_sigmoid_activation)]
 
     def sample_v_given_h(self, h0_sample):

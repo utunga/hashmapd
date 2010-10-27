@@ -10,6 +10,7 @@ from theano.tensor.shared_randomstreams import RandomStreams
 
 from mlp import HiddenLayer
 from rbm import RBM
+from rbm_softmax import RBMSoftmax
 from logistic_sgd import LogisticRegression
 
 
@@ -101,12 +102,22 @@ class DBN(object):
             self.params.extend(sigmoid_layer.params)
         
             # Construct an RBM that shared weights with this layer
-            rbm_layer = RBM(numpy_rng = numpy_rng, theano_rng = theano_rng, 
-                          input = layer_input, 
-                          n_visible = input_size, 
-                          n_hidden  = hidden_layers_sizes[i],  
-                          W = sigmoid_layer.W, 
-                          hbias = sigmoid_layer.b)
+            
+            if (i==0):
+                rbm_layer = RBMSoftmax(numpy_rng = numpy_rng, theano_rng = theano_rng, 
+                              input = layer_input, 
+                              n_visible = input_size, 
+                              n_hidden  = hidden_layers_sizes[i],  
+                              W = sigmoid_layer.W, 
+                              hbias = sigmoid_layer.b)
+            else:
+                rbm_layer = RBM(numpy_rng = numpy_rng, theano_rng = theano_rng, 
+                              input = layer_input, 
+                              n_visible = input_size, 
+                              n_hidden  = hidden_layers_sizes[i],  
+                              W = sigmoid_layer.W, 
+                              hbias = sigmoid_layer.b)
+            
             self.rbm_layers.append(rbm_layer)        
 
         
