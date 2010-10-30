@@ -1,3 +1,4 @@
+
 from struct import *
 from numpy import *
 import sys
@@ -6,10 +7,15 @@ import csv
 import cPickle
 import gzip
 import theano
+import time, PIL.Image
 
+from utils import tile_raster_images
 # Some fileconstants
 
 ##real data
+
+MNIST_FILE = 'data/truncated_mnist.pkl.gz'
+NORMALIZED_MNIST_FILE = 'data/truncated_normalized_mnist.pkl.gz'
 #WORD_VECTORS_FILE = "data/user_word_vectors.csv";
 #PICKLED_WORD_VECTORS_FILE = "data/word_vectors.pkl.gz";
 #TEST_PICKLED_WORD_VECTORS_FILE = "data/test_word_vectors.pkl.gz"
@@ -80,6 +86,34 @@ def output_pickled_data(normalized_counts):
     cPickle.dump((train_set_x, valid_set_x, test_set_x),f, cPickle.HIGHEST_PROTOCOL)
     f.close()
     
+def load_and_normalize_mnist(dataset_file=MNIST_FILE):
+ 
+    print '...  loading data from '+ dataset_file
+    f = gzip.open(dataset_file,'rb')
+    train_set, valid_set, test_set = cPickle.load(f)
+    f.close()
+    
+    train_set_x = train_set[0]
+    valid_set_x = valid_set[0]
+    test_set_x = test_set[0]
+    train_set_y = train_set[1]
+    valid_set_y = valid_set[1]
+    test_set_y = test_set[1]
+    
+    
+    print '... normalizing data for softmax friendly usage'
+    train_set_x = normalize_data_x(train_set_x)
+    valid_set_x = normalize_data_x(valid_set_x)
+    test_set_x = normalize_data_x(test_set_x)
+    
+    train_set = (train_set_x, train_set_y)
+    test_set = (test_set_x, test_set_y)
+    valid_set = (valid_set_x, valid_set_y)
+
+    print '...  pickling and zipping normalized data to '+ NORMALIZED_MNIST_FILE
+    f = gzip.open(NORMALIZED_MNIST_FILE,'wb')
+    cPickle.dump((train_set, valid_set, test_set),f, cPickle.HIGHEST_PROTOCOL)
+    f.close()
     
 
 def test_pickling(dataset=PICKLED_WORD_VECTORS_FILE):
@@ -104,8 +138,56 @@ def test_pickling(dataset=PICKLED_WORD_VECTORS_FILE):
     valid_set_x = shared_dataset(valid_set)
     train_set_x = shared_dataset(train_set)
 
+def test_normalize():
+    f = gzip.open(NORMALIZED_MNIST_FILE,'rb')
+    train_set, valid_set, test_set = cPickle.load(f)
+    f.close()
+    
+    # Plot filters after each training epoch
+    
+    # Construct image from the weight matrix 
+    image = PIL.Image.fromarray(tile_raster_images( train_set[0],
+             img_shape = (28,28),tile_shape = (30,30), 
+             tile_spacing=(1,1)))
+    image.save('truncated_normalized_input.png')
+  
+    print train_set[0][3].sum()
+    print valid_set[0][3].sum()
+    print test_set[0][3].sum()
+    print train_set[0][5].sum()
+    print valid_set[0][5].sum()
+    print test_set[0][5].sum()
+    
+    f = gzip.open(MNIST_FILE,'rb')
+    train_set, valid_set, test_set = cPickle.load(f)
+    f.close()
+    
+    # Plot filters after each training epoch
+    
+    # Construct image from the weight matrix 
+    image = PIL.Image.fromarray(tile_raster_images( train_set[0],
+             img_shape = (28,28),tile_shape = (30,30), 
+             tile_spacing=(1,1)))
+    image.save('truncated_input.png')
+    
+    print train_set[0][3].sum()
+    print valid_set[0][3].sum()
+    print test_set[0][3].sum()
+    print train_set[0][5].sum()
+    print valid_set[0][5].sum()
+    print test_set[0][5].sum()
+    
 
+def normalize_data_x(data_x):
+    totals_for_rows = data_x.sum(axis=1)
+    normalized_data = (data_x.transpose()/totals_for_rows).transpose();
+    return normalized_data;
+    
 if __name__ == '__main__':
-    normalized_counts = read_user_word_counts();
-    output_pickled_data(normalized_counts);
-    test_pickling()
+    #normalized_counts = read_user_word_counts();
+    #output_pickled_data(normalized_counts);
+    #test_pickling()
+    load_and_normalize_mnist()
+    test_normalize()
+#    print asarray([[0.1, 0.2, 0, 0, 0, 0.5]])
+#    print normalize_data_x(asarray([[0.1, 0.2, 0, 0, 0, 0.5]]))

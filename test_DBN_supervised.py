@@ -9,7 +9,11 @@ from DBN_supervised import DBN
 from theano.tensor.shared_randomstreams import RandomStreams
 #from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
+#truncatd from full set for easier test
+#TRUNCATED_MNIST_FILE = "data/truncated_mnist.pkl.gz"
+#as above, then normalized by row, so that testing rbm_softmax makes sense
 TRUNCATED_MNIST_FILE = "data/truncated_mnist.pkl.gz"
+TRUNCATED_NORMALIZED_MNIST_FILE = "data/truncated_normalized_mnist.pkl.gz"
 NUM_PIXELS = 784; 
 
 def load_data(dataset):
@@ -128,13 +132,14 @@ def test_DBN( finetune_lr = 0.1, pretraining_epochs = 100, \
     for i in xrange(dbn.n_layers):
         # go through pretraining epochs 
         for epoch in xrange(pretraining_epochs):
-            # go through the training set
-            c = []
-            for batch_index in xrange(n_train_batches):
-                c.append(pretraining_fns[i](index = batch_index, 
-                         lr = pretrain_lr ) )
-            print 'Pre-training layer %i, epoch %d, cost '%(i,epoch),numpy.mean(c)
- 
+                # go through the training set
+                c = []
+                for batch_index in xrange(n_train_batches):
+                    c.append(pretraining_fns[i](index = batch_index, 
+                             lr = pretrain_lr ) )
+                print 'Pre-training layer %i, epoch %d, cost '%(i,epoch),numpy.mean(c)
+
+
     end_time = time.clock()
     print >> sys.stderr, ('The pretraining code for file '+os.path.split(__file__)[1]+' ran for %.2fm' % ((end_time-start_time)/60.))
     
@@ -221,4 +226,4 @@ def test_DBN( finetune_lr = 0.1, pretraining_epochs = 100, \
 
 
 if __name__ == '__main__':
-    dbn = test_DBN(dataset=TRUNCATED_MNIST_FILE, batch_size=10, n_ins=NUM_PIXELS)
+    dbn = test_DBN(dataset=TRUNCATED_NORMALIZED_MNIST_FILE, batch_size=10, n_ins=NUM_PIXELS)
