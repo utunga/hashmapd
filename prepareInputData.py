@@ -189,5 +189,5 @@ if __name__ == '__main__':
     #test_pickling()
     load_and_normalize_mnist()
     test_normalize()
-#    print asarray([[0.1, 0.2, 0, 0, 0, 0.5]])
-#    print normalize_data_x(asarray([[0.1, 0.2, 0, 0, 0, 0.5]]))
+   # print asarray([[0.1, 0.2, 0, 0, 0, 0.5]])
+   # print normalize_data_x(asarray([[0.1, 0.2, 0, 0, 0, 0.5]]))
