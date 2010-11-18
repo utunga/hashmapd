@@ -114,6 +114,7 @@ class SMH(object):
         sigmoid_layer.trace_tile_shape = (inner_code_length,1)
         self.sigmoid_layers.append(sigmoid_layer)
         self.params.extend(sigmoid_layer.params)
+        self.hash_code_layer = sigmoid_layer
     
         # Construct an RBM that shared weights with this layer
         rbm_layer = RBM(numpy_rng = self.numpy_rng, theano_rng = self.theano_rng, 
@@ -166,10 +167,16 @@ class SMH(object):
         
     def output_given_x(self, data_x):
         
-        #theano.pprint( self.sigmoid_layers[-1].output)
-        #theano.pprint(self.x)
         output_fn = theano.function( [],
                outputs =  self.sigmoid_layers[-1].output, 
+               givens  = {self.sigmoid_layers[0].input : data_x})
+        
+        return output_fn();
+
+    def output_codes_given_x(self, data_x):
+        
+        output_fn = theano.function( [],
+               outputs =  self.hash_code_layer.output, 
                givens  = {self.sigmoid_layers[0].input : data_x})
         
         return output_fn();

@@ -32,14 +32,14 @@ import csv
 #WORD_VECTORS_NUM_USERS = 786; #number of users for which we have data in above file ('user_id' column is allowed to be *up to and including* this number)
 
 #test data
-WORD_VECTORS_FILE = "../data/test_word_vectors.csv";
+WORD_VECTORS_FILE = "data/test_word_vectors.csv";
 WORD_VECTORS_NUM_WORDS = 500; #500 words for testing.. (speeds stuff up a bit)
 WORD_VECTORS_NUM_USERS = 786; #number of users for which we have data in above file ('user_id' column is allowed to be *up to and including* this number)
 
 
 
 INTERIM_PCA_DIMS = 200; #number of dimensions to reduce as interim step
-COORDS_OUTPUT_FILE = "../out/coords.csv"; 
+COORDS_OUTPUT_FILE = "out/coords.csv"; 
 
 def calc_tsne(dataMatrix,NO_DIMS=2,PERPLEX=30,INITIAL_DIMS=30,LANDMARKS=1):
     """
@@ -106,14 +106,14 @@ def tSNE():
     platform=sys.platform
     print'Platform detected : %s'%platform
     if platform in ['mac', 'darwin'] :
-        cmd='../lib/tSNE_maci'
+        cmd='lib/tSNE_maci'
     elif platform == 'win32' :
-        cmd='../lib/tSNE_win'
+        cmd='lib/tSNE_win'
     elif platform == 'linux2' :
-        cmd='../lib/tSNE_linux'
+        cmd='lib/tSNE_linux'
     else :
         print 'Not sure about the platform, we will try linux version...'
-        cmd='../lib/tSNE_linux'
+        cmd='lib/tSNE_linux'
     print 'Calling executable "%s"'%cmd
     os.system(cmd)
     

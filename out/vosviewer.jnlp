@@ -18,9 +18,9 @@
 <application-desc main-class="nl.neesjanvaneck.vosviewer.VOSViewer">
   <argument>-jws</argument>
   <argument>-items</argument>
-  <argument>http://ict.ewi.tudelft.nl/~lvandermaaten/journal_tsne_items.txt</argument>
+  <argument>labels.csv</argument>
   <argument>-coordinates</argument>
-  <argument>http://ict.ewi.tudelft.nl/~lvandermaaten/journal_tsne_coordinates.txt</argument>
+  <argument>coords.csv</argument>
   <argument>-label_size_effect</argument>
   <argument>0.33</argument>
 </application-desc>
