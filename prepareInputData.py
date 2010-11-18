@@ -19,8 +19,10 @@ NORMALIZED_MNIST_FILE = 'data/truncated_normalized_mnist.pkl.gz'
 #WORD_VECTORS_FILE = "data/user_word_vectors.csv";
 #PICKLED_WORD_VECTORS_FILE = "data/word_vectors.pkl.gz";
 #TEST_PICKLED_WORD_VECTORS_FILE = "data/test_word_vectors.pkl.gz"
-#WORD_VECTORS_NUM_WORDS = 3000; #number of different words in above file ('word_id' column is allowed to be *up to and including* this number)
-#WORD_VECTORS_NUM_USERS = 786; #number of users for which we have data in above file ('user_id' column is allowed to be *up to and including* this number)
+WORD_VECTORS_NUM_WORDS = 3000; #number of different words in above file ('word_id' column is allowed to be *up to and including* this number)
+WORD_VECTORS_NUM_USERS = 786; #number of users for which we have data in above file ('user_id' column is allowed to be *up to and including* this number)
+NORMALIZED_UNSUPERVISED_MNIST = 'data/truncated_unsupervised_mnist.pkl.gz'
+
 
 #test data
 #WORD_VECTORS_FILE = "data/test_word_vectors.csv";
@@ -28,10 +30,10 @@ NORMALIZED_MNIST_FILE = 'data/truncated_normalized_mnist.pkl.gz'
 #WORD_VECTORS_NUM_USERS = 786; #number of users for which we have data in above file ('user_id' column is allowed to be *up to and including* this number)
 
 #fake data
-WORD_VECTORS_FILE = "data/fake_word_vectors.csv";
-PICKLED_WORD_VECTORS_FILE = "data/fake_word_vectors.pkl.gz";
-FAKE_WORD_VECTORS_NUM_WORDS = 50; 
-FAKE_WORD_VECTORS_NUM_USERS = 20;
+#WORD_VECTORS_FILE = "data/fake_word_vectors.csv";
+#PICKLED_WORD_VECTORS_FILE = "data/fake_word_vectors.pkl.gz";
+#FAKE_WORD_VECTORS_NUM_WORDS = 50; 
+#FAKE_WORD_VECTORS_NUM_USERS = 20;
 
 
 def read_user_word_counts():

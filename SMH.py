@@ -133,13 +133,13 @@ class SMH(object):
                                     n_in  = inner_code_length, 
                                     n_out = mid_layer_size,
                                     init_W = mirror_layer.W.value.T,
-                                    #init_b = mirror_layer.b.value,
+                                    #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1),
                                     activation = T.nnet.sigmoid)
         sigmoid_layer.trace_img_shape = (mid_layer_size,1)
         sigmoid_layer.trace_tile_shape = (inner_code_length,1)
         sigmoid_layer.trace_transpose_weights_file = False
         self.sigmoid_layers.append(sigmoid_layer)
-        self.params.extend(sigmoid_layer.params)
+        #self.params.extend(sigmoid_layer.params)
     
         #  layer 3 -> output (mid_layer_size->out)
         mirror_layer = self.sigmoid_layers[0];
@@ -149,13 +149,14 @@ class SMH(object):
                                     n_in  = mid_layer_size, 
                                     n_out = self.n_ins, #out matches in because this is an autoencoder
                                     init_W = mirror_layer.W.value.T,
+                                    #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1),
                                     #init_b = mirror_layer.b.value.T,
                                     activation = T.nnet.sigmoid)
         sigmoid_layer.trace_img_shape = (28,28)
         sigmoid_layer.trace_tile_shape = (10,10)
         sigmoid_layer.trace_transpose_weights_file = False
         self.sigmoid_layers.append(sigmoid_layer)
-        self.params.extend(sigmoid_layer.params)
+        #self.params.extend(sigmoid_layer.params)
 
         self.y = self.sigmoid_layers[-1].output;
         
@@ -165,11 +166,11 @@ class SMH(object):
         
     def output_given_x(self, data_x):
         
-        theano.pprint( self.sigmoid_layers[-1].output)
-        theano.pprint(self.x)
+        #theano.pprint( self.sigmoid_layers[-1].output)
+        #theano.pprint(self.x)
         output_fn = theano.function( [],
                outputs =  self.sigmoid_layers[-1].output, 
-               givens  = {self.x : data_x})
+               givens  = {self.sigmoid_layers[0].input : data_x})
         
         return output_fn();
 
@@ -291,12 +292,16 @@ class SMH(object):
     
         return train_fn, valid_score, test_score
 
-
     #added MKT
     def exportModel(self):
-        return self.params;
+        joint_params = []
+        for layer in self.sigmoid_layers:
+            joint_params.append(layer.exportModel())
+        return joint_params;
     
     def loadModel(self, inpt_params):
-        self.params=inpt_params;
+        for i in xrange(len(inpt_params)):
+            #print 'loading layer %i'%i
+            self.sigmoid_layers[i].loadModel(inpt_params[i])
 
 

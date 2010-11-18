@@ -7,7 +7,7 @@ from utils import tile_raster_images
 from logistic_sgd import LogisticRegression
 
 class HiddenLayer(object):
-    def __init__(self, rng, input, n_in, n_out, init_W=None, init_b=None, activation = T.tanh):
+    def __init__(self,  rng, input=None, n_in=784, n_out=500, init_W=None, init_b=None, activation = T.tanh):
         """
         Typical hidden layer of a MLP: units are fully-connected and have
         sigmoidal activation function. Weight matrix W is of shape (n_in,n_out)
@@ -34,6 +34,8 @@ class HiddenLayer(object):
                               layer
         """
         self.input = input
+        if not input:
+            self.input = T.matrix('input')
 
         if (init_W == None):
             W_values = numpy.asarray( rng.uniform(
@@ -53,7 +55,7 @@ class HiddenLayer(object):
         else:
             self.b = theano.shared(value= init_b, name ='b')
 
-        self.output = activation(T.dot(input, self.W) + self.b)
+        self.output = activation(T.dot(self.input, self.W) + self.b)
         # parameters of the model
         self.params = [self.W, self.b]
 
@@ -76,7 +78,12 @@ class HiddenLayer(object):
         return self.params;
     
     def loadModel(self, inpt_params):
-        self.params=inpt_params;
+        #FIXME dont quite get why
+        #self.params = inpt_params doesn't work
+        #.. but it doesn't set the 'value' of shared variable W/b so we have
+        #.. to do this explictly MKT
+        self.W.value=inpt_params[0].value
+        self.b.value=inpt_params[1].value
         
     def export_weights_image(self, file_name):
         # Construct image from the weight matrix

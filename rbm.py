@@ -13,7 +13,7 @@ import theano.tensor as T
 import os
 
 from utils import tile_raster_images
-#from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
+from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 
 class RBM(object):
