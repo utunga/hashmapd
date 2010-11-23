@@ -19,9 +19,18 @@ from utils import tile_raster_images
 UNSUPERVISED_MNIST = 'data/truncated_unsupervised_mnist.pkl.gz'
 FAKE_IMG_DATA_FILE = "data/fake_img_data.pkl.gz"
 UNSUPERVISED_MNIST_WEIGHTS_FILE = "data/unsuperivsed_mnist_weights.pkl.gz"
-NUM_PIXELS = 784; 
+NUM_PIXELS = 784;
+
+
+WORD_VECTORS_FILE = "data/word_vectors.pkl.gz";
+WORD_VECTORS_NUM_WORDS = 3000; #number of different words in above file ('word_id' column is allowed to be *up to and including* this number)
+WORD_VECTORS_NUM_USERS = 786; #number of users for which we have data in above file ('user_id' column is allowed to be *up to and including* this number)
+WORD_VECTORS_WEIGHTS_FILE = "data/word_vectors_weights.pkl.gz"
+
+SKIP_TRACE_OUTPUT = False
+
  
-def load_data(dataset):
+def load_data(dataset_file):
     ''' Loads the dataset
 
     :type dataset: string
@@ -31,10 +40,10 @@ def load_data(dataset):
     #############
     # LOAD DATA #
     #############
-    print '... loading data'
+    print '... loading data from ' + dataset_file
 
     # Load the dataset  - expecting both supervised and unsupervised data to be supplied (in pairs)
-    f = gzip.open(dataset,'rb')
+    f = gzip.open(dataset_file,'rb')
     train_set, valid_set, test_set = cPickle.load(f)
     f.close()
 
@@ -57,9 +66,9 @@ def load_model(smh):
     save_file.close();
     return smh;
     
-def test_SMH( finetune_lr = 0.3, pretraining_epochs = 100, \
+def train_SMH( finetune_lr = 0.3, pretraining_epochs = 100, \
               pretrain_lr = 0.01, k = 1, training_epochs = 100, \
-              dataset='data/truncated_mnist.pkl.gz', batch_size = 10, mid_layer_size=200, inner_code_length=10, n_ins=784):
+              dataset='data/truncated_mnist.pkl.gz', batch_size = 10, mid_layer_sizes=[200], inner_code_length=10, n_ins=784):
 
     datasets = load_data(dataset)
 
@@ -74,7 +83,7 @@ def test_SMH( finetune_lr = 0.3, pretraining_epochs = 100, \
     numpy_rng = numpy.random.RandomState(123)
     print '... building the model'
     # construct the Deep Belief Network
-    smh = SMH(numpy_rng = numpy_rng, inner_code_length=inner_code_length, mid_layer_size=mid_layer_size, n_ins = n_ins)      
+    smh = SMH(numpy_rng = numpy_rng, inner_code_length=inner_code_length, mid_layer_sizes=mid_layer_sizes, n_ins = n_ins)      
     
 
     #########################
@@ -191,9 +200,7 @@ def test_SMH( finetune_lr = 0.3, pretraining_epochs = 100, \
 
 def output_trace_info(smh, datasets, prefix):
     
-    train_set_x = datasets[0]
-    valid_set_x = datasets[1]
-    test_set_x   = datasets[2]
+    
     
     ########################
     # OUTPUT WEIGHTS       #
@@ -204,31 +211,20 @@ def output_trace_info(smh, datasets, prefix):
         sigmoid_layer = smh.sigmoid_layers[layer]
         sigmoid_layer.export_weights_image('trace/%s_weights_%i.png'%(prefix,layer))
     
-    #for layer in xrange(smh.n_rbm_layers):
-    #layer =0
-    #rbm = smh.rbm_layers[layer]
-    ## Construct image from the weight matrix 
-    #image = PIL.Image.fromarray(tile_raster_images( X = rbm.W.value.T,
-    #         img_shape = (28,28),tile_shape = (5,4), 
-    #         tile_spacing=(1,1)))
-    #image.save('trace/rbmfilters_%i.png'%layer)
+    if SKIP_TRACE_OUTPUT:
+        return
+   
         
-    ########################
-    # RUN A FEW SAMPLES    #
-    ########################
+    #################################
+    # RUN RECONSTRUCTION SAMPLES    #
+    #################################
+   
+    train_set_x = datasets[0]
+    valid_set_x = datasets[1]
+    test_set_x   = datasets[2]
        
-    #  compute number of batches
     data_x = test_set_x.value #[index*batch_size:(index+1)*batch_size];
     output_y = smh.output_given_x(data_x);
-    
-    #data_x = T.dmatrix()
-    #output_y = T.dmatrix()
-    #
-    #for index in xrange(test_set_x.value.shape[0]):
-    #    datum_x = test_set_x.value[index] #[index*batch_size:(index+1)*batch_size];
-    #    datum_y = smh.output_given_x(data_x);
-    #    data_x.append(data_x)
-    #    output_y.append(datum_y)
     
     output_y = smh.output_given_x(test_set_x.value);
     
@@ -250,10 +246,10 @@ def save_model(smh, weights_file=DEFAULT_WEIGHTS_FILE):
     cPickle.dump(smh.exportModel(), save_file, cPickle.HIGHEST_PROTOCOL);
     save_file.close();
 
-def load_model(n_ins=784,  mid_layer_size = 200,
+def load_model(n_ins=784,  mid_layer_sizes = [200],
                     inner_code_length = 10, weights_file=DEFAULT_WEIGHTS_FILE):
     numpy_rng = numpy.random.RandomState(212)
-    smh = SMH(numpy_rng = numpy_rng,  mid_layer_size = mid_layer_size, inner_code_length = inner_code_length, n_ins = n_ins)
+    smh = SMH(numpy_rng = numpy_rng,  mid_layer_sizes = mid_layer_sizes, inner_code_length = inner_code_length, n_ins = n_ins)
     save_file=open(weights_file)
     smh_params = cPickle.load(save_file)
     save_file.close()
@@ -265,22 +261,27 @@ if __name__ == '__main__':
     data_file = UNSUPERVISED_MNIST
     weights_file = UNSUPERVISED_MNIST_WEIGHTS_FILE
     n_ins = NUM_PIXELS
-    
-    smh = test_SMH(dataset=data_file,
-                    batch_size=8, 
-                    pretraining_epochs = 2000,
-                    training_epochs = 3000,
-                    mid_layer_size = 500,
+ 
+    #data_file = WORD_VECTORS_FILE
+    #weights_file = WORD_VECTORS_WEIGHTS_FILE
+    #n_ins = WORD_VECTORS_NUM_WORDS
+    #SKIP_TRACE_OUTPUT = True
+
+    smh = train_SMH(dataset=data_file,
+                    batch_size=10, 
+                    pretraining_epochs = 1000,
+                    training_epochs = 2000,
+                    mid_layer_sizes = [400,200],
                     inner_code_length = 30,
                     n_ins=n_ins)
 
     save_model(smh, weights_file=weights_file)
    
     #double check that save/load worked OK
-    datasets = load_data(dataset=data_file)
+    datasets = load_data(data_file)
     output_trace_info(smh, datasets, 'test_weights_b4_restore')
 
-    smh2 = load_model(n_ins=n_ins,  mid_layer_size = 500,
+    smh2 = load_model(n_ins=n_ins,  mid_layer_sizes = [400,200],
                     inner_code_length = 30, weights_file=weights_file)
     output_trace_info(smh2, datasets, 'test_weights_restore')
     

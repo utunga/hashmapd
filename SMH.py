@@ -27,7 +27,7 @@ class SMH(object):
     
     """
 
-    def __init__(self, numpy_rng, theano_rng = None, n_ins = 784, mid_layer_size=200, inner_code_length = 10):
+    def __init__(self, numpy_rng, theano_rng = None, n_ins = 784, mid_layer_sizes=[200], inner_code_length = 10):
         """This class is made to support a variable number of layers. 
 
         :type numpy_rng: numpy.random.RandomState
@@ -51,7 +51,7 @@ class SMH(object):
         
         self.n_ins = n_ins
         self.inner_code_length = inner_code_length
-        self.mid_layer_size = mid_layer_size
+        self.mid_layer_sizes = mid_layer_sizes
         
         self.numpy_rng = numpy_rng
         self.theano_rng = RandomStreams(numpy_rng.randint(2**30))
@@ -75,94 +75,69 @@ class SMH(object):
 
     def init_test_layers(self):
         ###    MKT: To keep things simple for now, we hard code the layers structure right in this constructor
-        ### input-layer 0 (n_ins->50) *including RB
+        
+        ### input-layer 0 (n_ins->50) *including RBM
       
-        mid_layer_size = self.mid_layer_size
         inner_code_length = self.inner_code_length
+        hidden_layer_sizes = self.mid_layer_sizes
+        hidden_layer_sizes.append(inner_code_length)
         
-        layer_input = self.x
-        
-        sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
-                                    input = layer_input, 
-                                    n_in  = self.n_ins, 
-                                    n_out = mid_layer_size,
-                                    activation = T.nnet.sigmoid)
-        sigmoid_layer.trace_img_shape = (28,28)
-        sigmoid_layer.trace_tile_shape = (10,10)
-        self.sigmoid_layers.append(sigmoid_layer)
+        # middle layer/layers
+        num_hidden = len(hidden_layer_sizes)
+        for i in xrange(num_hidden):
+            # the input is x if we are on the first layer, otherwise input to this layer is output of layer below
+            if i == 0 :
+                n_in = self.n_ins
+                layer_input = self.x
+            else:
+                n_in = hidden_layer_sizes[i-1]
+                layer_input = self.sigmoid_layers[-1].output
 
-        self.params.extend(sigmoid_layer.params)
+            n_out = hidden_layer_sizes[i]
+
+            sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
+                                        input = layer_input, 
+                                        n_in  = n_in, 
+                                        n_out = n_out,
+                                        activation = T.nnet.sigmoid)
+            print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)            
+            self.sigmoid_layers.append(sigmoid_layer)
+            self.params.extend(sigmoid_layer.params)
+        
+            # Construct an RBM that shared weights with this layer
+            rbm_layer = RBM(numpy_rng = self.numpy_rng,
+                            theano_rng = self.theano_rng, 
+                            input = layer_input, 
+                            n_visible = n_in, 
+                            n_hidden  = n_out,
+                            W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
+                            hbias = sigmoid_layer.b)
+            #print 'created rbm (n_in:%d n_out:%d)'%(rbm_layer.n_in,rbm_layer.n_out)                  
+            self.rbm_layers.append(rbm_layer)
+        
+        self.hash_code_layer = self.sigmoid_layers[-1]
     
-        # Construct an RBM that shared weights with this layer
-        rbm_layer = RBM(numpy_rng = self.numpy_rng, theano_rng = self.theano_rng, 
-                      input = layer_input, 
-                      n_visible = self.n_ins, 
-                      n_hidden  = mid_layer_size,
-                      W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
-                      hbias = sigmoid_layer.b)
-
-        self.rbm_layers.append(rbm_layer)        
-        
-        ###  layer 0->layer 1 (hashcode) (mid_layer_size->n_code_length) * including RBM
-        layer_input = self.sigmoid_layers[-1].output
-        sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
-                                    input = layer_input, 
-                                    n_in  = mid_layer_size, 
-                                    n_out = inner_code_length,
-                                    activation = T.nnet.sigmoid)
-        sigmoid_layer.trace_img_shape = (mid_layer_size,1)
-        sigmoid_layer.trace_tile_shape = (inner_code_length,1)
-        self.sigmoid_layers.append(sigmoid_layer)
-        self.params.extend(sigmoid_layer.params)
-        self.hash_code_layer = sigmoid_layer
-    
-        # Construct an RBM that shared weights with this layer
-        rbm_layer = RBM(numpy_rng = self.numpy_rng, theano_rng = self.theano_rng, 
-                      input = layer_input, 
-                      n_visible = mid_layer_size, 
-                      n_hidden  = inner_code_length,
-                      W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
-                      hbias = sigmoid_layer.b)
-
-        self.rbm_layers.append(rbm_layer)
-        
         ###  layer 2 (hashcode) - layer 3 (n_code_length->mid_layer_size)
-        mirror_layer = self.sigmoid_layers[1];
-        layer_input = self.sigmoid_layers[-1].output
-        sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
-                                    input = self.sigmoid_layers[-1].output, 
-                                    n_in  = inner_code_length, 
-                                    n_out = mid_layer_size,
-                                    init_W = mirror_layer.W.value.T,
-                                    #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1),
-                                    activation = T.nnet.sigmoid)
-        sigmoid_layer.trace_img_shape = (mid_layer_size,1)
-        sigmoid_layer.trace_tile_shape = (inner_code_length,1)
-        sigmoid_layer.trace_transpose_weights_file = False
-        self.sigmoid_layers.append(sigmoid_layer)
-        #self.params.extend(sigmoid_layer.params)
-    
-        #  layer 3 -> output (mid_layer_size->out)
-        mirror_layer = self.sigmoid_layers[0];
-        layer_input = self.sigmoid_layers[-1].output
-        sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
-                                    input = self.sigmoid_layers[-1].output, 
-                                    n_in  = mid_layer_size, 
-                                    n_out = self.n_ins, #out matches in because this is an autoencoder
-                                    init_W = mirror_layer.W.value.T,
-                                    #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1),
-                                    #init_b = mirror_layer.b.value.T,
-                                    activation = T.nnet.sigmoid)
-        sigmoid_layer.trace_img_shape = (28,28)
-        sigmoid_layer.trace_tile_shape = (10,10)
-        sigmoid_layer.trace_transpose_weights_file = False
-        self.sigmoid_layers.append(sigmoid_layer)
-        #self.params.extend(sigmoid_layer.params)
+        for i in xrange(num_hidden):
+            rev = num_hidden-i-1 #yeah there must be a nicer way to do this but I dont know python and on train right now sorry
+        
+            mirror_layer = self.sigmoid_layers[rev];
+            layer_input = self.sigmoid_layers[-1].output
+            sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
+                                        input = self.sigmoid_layers[-1].output, 
+                                        n_in  = mirror_layer.n_out, 
+                                        n_out = mirror_layer.n_in,
+                                        init_W = mirror_layer.W.value.T,
+                                        #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1),
+                                        activation = T.nnet.sigmoid)
+            print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)
+            self.sigmoid_layers.append(sigmoid_layer)
+            #self.params.extend(sigmoid_layer.params)
 
         self.y = self.sigmoid_layers[-1].output;
         
-        self.n_rbm_layers = 2
-        self.n_unrolled_layers = 4
+        self.n_rbm_layers = num_hidden
+        self.n_unrolled_layers = len(self.sigmoid_layers)
         
         
     def output_given_x(self, data_x):

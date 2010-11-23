@@ -38,9 +38,9 @@ def load_and_truncate_mnist():
     
     print '...  truncating to smaller set'
     #truncate the data so it fits in the damn gpu
-    train_set_x = train_set_x[0:1000]
-    valid_set_x = valid_set_x[0:400]
-    test_set_x = test_set_x[0:500]
+    train_set_x = train_set_x[0:5000]
+    valid_set_x = valid_set_x[0:1000]
+    test_set_x = test_set_x[0:1000]
         
     print '...  pickling and zipping truncated, unsupervised data to '+ UNSUPERVISED_MNIST
     f = gzip.open(UNSUPERVISED_MNIST,'wb')

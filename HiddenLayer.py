@@ -33,6 +33,8 @@ class HiddenLayer(object):
         :param activation: Non linearity to be applied in the hidden 
                               layer
         """
+        self.n_in = n_in
+        self.n_out = n_out
         self.input = input
         if not input:
             self.input = T.matrix('input')
@@ -58,20 +60,21 @@ class HiddenLayer(object):
         self.output = activation(T.dot(self.input, self.W) + self.b)
         # parameters of the model
         self.params = [self.W, self.b]
-
-
+                
         #strictly for tracing only
         if (self.W.value.shape[0]==(28*28)):
-            self.trace_img_shape = (28,28)
-        else:
-            self.trace_img_shape = (self.W.value.shape[0],1)
-
-        if (self.W.value.shape[1]==20):
-            self.trace_tile_shape = (5,4)
-        else:
+            self.trace_img_shape = (28,28)    
             self.trace_tile_shape = (10,10)
-           
-        self.trace_transpose_weights_file = True
+            self.trace_transpose_weights_file = True
+        else:
+            if (self.W.value.shape[1]==(28*28)):
+                self.trace_img_shape = (28,28)    
+                self.trace_tile_shape = (10,10)
+                self.trace_transpose_weights_file = False
+            else:
+                self.trace_img_shape = (self.n_in,1)    
+                self.trace_tile_shape = (self.n_out,1)
+                self.trace_transpose_weights_file = True
         
     #added MKT
     def exportModel(self):

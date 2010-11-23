@@ -13,21 +13,35 @@ from struct import *
 
 #truncatd from full set for easier test
 TRUNCATED_MNIST_FILE = "data/truncated_mnist.pkl.gz"
-#as above, then normalized by row, so that testing rbm_softmax makes sense
-#TRUNCATED_MNIST_FILE = "data/truncated_mnist.pkl.gz"
-#TRUNCATED_NORMALIZED_MNIST_FILE = "data/truncated_normalized_mnist.pkl.gz"
-#UNSUPERVISED_MNIST = 'data/truncated_unsupervised_mnist.pkl.gz'
-#FAKE_IMG_DATA_FILE = "data/fake_img_data.pkl.gz"
 UNSUPERVISED_MNIST_WEIGHTS_FILE = "data/unsuperivsed_mnist_weights.pkl.gz"
 NUM_PIXELS = 784;
+SKIP_TRACE = False
+
+#WORD_VECTORS_FILE = "data/word_vectors.pkl.gz";
+VECTORS_FILE_DISPLAY = "data/word_vectors_display.pkl.gz";
+WORD_VECTORS_WEIGHTS_FILE = "data/word_vectors_weights.pkl.gz"
+WORD_VECTORS_NUM_WORDS = 3000; #number of different words in above file ('word_id' column is allowed to be *up to and including* this number)
 
 
 #################################
 ## stuff relating to running the SMH step
 #################################
 
+def load_unsupervised_data(dataset):
+    print '... loading data'
 
-def load_data(dataset):
+    f = gzip.open(dataset,'rb')
+    data_x = cPickle.load(f)
+    f.close()
+
+    #need to use train_set since this is where all the data is
+    print data_x.shape
+    #not sure if making these things 'shared' helps the GPU out but just in case we may as well do that
+    data_x_shared  = theano.shared(numpy.asarray(data_x, dtype=theano.config.floatX))
+    
+    return data_x_shared
+
+def load_mnist_data(dataset):
     # unlike the train_SMH case we expect both unsupervised data and appropriate labels for that data, in pairs,
     # but we only use the test data.. so only return that 
     print '... loading data'
@@ -58,10 +72,10 @@ def save_model(smh, weights_file=DEFAULT_WEIGHTS_FILE):
     cPickle.dump(smh.exportModel(), save_file, cPickle.HIGHEST_PROTOCOL);
     save_file.close();
 
-def load_model(n_ins=784,  mid_layer_size = 200,
+def load_model(n_ins=784,  mid_layer_sizes = [200],
                     inner_code_length = 10, weights_file=DEFAULT_WEIGHTS_FILE):
     numpy_rng = numpy.random.RandomState(212)
-    smh = SMH(numpy_rng = numpy_rng,  mid_layer_size = mid_layer_size, inner_code_length = inner_code_length, n_ins = n_ins)
+    smh = SMH(numpy_rng = numpy_rng,  mid_layer_sizes = mid_layer_sizes, inner_code_length = inner_code_length, n_ins = n_ins)
     save_file=open(weights_file)
     smh_params = cPickle.load(save_file)
     save_file.close()
@@ -69,6 +83,9 @@ def load_model(n_ins=784,  mid_layer_size = 200,
     return smh
 
 def output_trace(smh, data_x, prefix="run"):
+    
+    if SKIP_TRACE:
+        return
     
     output_y = smh.output_given_x(data_x.value);
     
@@ -83,7 +100,7 @@ def output_trace(smh, data_x, prefix="run"):
              tile_spacing=(1,1)))
     image.save('trace/%s_reconstruction.png'%prefix)
 
-def get_output_codes(smh, data_x, data_labels):
+def get_output_codes(smh, data_x):
     
     print 'running input data forward through smh..'
     output_codes = smh.output_codes_given_x(data_x.value);
@@ -225,6 +242,8 @@ def write_csv_coords(coords, labels):
     for row in coords:
         csv_writer.writerow(["%.10f"%code for code in row]) # format with 10dp accuracy (but no '-e' format stuff)
 
+    if labels==None:
+        return
     print 'writing labels to csv'
     csv_writer = csv.writer(open(LABELS_OUTPUT_FILE, 'wb'), delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
     for label in labels:
@@ -235,18 +254,25 @@ if __name__ == '__main__':
     data_file = TRUNCATED_MNIST_FILE #NB includes labels
     weights_file = UNSUPERVISED_MNIST_WEIGHTS_FILE
     n_ins = NUM_PIXELS
+    dataset_x, dataset_labels = load_mnist_data(dataset=data_file)
+    
+    #data_file = VECTORS_FILE_DISPLAY
+    #weights_file = WORD_VECTORS_WEIGHTS_FILE
+    #n_ins = WORD_VECTORS_NUM_WORDS
+    #dataset_x = load_unsupervised_data(dataset=data_file)
+    #dataset_labels = None
+    #SKIP_TRACE = True
     
     # load weights file and initialize smh
-    dataset_x, dataset_labels = load_data(dataset=data_file)
     
-    smh = load_model(n_ins=n_ins,  mid_layer_size = 500,
+    smh = load_model(n_ins=n_ins,  mid_layer_sizes = [400,200],
                     inner_code_length = 30, weights_file=weights_file)
     
     # check it is setup right by reconstructing the input
     output_trace(smh, dataset_x)
     
     # run the input data forward through the smh
-    codes = get_output_codes(smh, dataset_x, dataset_labels)
+    codes = get_output_codes(smh, dataset_x)
     
     # run the middle layer 'semantic hashes' or 'codes' through Stochastic Neighbour Embedding library
     desired_dims = 2;
@@ -255,4 +281,4 @@ if __name__ == '__main__':
     coords = calc_tsne(codes, desired_dims, perplexity, pca_dims);
     
     # write results and labels
-    write_csv_coords(coords, dataset_labels.value)
+    write_csv_coords(coords, dataset_labels)
