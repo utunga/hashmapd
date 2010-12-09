@@ -250,22 +250,22 @@ def write_csv_coords(coords, labels):
         csv_writer.writerow(("%d"%label,)) 
 
 if __name__ == '__main__':
-   
-    data_file = TRUNCATED_MNIST_FILE #NB includes labels
-    weights_file = UNSUPERVISED_MNIST_WEIGHTS_FILE
-    n_ins = NUM_PIXELS
-    dataset_x, dataset_labels = load_mnist_data(dataset=data_file)
+    #
+    #data_file = TRUNCATED_MNIST_FILE #NB includes labels
+    #weights_file = UNSUPERVISED_MNIST_WEIGHTS_FILE
+    #n_ins = NUM_PIXELS
+    #dataset_x, dataset_labels = load_mnist_data(dataset=data_file)
     
-    #data_file = VECTORS_FILE_DISPLAY
-    #weights_file = WORD_VECTORS_WEIGHTS_FILE
-    #n_ins = WORD_VECTORS_NUM_WORDS
-    #dataset_x = load_unsupervised_data(dataset=data_file)
-    #dataset_labels = None
-    #SKIP_TRACE = True
+    data_file = VECTORS_FILE_DISPLAY
+    weights_file = WORD_VECTORS_WEIGHTS_FILE
+    n_ins = WORD_VECTORS_NUM_WORDS
+    dataset_x = load_unsupervised_data(dataset=data_file)
+    dataset_labels = None
+    SKIP_TRACE = True
     
     # load weights file and initialize smh
     
-    smh = load_model(n_ins=n_ins,  mid_layer_sizes = [400,200],
+    smh = load_model(n_ins=n_ins,  mid_layer_sizes = [1000,200],
                     inner_code_length = 30, weights_file=weights_file)
     
     # check it is setup right by reconstructing the input
@@ -274,10 +274,11 @@ if __name__ == '__main__':
     # run the input data forward through the smh
     codes = get_output_codes(smh, dataset_x)
     
+    
     # run the middle layer 'semantic hashes' or 'codes' through Stochastic Neighbour Embedding library
     desired_dims = 2;
-    pca_dims = 30; #don't shrink through the PCA step at all
-    perplexity = 10;
+    pca_dims = 10; #don't shrink through the PCA step at all
+    perplexity = 5;
     coords = calc_tsne(codes, desired_dims, perplexity, pca_dims);
     
     # write results and labels
