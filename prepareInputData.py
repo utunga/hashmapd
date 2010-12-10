@@ -16,8 +16,8 @@ from utils import tile_raster_images
 
 MNIST_FILE = 'data/truncated_mnist.pkl.gz'
 NORMALIZED_MNIST_FILE = 'data/truncated_normalized_mnist.pkl.gz'
-#WORD_VECTORS_FILE = "data/user_word_vectors.csv";
-#PICKLED_WORD_VECTORS_FILE = "data/word_vectors.pkl.gz";
+WORD_VECTORS_FILE = "data/user_word_vectors.csv";
+PICKLED_WORD_VECTORS_FILE = "data/word_vectors.pkl.gz";
 #TEST_PICKLED_WORD_VECTORS_FILE = "data/test_word_vectors.pkl.gz"
 WORD_VECTORS_NUM_WORDS = 3000; #number of different words in above file ('word_id' column is allowed to be *up to and including* this number)
 WORD_VECTORS_NUM_USERS = 786; #number of users for which we have data in above file ('user_id' column is allowed to be *up to and including* this number)
@@ -186,10 +186,9 @@ def normalize_data_x(data_x):
     return normalized_data;
     
 if __name__ == '__main__':
-    #normalized_counts = read_user_word_counts();
-    #output_pickled_data(normalized_counts);
-    #test_pickling()
-    load_and_normalize_mnist()
-    test_normalize()
-   # print asarray([[0.1, 0.2, 0, 0, 0, 0.5]])
-   # print normalize_data_x(asarray([[0.1, 0.2, 0, 0, 0, 0.5]]))
+    normalized_counts = read_user_word_counts();
+    output_pickled_data(normalized_counts);
+    test_pickling()
+    #load_and_normalize_mnist()
+    #test_normalize()
+   
