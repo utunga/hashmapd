@@ -277,8 +277,10 @@ if __name__ == '__main__':
     
     # run the middle layer 'semantic hashes' or 'codes' through Stochastic Neighbour Embedding library
     desired_dims = 2;
-    pca_dims = 10; #don't shrink through the PCA step at all
-    perplexity = 5;
+    pca_dims = 30; #don't shrink through the PCA step at all
+    perplexity = 100; #roughly 'the optimal number of neighbours'
+    #max_iter = 200; #200 is a low number, default is 1000
+    
     coords = calc_tsne(codes, desired_dims, perplexity, pca_dims);
     
     # write results and labels

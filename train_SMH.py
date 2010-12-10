@@ -24,7 +24,7 @@ NUM_PIXELS = 784;
 
 WORD_VECTORS_FILE = "data/word_vectors.pkl.gz";
 WORD_VECTORS_NUM_WORDS = 3000; #number of different words in above file ('word_id' column is allowed to be *up to and including* this number)
-WORD_VECTORS_NUM_USERS = 786; #number of users for which we have data in above file ('user_id' column is allowed to be *up to and including* this number)
+WORD_VECTORS_NUM_USERS = 5285; #number of users for which we have data in above file ('user_id' column is allowed to be *up to and including* this number)
 WORD_VECTORS_WEIGHTS_FILE = "data/word_vectors_weights.pkl.gz"
 
 SKIP_TRACE_OUTPUT = False
@@ -47,9 +47,9 @@ def load_data(dataset_file):
     train_set, valid_set, test_set = cPickle.load(f)
     f.close()
 
-    test_set_x  = theano.shared(numpy.asarray(test_set, dtype=theano.config.floatX)) #shared_dataset(test_set)
-    valid_set_x = theano.shared(numpy.asarray(valid_set, dtype=theano.config.floatX)) #shared_dataset(valid_set)
     train_set_x = theano.shared(numpy.asarray(train_set, dtype=theano.config.floatX)) #shared_dataset(train_set)
+    valid_set_x = theano.shared(numpy.asarray(valid_set, dtype=theano.config.floatX)) #shared_dataset(valid_set)
+    test_set_x  = theano.shared(numpy.asarray(test_set, dtype=theano.config.floatX)) #shared_dataset(test_set)
 
     rval = [train_set_x, valid_set_x, test_set_x]
     return rval
@@ -258,30 +258,34 @@ def load_model(n_ins=784,  mid_layer_sizes = [200],
    
 if __name__ == '__main__':
    
-    data_file = UNSUPERVISED_MNIST
-    weights_file = UNSUPERVISED_MNIST_WEIGHTS_FILE
-    n_ins = NUM_PIXELS
+    #data_file = UNSUPERVISED_MNIST
+    #weights_file = UNSUPERVISED_MNIST_WEIGHTS_FILE
+    #n_ins = NUM_PIXELS
  
-    #data_file = WORD_VECTORS_FILE
-    #weights_file = WORD_VECTORS_WEIGHTS_FILE
-    #n_ins = WORD_VECTORS_NUM_WORDS
-    #SKIP_TRACE_OUTPUT = True
-
+    data_file = WORD_VECTORS_FILE
+    weights_file = WORD_VECTORS_WEIGHTS_FILE
+    n_ins = WORD_VECTORS_NUM_WORDS
+    SKIP_TRACE_OUTPUT = True
+    
     smh = train_SMH(dataset=data_file,
                     batch_size=10, 
-                    pretraining_epochs = 1000,
-                    training_epochs = 2000,
-                    mid_layer_sizes = [400,200],
+                    pretraining_epochs = 100,
+                    training_epochs = 1000,
+                    mid_layer_sizes = [1000,200],
                     inner_code_length = 30,
                     n_ins=n_ins)
-
+    
     save_model(smh, weights_file=weights_file)
-   
+    
     #double check that save/load worked OK
     datasets = load_data(data_file)
     output_trace_info(smh, datasets, 'test_weights_b4_restore')
-
-    smh2 = load_model(n_ins=n_ins,  mid_layer_sizes = [400,200],
+    
+    smh2 = load_model(n_ins=n_ins,  mid_layer_sizes = [1000,200],
                     inner_code_length = 30, weights_file=weights_file)
     output_trace_info(smh2, datasets, 'test_weights_restore')
+    
+    
+        
+    
     
