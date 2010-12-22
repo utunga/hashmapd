@@ -128,7 +128,7 @@ class SMH(object):
                                         n_in  = mirror_layer.n_out, 
                                         n_out = mirror_layer.n_in,
                                         init_W = mirror_layer.W.value.T,
-                                        #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1),
+                                        init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1),
                                         activation = T.nnet.sigmoid)
             print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)
             self.sigmoid_layers.append(sigmoid_layer)

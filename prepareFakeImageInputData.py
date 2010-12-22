@@ -71,9 +71,6 @@ def output_pickled_data(raw_pixels):
     cPickle.dump((train_set_x, valid_set_x, test_set_x),f, cPickle.HIGHEST_PROTOCOL)
     f.close()
     
-    
-    
-    
 
 def test_pickling(dataset=PICKLED_WORD_VECTORS_FILE):
 

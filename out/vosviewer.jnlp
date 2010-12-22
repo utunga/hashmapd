@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<jnlp spec="1.0+" codebase="http://www.vosviewer.com" href="http://www.vosviewer.com/vosviewer.php?title=Journals%20t-SNE20map&items=http://ict.ewi.tudelft.nl/~lvandermaaten/journal_tsne_items.txt&coordinates=http://ict.ewi.tudelft.nl/~lvandermaaten/journal_tsne_coordinates.txt&label_size_effect=0.33">
+<jnlp spec="1.0+" codebase="http://www.vosviewer.com" href="http://www.vosviewer.com/vosviewer.php?title=HashmapTest&items=file:///Users/utunga/Documents/hashmapd/out/5000_user_labels.csv&coordinates=file:///Users/utunga/Documents/hashmapd/out/coords.csv&label_size_effect=0.33">
 <information>
-  <title>VOSviewer - Journals t-SNE20map</title>
+  <title>VOSviewer - Hashmapd Test</title>
   <vendor>Nees Jan van Eck and Ludo Waltman</vendor>
   <homepage href="http://www.vosviewer.com"/>
   <description>VOSviewer</description>

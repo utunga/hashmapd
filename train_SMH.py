@@ -5,9 +5,9 @@ import numpy, time, cPickle, gzip, PIL.Image
 
 import theano
 import theano.tensor as T
-from SMH import SMH
+from hashmapd.SMH import SMH
 from theano.tensor.shared_randomstreams import RandomStreams
-from utils import tile_raster_images
+from hashmapd.utils import tile_raster_images
 
 #from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 

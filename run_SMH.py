@@ -112,6 +112,7 @@ def get_output_codes(smh, data_x):
 
 COORDS_OUTPUT_FILE = "out/coords.csv";
 LABELS_OUTPUT_FILE = "out/labels.csv"
+CODES_OUTPUT_FILE = "out/codes.csv"
 TSNE_OUTPUT_FILE = "result.dat"; #turns out it *has* to be this to play nicely with the c++ binary 
 PCA_INTERIM_FILE = "data.dat"; #turns out it *has* to be this to play nicely with the c++ binary #tsne_pca_interim.dat";
 
@@ -249,6 +250,17 @@ def write_csv_coords(coords, labels):
     for label in labels:
         csv_writer.writerow(("%d"%label,)) 
 
+def write_csv_codes(codes):
+    
+    print 'writing output codes to csv'
+    csv_writer = csv.writer(open(CODES_OUTPUT_FILE, 'wb'), delimiter=',')
+    for row_id in xrange(len(codes)):
+        row = []
+        row.append("%i"%row_id)
+        for code in codes[row_id]:
+            row.append("%.10f"%code)# format with 10dp accuracy (but no '-e' format stuff)
+        csv_writer.writerow(row) 
+
 if __name__ == '__main__':
     #
     #data_file = TRUNCATED_MNIST_FILE #NB includes labels
@@ -274,6 +286,11 @@ if __name__ == '__main__':
     # run the input data forward through the smh
     codes = get_output_codes(smh, dataset_x)
     
+    #output codes
+    write_csv_codes(codes)
+    
+    #FIXME remove this
+    sys.exit(0)
     
     # run the middle layer 'semantic hashes' or 'codes' through Stochastic Neighbour Embedding library
     desired_dims = 2;
