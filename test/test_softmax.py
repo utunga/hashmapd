@@ -2,6 +2,8 @@ import numpy
 import theano
 import theano.tensor as T
 
+#just some code while playing around with softmax - see rbm_softmax.py for the real thing
+
 initial_W = numpy.asarray( [[0.1,0.2,0.3], \
                             [0.1,0.2,0.3], \
                             [0.1,0.2,0.3]], \

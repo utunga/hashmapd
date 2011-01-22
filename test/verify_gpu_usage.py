@@ -2,6 +2,9 @@ from theano import function, config, shared, sandbox
 import theano.tensor as T
 import numpy
 import time
+#import logging
+#logging.getLogger("theano.gof.cmodule").setLevel(logging.DEBUG)
+#logging.getLogger("theano.sandbox.cuda.nvcc_compiler").setLevel(logging.DEBUG)
 
 vlen = 10 * 30 * 768  # 10 x #cores x # threads per core
 iters = 1000
