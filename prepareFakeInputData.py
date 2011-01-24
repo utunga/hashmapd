@@ -34,7 +34,7 @@ def read_user_word_counts():
     """
     print "attempting to read " + WORD_VECTORS_FILE
     
-    raw_counts = zeros((WORD_VECTORS_NUM_USERS, WORD_VECTORS_NUM_WORDS), dtype=float64);#store as floa64 so that normalized_counts uses float math
+    raw_counts = zeros((WORD_VECTORS_NUM_USERS, WORD_VECTORS_NUM_WORDS), dtype=theano.config.floatX);#store as floa64 so that normalized_counts uses float math
     
     vectorReader = csv.DictReader(open(WORD_VECTORS_FILE, 'rb'), delimiter=',')
     iter=0;

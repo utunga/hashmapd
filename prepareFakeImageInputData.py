@@ -36,7 +36,7 @@ def read_user_word_pixels():
     """
     print "attempting to read " + WORD_VECTORS_FILE
     
-    raw_pixels = zeros((WORD_VECTORS_NUM_USERS, WORD_VECTORS_NUM_WORDS), dtype=float64);#store as floa64 so that normalized_pixels uses float math
+    raw_pixels = zeros((WORD_VECTORS_NUM_USERS, WORD_VECTORS_NUM_WORDS), dtype=theano.config.floatX);#store as floa64 so that normalized_pixels uses float math
     
     vectorReader = csv.DictReader(open(WORD_VECTORS_FILE, 'rb'), delimiter=',')
     iter=0;

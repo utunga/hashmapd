@@ -9,7 +9,7 @@ import gzip
 import theano
 import time, PIL.Image
 
-from utils import tile_raster_images
+from hashmapd.utils import tile_raster_images
 # Some fileconstants
 
 ##real data

@@ -79,9 +79,8 @@ class SMH(object):
         ### input-layer 0 (n_ins->50) *including RBM
       
         inner_code_length = self.inner_code_length
-        hidden_layer_sizes = self.mid_layer_sizes
-        hidden_layer_sizes.append(inner_code_length)
-        
+        hidden_layer_sizes = self.mid_layer_sizes + [inner_code_length]
+                
         # middle layer/layers
         num_hidden = len(hidden_layer_sizes)
         for i in xrange(num_hidden):
@@ -128,7 +127,7 @@ class SMH(object):
                                         n_in  = mirror_layer.n_out, 
                                         n_out = mirror_layer.n_in,
                                         init_W = mirror_layer.W.value.T,
-                                        init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1),
+                                        #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1),
                                         activation = T.nnet.sigmoid)
             print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)
             self.sigmoid_layers.append(sigmoid_layer)
