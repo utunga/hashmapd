@@ -95,7 +95,7 @@ def train_SMH( finetune_lr = 0.3, pretraining_epochs = 100, \
     patience              = 4*n_train_batches # look as this many examples regardless
     patience_increase     = 2.    # wait this much longer when a new best is 
                                   # found
-    improvement_threshold = 0.9995 # a relative improvement of this much is 
+    improvement_threshold = 0.995 # a relative improvement of this much is 
                                   # considered significant
     validation_frequency  = min(n_train_batches, patience/2)
                                   # go through this many 
@@ -228,17 +228,22 @@ def main(argv = sys.argv):
     
     data_file = cfg.input.train_data
     n_ins = cfg.shape.input_vector_length
+   
     weights_file = cfg.train.weights_file
     skip_trace_images = cfg.train.skip_trace_images
-    
+   
     input_vector_length = cfg.shape.input_vector_length
     mid_layer_sizes = list(cfg.shape.mid_layer_sizes)
     inner_code_length = cfg.shape.inner_code_length
     
+    train_batch_size = cfg.train.train_batch_size
+    pretraining_epochs = cfg.train.pretraining_epochs
+    training_epochs = cfg.train.training_epochs
+    
     smh = train_SMH(dataset=data_file,
-                    batch_size=10, 
-                    pretraining_epochs = 1,
-                    training_epochs = 1,
+                    batch_size=train_batch_size, 
+                    pretraining_epochs = pretraining_epochs,
+                    training_epochs = training_epochs,
                     mid_layer_sizes = mid_layer_sizes,
                     inner_code_length = inner_code_length,
                     n_ins=input_vector_length,

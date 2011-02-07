@@ -3,7 +3,7 @@ import csv
 import numpy as np
 from pylab import plot, draw, figure, imshow, xlabel, ylabel, cm, show, axis, savefig, text
 from scipy import stats, mgrid, c_, reshape, random, rot90
-from csv_unicode_helpers import UnicodeReader
+from hashmapd.csv_unicode_helpers import UnicodeReader
 
 if len(sys.argv) < 2:
     sys.exit("usage: python %s  coordsfile.csv   [labelsfile.csv]" % (sys.argv[0]))

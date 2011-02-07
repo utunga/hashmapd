@@ -37,7 +37,7 @@ def read_user_word_counts(cfg):
     #
     #raw_counts = zeros((max_user_id+1, max_word_id+1), dtype=floatX);#store as floa64 so that normalized_counts uses float math
 
-    raw_counts = zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX);#store as floa64 so that normalized_counts uses float math
+    raw_counts = zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX); #store as float so that normalized_counts uses float math
     vectorReader = csv.DictReader(open(cfg.input.csv_data, 'rb'), delimiter=',')
     iter=0;
     for row in vectorReader:
@@ -56,6 +56,9 @@ def read_user_word_counts(cfg):
             total_user_counts[idx] = 1
             
     normalized_counts = (raw_counts.transpose()/total_user_counts).transpose();
+   
+    #force precision
+    normalized_counts = numpy.array(normalized_counts, dtype=theano.config.floatX)
     
     print 'done reading input';
     return normalized_counts;

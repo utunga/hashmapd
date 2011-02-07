@@ -45,7 +45,7 @@ DATA PREP STEP
 **user/word vectors (csv) -> presentation data (pkl.gz)**  
   
 main python file:  
-**prepareUserVectorsData.py**    
+**prepare.py**    
 - reads data/user_word_vectors.csv   
 - writes data/word_vectors.pkl.gz  
 - writes data/word_vectors_display.pkl.gz  

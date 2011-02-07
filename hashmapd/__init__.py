@@ -2,6 +2,7 @@ from hashmapd.ConfigLoader import *
 from hashmapd.HiddenLayer import *
 from hashmapd.SMH import *
 from hashmapd.utils import *
+from hashmapd.querycouch import *
 #NOTE2ED I'm thoroughly confused by python's package maanagement defaults
 #         is this the 'standard' way to do this or am I missing things?
 #        at the moment I'm working on the idea that into __init__.py its common to put imports
