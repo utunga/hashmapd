@@ -1,0 +1,10 @@
+{
+  "env": {
+    "public" : {
+      "db" : "http://hashmapd:hinton@hashmapd.couchone.com/hashmapdt"
+    },
+    "default" : {
+      "db" : "http://utunga:worldpc@localhost:5984/fake_txt"
+    }
+  }
+}
