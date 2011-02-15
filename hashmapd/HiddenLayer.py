@@ -20,7 +20,7 @@ class HiddenLayer(object):
         :type rng: numpy.random.RandomState
         :param rng: a random number generator used to initialize weights
 
-        :type input: theano.tensor.dmatrix
+        :type input: theano.tensor.matrix/dmatrix
         :param input: a symbolic tensor of shape (n_examples, n_in)
 
         :type n_in: int
@@ -36,8 +36,10 @@ class HiddenLayer(object):
         self.n_in = n_in
         self.n_out = n_out
         self.input = input
+        T.pprint(self.input)
         if not input:
-            self.input = T.matrix('input')
+            raise Exception
+            #self.input = T.matrix('input')
 
         if (init_W == None):
             W_values = numpy.asarray( rng.uniform(
@@ -47,8 +49,10 @@ class HiddenLayer(object):
             if activation == theano.tensor.nnet.sigmoid:
                 W_values *= 4
     
+            print 'using shared weights, randomized'
             self.W = theano.shared(value = W_values, name ='W')
         else:
+            print 'using shared weights, as passed in'
             self.W = theano.shared(value = init_W, name ='W')
         
         if (init_b == None):
@@ -77,10 +81,10 @@ class HiddenLayer(object):
                 self.trace_transpose_weights_file = True
         
     #added MKT
-    def exportModel(self):
+    def export_model(self):
         return self.params;
     
-    def loadModel(self, inpt_params):
+    def load_model(self, inpt_params):
         #FIXME dont quite get why
         #self.params = inpt_params doesn't work
         #.. but it doesn't set the 'value' of shared variable W/b so we have

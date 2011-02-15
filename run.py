@@ -18,12 +18,14 @@ def load_data_without_labels(dataset):
     data_x = cPickle.load(f)
     f.close()
 
+    print "render data has shape:"
     print data_x.shape
 
+    return data_x
     #not sure if making these things 'shared' helps the GPU out but just in case we may as well do that
-    data_x_shared  = theano.shared(numpy.asarray(data_x, dtype=theano.config.floatX))
+    #data_x_shared  = theano.shared(numpy.asarray(data_x, dtype=theano.config.floatX))
     
-    return data_x_shared
+    #return data_x_shared
 
 def load_data_with_labels(dataset):
 
@@ -35,17 +37,22 @@ def load_data_with_labels(dataset):
     f.close()
     
     train_set_x, train_set_labels = train_set
+
+    print "render data has shape:"
+    print train_set_x.shape
+    
+    return [train_set_x, train_set_labels]
     
     #not sure if making these things 'shared' helps the GPU out but just in case we may as well do that
-    train_set_x_shared  = theano.shared(numpy.asarray(train_set_x[0:500], dtype=theano.config.floatX))
-    train_set_labels_shared  = theano.shared(numpy.asarray(train_set_labels[0:500], dtype=theano.config.floatX))
+    #train_set_x_shared  = theano.shared(numpy.asarray(train_set_x[0:500], dtype=theano.config.floatX))
+    #train_set_labels_shared  = theano.shared(numpy.asarray(train_set_labels[0:500], dtype=theano.config.floatX))
     
-    return [train_set_x_shared, train_set_labels_shared]
+    #return [train_set_x_shared, train_set_labels_shared]
 
 
 def save_model(smh, weights_file='data/last_smh_model_params.pkl.gz'):
     save_file=open(weights_file,'wb')
-    cPickle.dump(smh.exportModel(), save_file, cPickle.HIGHEST_PROTOCOL);
+    cPickle.dump(smh.export_model(), save_file, cPickle.HIGHEST_PROTOCOL);
     save_file.close();
 
 def load_model(n_ins=784,  mid_layer_sizes = [200],
@@ -53,10 +60,11 @@ def load_model(n_ins=784,  mid_layer_sizes = [200],
     
     numpy_rng = numpy.random.RandomState(212)
     smh = SMH(numpy_rng = numpy_rng,  mid_layer_sizes = mid_layer_sizes, inner_code_length = inner_code_length, n_ins = n_ins)
+    smh.unroll_layers() #need to unroll before loading params so that we have right number of layers
     save_file=open(weights_file)
     smh_params = cPickle.load(save_file)
     save_file.close()
-    smh.loadModel(smh_params)
+    smh.load_model(smh_params)
     return smh
 
 def output_trace(smh, data_x, prefix="run", skip_trace_images=True):
@@ -80,7 +88,7 @@ def output_trace(smh, data_x, prefix="run", skip_trace_images=True):
 def get_output_codes(smh, data_x):
     
     print 'running input data forward through smh..'
-    output_codes = smh.output_codes_given_x(data_x.value);
+    output_codes = smh.output_codes_given_x(data_x);
     return output_codes; #a 2d array consisting of 'smh' representation of each input row as a row of floats
 
 #################################
@@ -287,7 +295,7 @@ def main(argv = sys.argv):
     write_csv_coords(coords, coords_file)
     
     if (render_file_has_labels):
-        write_csv_labels(labels, labels_file)
+        write_csv_labels(dataset_labels, labels_file)
         
 if __name__ == '__main__':
     sys.exit(main())

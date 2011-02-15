@@ -17,6 +17,11 @@ from scipy import stats, mgrid, c_, reshape, random, rot90
 from hashmapd import *
 from hashmapd.csv_unicode_helpers import UnicodeWriter
 
+
+def clean_filename(filename):
+    """util function"""
+    return re.sub("[^a-zA-Z]", "", filename)
+
 def output_top_word_per_square(cfg):
     query = QueryCouch(cfg)
     
@@ -87,9 +92,6 @@ def render_token(cfg, token='Yoga', output_file='out/word_density.png'):
     print 'saving density map for ', token, 'to ', output_file
     savefig(output_file)    
 
-def clean_filename(filename):
-    return re.sub("[^a-zA-Z]", "", filename)
-
 def render_top_tokens(cfg, skip=0, topN = 100):
     query = QueryCouch(cfg)    
     rows = query.all_tokens(topN)
@@ -105,8 +107,20 @@ def main(argv = sys.argv):
     
     #render_token(cfg, 'Yoga', 'out/yoga_density.png')
     #render_token(cfg, 'Lol', 'out/lol_density.png')
-    render_top_tokens(cfg, 279, 1000)
-    
+    #render_top_tokens(cfg, 279, 1000)
+    #output_all_tokens(cfg)
 
+    query = QueryCouch(cfg)
+    
+    rows = query.non_english_screennames()
+    #print "<html><body>"
+    #for row in rows:
+    #    print "<a href='http://twitter.com/" + row[1] +"' >" , row[0] , "." , row[1] , "</a><br />"
+    #print "</body></html>"
+
+    print "count,screen_name"
+    for row in rows:
+        print row[0],",",row[1]
+    
 if __name__ == '__main__':
     sys.exit(main())    

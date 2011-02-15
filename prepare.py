@@ -13,30 +13,38 @@ import time, PIL.Image
 from hashmapd import *
 
 
+def read_user_word_pixels(cfg):
+    """
+    Reads in data from user_word_vectors.csv
+    """
+    print "attempting to read " + cfg.input.csv_data
+    
+    raw_pixels = zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX); #store as float so that normalized_counts uses float math
+    
+    vectorReader = csv.DictReader(open(cfg.input.csv_data, 'rb'), delimiter=',')
+    iter=0;
+    for row in vectorReader:
+        if iter % 100==0:
+            print 'reading row '+ str(iter) + '..'; #MKT: presumably a nicer way to do this
+        iter += 1;
+        user_id = int(row['user_id']);
+        word_id = int(row['word_id']);
+        pixel = float(row['pixel']);
+        raw_pixels[user_id,word_id] = pixel;
+    
+    #total_user_pixels = raw_pixels.sum(axis=1)
+    #normalized_pixels = (raw_pixels.transpose()/total_user_pixels).transpose();
+    
+    print 'done reading input';
+    print raw_pixels;
+    return raw_pixels;
+    
 def read_user_word_counts(cfg):
     """
     Reads in data from user_word_vectors.csv
     """
     print "attempting to read " + cfg.input.csv_data
     
-    #vectorReader = csv.DictReader(open(cfg.input.csv_data, 'rb'), delimiter=',')
-    #iter=0;
-    #max_word_id = 0
-    #max_user_id = 0
-    #for row in vectorReader:
-    #    if iter % 10000==0:
-    #        print 'reading row '+ str(iter) + '..'; #MKT: presumably a nicer way to do this
-    #    iter += 1;
-    #    user_id = int(row['user_id'])-1;
-    #    word_id = int(row['word_id'])-1;
-    #    max_word_id = max(word_id, max_word_id)
-    #    max_user_id = max(user_id, max_user_id)
-    #    
-    #print ' max user id %i'%max_user_id
-    #print ' max word id %i'%max_word_id
-    #
-    #raw_counts = zeros((max_user_id+1, max_word_id+1), dtype=floatX);#store as floa64 so that normalized_counts uses float math
-
     raw_counts = zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX); #store as float so that normalized_counts uses float math
     vectorReader = csv.DictReader(open(cfg.input.csv_data, 'rb'), delimiter=',')
     iter=0;
@@ -74,10 +82,10 @@ def validate_config(cfg):
         "total of number of examples should be more than cases for train, validate and test"
     assert 0<train_cutoff, \
         "config fail, number_for_training needs to be > 0"
-    assert train_cutoff<validate_cutoff, \
+    assert train_cutoff<=validate_cutoff, \
         "config fail, number_for_validation should be > 0"
-    assert validate_cutoff<test_cutoff, \
-        "config fail, number_for_testing should be > 0"
+    assert validate_cutoff<=test_cutoff, \
+        "config fail, number_for_testing should be >= 0"
     
     
 def output_pickled_data(cfg, normalized_counts):
@@ -90,8 +98,18 @@ def output_pickled_data(cfg, normalized_counts):
     test_cutoff = validate_cutoff+cfg.input.number_for_testing
     
     train_set_x = normalized_counts[0:train_cutoff]
-    valid_set_x = normalized_counts[train_cutoff:validate_cutoff]
-    test_set_x = normalized_counts[validate_cutoff:test_cutoff]
+    
+    if (cfg.input.number_for_validation ==0):
+        print 'WARNING: no examples set aside for validation, copying train set data for validation (as a quick hack only)'
+        valid_set_x = train_set_x
+    else:
+        valid_set_x = normalized_counts[train_cutoff:validate_cutoff]
+
+    if (cfg.input.number_for_testing ==0):
+        print 'WARNING: no examples set aside for testing, copying validation set data for training (as a quick hack only)'
+        test_set_x = valid_set_x
+    else:
+        test_set_x = normalized_counts[validate_cutoff:test_cutoff]
    
     print '...  pickling and zipping train/validate/test data to '+ cfg.input.train_data
     f = gzip.open(cfg.input.train_data,'wb')
@@ -115,11 +133,20 @@ def main(argv = sys.argv):
     cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
     validate_config(cfg)
     
-    #read in csv and normalize
-    normalized_counts = read_user_word_counts(cfg);
+    if (cfg.input.csv_contains_counts):
+        #read in csv and normalize
+        normalized_data = read_user_word_counts(cfg);
+    
+    if (cfg.input.csv_contains_pixels):
+        #read in pixel values between 0 and 1
+        normalized_data = read_user_word_pixels(cfg);
+    
+    
+    if (normalized_data == None):
+        print "You need to set either cfg.input.csv_contains_pixels or cfg.input.csv_contains_counts to True otherwise not sure how to process data"
     
     #output into pickled data files
-    output_pickled_data(cfg,normalized_counts);
+    output_pickled_data(cfg,normalized_data);
 
 if __name__ == '__main__':
     sys.exit(main())    

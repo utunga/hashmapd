@@ -20,7 +20,7 @@ class QueryCouch(object):
         def __init__(self, cfg):
                 couch = Server(cfg.couchdb.server_url)
                 self.db = couch[cfg.couchdb.database]
-            
+        
         def tokens_for_square(self, coord_x, coord_y):
             view = self.db.view('tokens_per_square/tokens_per_square', reduce=False)
                 
@@ -59,7 +59,19 @@ class QueryCouch(object):
                 x_coord=results[0][1][1]
                 y_coord=results[0][1][2]
                 return (x_coord,y_coord,token)
-          
+        
+        def non_english_screennames(self):
+                
+            view = self.db.view('non_english/non_english', reduce=True, group_level=1)
+           
+            results = []
+            for row in view:
+                results.append((row.value,row.key))
+                
+            results.sort()
+            results.reverse()
+            return results
+
         def all_tokens(self, topN=None):
             
             # we have to query entire lot of tokens even if we only want topN as the sort has to be on Python side

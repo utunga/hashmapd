@@ -69,17 +69,18 @@ def train_SMH( finetune_lr = 0.3, pretraining_epochs = 100, \
                 # go through the training set
                 c = []
                 for batch_index in xrange(n_train_batches):
-                    c.append(pretraining_fns[i](index = batch_index, 
-                             lr = pretrain_lr ) )
+                    batch_cost = pretraining_fns[i](index = batch_index, lr = pretrain_lr )
+                    c.append(batch_cost)
                 print 'Pre-training layer %i, epoch %d, cost '%(i,epoch),numpy.mean(c)
 
 
     end_time = time.clock()
     print >> sys.stderr, ('The pretraining code for file '+os.path.split(__file__)[1]+' ran for %.2fm' % ((end_time-start_time)/60.))
 
+
+    smh.unroll_layers();
     output_trace_info(smh, datasets,'b4_finetuning',skip_trace_images)
-
-
+ 
     ########################
     # FINETUNING THE MODEL #
     ########################
@@ -95,7 +96,7 @@ def train_SMH( finetune_lr = 0.3, pretraining_epochs = 100, \
     patience              = 4*n_train_batches # look as this many examples regardless
     patience_increase     = 2.    # wait this much longer when a new best is 
                                   # found
-    improvement_threshold = 0.995 # a relative improvement of this much is 
+    improvement_threshold = 0.9995 # a relative improvement of this much is 
                                   # considered significant
     validation_frequency  = min(n_train_batches, patience/2)
                                   # go through this many 
@@ -171,7 +172,7 @@ def output_trace_info(smh, datasets, prefix, skip_trace_images):
     ########################
     
     #output state of weights
-    for layer in xrange(smh.n_unrolled_layers):
+    for layer in xrange(smh.n_sigmoid_layers):
         sigmoid_layer = smh.sigmoid_layers[layer]
         sigmoid_layer.export_weights_image('trace/%s_weights_%i.png'%(prefix,layer))
     
@@ -207,17 +208,18 @@ def output_trace_info(smh, datasets, prefix, skip_trace_images):
 DEFAULT_WEIGHTS_FILE='data/last_smh_model_params.pkl.gz'
 def save_model(smh, weights_file=DEFAULT_WEIGHTS_FILE):
     save_file=open(weights_file,'wb')
-    cPickle.dump(smh.exportModel(), save_file, cPickle.HIGHEST_PROTOCOL);
+    cPickle.dump(smh.export_model(), save_file, cPickle.HIGHEST_PROTOCOL);
     save_file.close();
 
 def load_model(n_ins=784,  mid_layer_sizes = [200],
                     inner_code_length = 10, weights_file=DEFAULT_WEIGHTS_FILE):
     numpy_rng = numpy.random.RandomState(212)
     smh = SMH(numpy_rng = numpy_rng,  mid_layer_sizes = mid_layer_sizes, inner_code_length = inner_code_length, n_ins = n_ins)
+    smh.unroll_layers(); #need to unroll before loading model otherwise doesn't work
     save_file=open(weights_file)
     smh_params = cPickle.load(save_file)
     save_file.close()
-    smh.loadModel(smh_params)
+    smh.load_model(smh_params)
     return smh
 
 def main(argv = sys.argv):

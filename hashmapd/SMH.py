@@ -57,8 +57,16 @@ class SMH(object):
         self.theano_rng = RandomStreams(numpy_rng.randint(2**30))
      
         # allocate symbolic variables for the data
-        self.x  = T.dmatrix('x')  # the data is presented as rasterized images
-        self.y  = T.dmatrix('y') # the output (after finetuning) should look the same as the input
+        
+        if (theano.config.floatX == "float32"):
+            self.x  = T.matrix('x')  #
+            self.y  = T.matrix('y') # the output (after finetuning) should look the same as the input
+        else:
+            if (theano.config.floatX == "float64"):
+                self.x  = T.dmatrix('x')  # 
+                self.y  = T.dmatrix('y') # the output (after finetuning) should look the same as the input
+            else:        
+                raise Exception #not sure whats up here..
 
         # The SMH is an MLP, for which all weights of intermediate layers are shared with a
         # different RBM.  We will first construct the SMH as a deep multilayer perceptron, and
@@ -67,14 +75,9 @@ class SMH(object):
         # to chainging the weights of the MLP as well) During finetuning we will finish
         # training the SMH by doing stochastic gradient descent on the MLP.
 
-        self.init_test_layers()
+        self.init_layers()
     
-        # compute the cost for second phase of training
-        # can't get nll to work so just use squared diff to get something working! (MKT)
-        self.finetune_cost = self.squared_diff_cost() #negative_log_likelihood()
-
-    def init_test_layers(self):
-        ###    MKT: To keep things simple for now, we hard code the layers structure right in this constructor
+    def init_layers(self):
         
         ### input-layer 0 (n_ins->50) *including RBM
       
@@ -116,29 +119,97 @@ class SMH(object):
         
         self.hash_code_layer = self.sigmoid_layers[-1]
     
-        ###  layer 2 (hashcode) - layer 3 (n_code_length->mid_layer_size)
-        for i in xrange(num_hidden):
-            rev = num_hidden-i-1 #yeah there must be a nicer way to do this but I dont know python and on train right now sorry
+        self.n_rbm_layers = len(self.rbm_layers)
+        self.n_sigmoid_layers = len(self.sigmoid_layers)
+    
+    def unroll_layers(self):
+    
+        inner_code_length = self.inner_code_length
+        hidden_layer_sizes = self.mid_layer_sizes + [inner_code_length]
+        num_hidden = len(hidden_layer_sizes)
         
-            mirror_layer = self.sigmoid_layers[rev];
-            layer_input = self.sigmoid_layers[-1].output
+        for i in xrange(num_hidden):
+            reverse_indx = num_hidden-i-1 
+            mirror_layer = self.sigmoid_layers[reverse_indx];
+            layer_input = self.sigmoid_layers[-1].output 
             sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
-                                        input = self.sigmoid_layers[-1].output, 
+                                        input = layer_input, 
                                         n_in  = mirror_layer.n_out, 
                                         n_out = mirror_layer.n_in,
                                         init_W = mirror_layer.W.value.T,
-                                        #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1),
+                                        #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1), #cant for the life of me think of a good default for this 
                                         activation = T.nnet.sigmoid)
             print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)
             self.sigmoid_layers.append(sigmoid_layer)
-            #self.params.extend(sigmoid_layer.params)
+            self.params.extend(sigmoid_layer.params) ##NB NN training gradients are computed with respect to self.params
 
-        self.y = self.sigmoid_layers[-1].output;
+        self.y = self.sigmoid_layers[-1].output; 
+        self.n_sigmoid_layers = len(self.sigmoid_layers)
         
-        self.n_rbm_layers = num_hidden
-        self.n_unrolled_layers = len(self.sigmoid_layers)
-        
-        
+        # compute the cost for second phase of training
+        # can't get nll to work so just use squared diff to get something working! (MKT)
+        self.finetune_cost = self.squared_diff_cost() #negative_log_likelihood()    
+    
+    #static versions of above - useful for debugging
+    #def static_init_layers(self):
+    #    ###    MKT: desperately dbugging, back to static wiring up again
+    #    
+    #    ### input-layer 0 (n_ins->2)
+    #    layer_input = self.x
+    #    sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
+    #                                input = layer_input, 
+    #                                n_in  = self.n_ins, 
+    #                                n_out = self.inner_code_length,
+    #                                activation = T.nnet.sigmoid)
+    #    print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)            
+    #    self.sigmoid_layers.append(sigmoid_layer)
+    #    self.params.extend(sigmoid_layer.params)
+    #    self.hash_code_layer = self.sigmoid_layers[-1]
+    #
+    #    # Construct an RBM that shared weights with this layer
+    #    rbm_layer = RBM(numpy_rng = self.numpy_rng,
+    #                    theano_rng = self.theano_rng, 
+    #                    input = layer_input, 
+    #                    n_visible = sigmoid_layer.n_in, 
+    #                    n_hidden  = sigmoid_layer.n_out,
+    #                    W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
+    #                    hbias = sigmoid_layer.b)
+    #    print 'created rbm (n_visible:%d n_hidden:%d)'%(rbm_layer.n_visible,rbm_layer.n_hidden)                  
+    #    self.rbm_layers.append(rbm_layer)
+    #    self.n_rbm_layers = len(self.rbm_layers)
+    #    self.n_sigmoid_layers = len(self.sigmoid_layers)
+    #   
+    #    self.unroll_layers = self.static_unroll_layers
+    #    
+    #def static_unroll_layers(self):
+    #    print 'unrolling layers'
+    #    mirror_layer = self.sigmoid_layers[-1];
+    #    layer_input = self.sigmoid_layers[-1].output
+    #    
+    #    #print 'mirror_layer : (',mirror_layer.n_in,',', mirror_layer.n_out,')'
+    #    #print 'mirror_layer.b.shape :', mirror_layer.b.value.shape - prints, eg fake_img mirror_layer.b.shape : (4,)
+    #    sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
+    #                                input = layer_input, 
+    #                                n_in  = mirror_layer.n_out, 
+    #                                n_out = mirror_layer.n_in,
+    #                                init_W = mirror_layer.W.value.T,
+    #                                #init_b = mirror_layer.b.value,
+    #                                activation = T.nnet.sigmoid)
+    #    
+    #    #print 'sigmoid_layer.b.shape :', sigmoid_layer.b.value.shape prints, eg fake_img sigmoid_layer.b.shape : (784,)
+    #
+    #    print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)
+    #    self.sigmoid_layers.append(sigmoid_layer)
+    #    self.params.extend(sigmoid_layer.params) #NB NN training gradients are computed with respect to self.params
+    #
+    #    self.y = self.sigmoid_layers[-1].output;
+    #    
+    #    self.n_sigmoid_layers = len(self.sigmoid_layers)
+    #    
+    #    # compute the cost for second phase of training
+    #    # can't get nll to work so just use squared diff to get something working! (MKT)
+    #    self.finetune_cost = self.squared_diff_cost() #negative_log_likelihood()
+    #    
     def output_given_x(self, data_x):
         
         output_fn = theano.function( [],
@@ -151,7 +222,7 @@ class SMH(object):
         
         output_fn = theano.function( [],
                outputs =  self.hash_code_layer.output, 
-               givens  = {self.sigmoid_layers[0].input : data_x})
+               givens  = {self.x : data_x})
         
         return output_fn();
 
@@ -274,15 +345,15 @@ class SMH(object):
         return train_fn, valid_score, test_score
 
     #added MKT
-    def exportModel(self):
+    def export_model(self):
         joint_params = []
         for layer in self.sigmoid_layers:
-            joint_params.append(layer.exportModel())
+            joint_params.append(layer.export_model())
         return joint_params;
     
-    def loadModel(self, inpt_params):
+    def load_model(self, inpt_params):
         for i in xrange(len(inpt_params)):
             #print 'loading layer %i'%i
-            self.sigmoid_layers[i].loadModel(inpt_params[i])
+            self.sigmoid_layers[i].load_model(inpt_params[i])
 
 
