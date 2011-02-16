@@ -22,7 +22,7 @@ class QueryCouch(object):
                 self.db = couch[cfg.couchdb.database]
         
         def tokens_for_square(self, coord_x, coord_y):
-            view = self.db.view('tokens_per_square/tokens_per_square', reduce=False)
+            view = self.db.view('couchapp/token_per_square', reduce=False)
                 
             results = []
             rows = view[[coord_x,coord_y]:[coord_x,coord_y+1]]
@@ -41,7 +41,7 @@ class QueryCouch(object):
             return (x_coord,y_coord)
             
         def squares_for_token(self, token):
-            view = self.db.view('square_per_token/square_per_token', reduce=False)
+            view = self.db.view('couchapp/square_per_token', reduce=False)
                 
             results = []
             rows = view[[token]:[token+' ']]
@@ -76,7 +76,7 @@ class QueryCouch(object):
             
             # we have to query entire lot of tokens even if we only want topN as the sort has to be on Python side
             # (because CouchDB doesn't support sort by value)
-            view = self.db.view('square_per_token/square_per_token', reduce=True, group_level=1)
+            view = self.db.view('couchapp/square_per_token', reduce=True, group_level=1)
            
             results = []
             for row in view:
@@ -91,7 +91,7 @@ class QueryCouch(object):
                     
         def locations_for_token(self, token):
                 
-            view = self.db.view('location_by_token/location_by_token', reduce=False)
+            view = self.db.view('couchapp/location_by_token', reduce=False)
                 
             results = []
             rows = view[[token]:[token+' ']]

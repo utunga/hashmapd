@@ -49,10 +49,10 @@ class HiddenLayer(object):
             if activation == theano.tensor.nnet.sigmoid:
                 W_values *= 4
     
-            print 'using shared weights, randomized'
+            #print 'using shared weights, randomized' #init case
             self.W = theano.shared(value = W_values, name ='W')
         else:
-            print 'using shared weights, as passed in'
+            #print 'using shared weights, as passed in' # unroll case
             self.W = theano.shared(value = init_W, name ='W')
         
         if (init_b == None):

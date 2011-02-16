@@ -107,12 +107,12 @@ def main(argv = sys.argv):
     
     #render_token(cfg, 'Yoga', 'out/yoga_density.png')
     #render_token(cfg, 'Lol', 'out/lol_density.png')
-    #render_top_tokens(cfg, 279, 1000)
+    render_top_tokens(cfg, 0, 1000)
     #output_all_tokens(cfg)
 
-    query = QueryCouch(cfg)
+    #query = QueryCouch(cfg)
     
-    rows = query.non_english_screennames()
+    #rows = query.non_english_screennames()
     #print "<html><body>"
     #for row in rows:
     #    print "<a href='http://twitter.com/" + row[1] +"' >" , row[0] , "." , row[1] , "</a><br />"

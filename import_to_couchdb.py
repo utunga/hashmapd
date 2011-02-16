@@ -59,13 +59,14 @@ def read_word_data_into_couch(cfg):
                   overall_count = row[7], #row["overall_count"],
                   user_wordcount = row[8], #row["user_word_count"],
                   )
-              doc.calc_word_prob()
               #print doc.word_prob
-              buff.append(doc)
-              if i % 2000==0:  
-                  db.update(buff)
-                  buff = []
-                  print 'copied up to row '+ str(i) + '..';
+              if (doc.overall_count<30000):
+                  doc.calc_word_prob()
+                  buff.append(doc)
+                  if i % 2000==0:  
+                      db.update(buff)
+                      buff = []
+                      print 'copied up to row '+ str(i) + '..';
         
       db.update(buff)
       print 'copied up to row '+ str(i) + '..';

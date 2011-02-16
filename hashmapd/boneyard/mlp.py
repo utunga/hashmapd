@@ -103,10 +103,10 @@ class MLP(object):
         # made out of
         self.params = self.hiddenLayer.params + self.logRegressionLayer.params
 
-    def exportModel():
+    def export_model():
         return self.params;
     
-    def loadModel(inpt_params):
+    def load_model(inpt_params):
         self.params=inpt_params;
 
 
