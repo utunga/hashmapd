@@ -190,7 +190,11 @@ class RBM(object):
         if persistent is None:
             chain_start = ph_sample
         else:
-            chain_start = persistent
+            # should pcd start from a zero filled matrix (like the deep learning tutorials)?
+            if T.mean(persistent) == 0 :
+                chain_start = ph_sample
+            else :
+                chain_start = persistent
 
         # perform actual negative phase
         # in order to implement CD-k/PCD-k we need to scan over the 
@@ -243,15 +247,7 @@ class RBM(object):
 
         # flip bit x_i of matrix xi and preserve all other bits x_{\i}
         # Equivalent to xi[:,bit_i_idx] = 1-xi[:, bit_i_idx]
-        # NB: slice(start,stop,step) is the python object used for
-        # slicing, e.g. to index matrix x as follows: x[start:stop:step]
-        # In our case, idx_list is a tuple. The first element of the tuple
-        # describes what slice we want from the first dimension. 
-        # ``slice(None,None,None)`` means that we want all values, equivalent
-        # to numpy notation ``:``. The second element of the tuple is the 
-        # value bit_i_idx, meaning that we are looking for [:,bit_i_idx]. 
-        xi_flip = T.setsubtensor(xi, 1-xi[:, bit_i_idx], 
-                                 idx_list=(slice(None,None,None),bit_i_idx))
+        xi_flip = T.set_subtensor(xi[:,bit_i_idx], 1-xi[:, bit_i_idx])
 
         # calculate free energy with bit flipped
         fe_xi_flip = self.free_energy(xi_flip)

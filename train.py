@@ -31,7 +31,7 @@ def load_data(dataset_file):
     return rval
     
 def train_SMH( finetune_lr = 0.3, pretraining_epochs = 100, \
-              pretrain_lr = 0.01, k = 1, training_epochs = 100, \
+              pretrain_lr = 0.1, k = 1, training_epochs = 100, \
               dataset='data/truncated_mnist.pkl.gz', batch_size = 10, mid_layer_sizes=[200], inner_code_length=10, n_ins=784,
               skip_trace_images=False):
 
@@ -216,7 +216,7 @@ def load_model(n_ins=784,  mid_layer_sizes = [200],
     numpy_rng = numpy.random.RandomState(212)
     smh = SMH(numpy_rng = numpy_rng,  mid_layer_sizes = mid_layer_sizes, inner_code_length = inner_code_length, n_ins = n_ins)
     smh.unroll_layers(); #need to unroll before loading model otherwise doesn't work
-    save_file=open(weights_file)
+    save_file=open(weights_file, 'rb')
     smh_params = cPickle.load(save_file)
     save_file.close()
     smh.load_model(smh_params)

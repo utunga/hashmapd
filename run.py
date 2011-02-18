@@ -61,7 +61,7 @@ def load_model(n_ins=784,  mid_layer_sizes = [200],
     numpy_rng = numpy.random.RandomState(212)
     smh = SMH(numpy_rng = numpy_rng,  mid_layer_sizes = mid_layer_sizes, inner_code_length = inner_code_length, n_ins = n_ins)
     smh.unroll_layers() #need to unroll before loading params so that we have right number of layers
-    save_file=open(weights_file)
+    save_file=open(weights_file,'rb')
     smh_params = cPickle.load(save_file)
     save_file.close()
     smh.load_model(smh_params)
@@ -127,7 +127,7 @@ def do_tSNE():
     if platform in ['mac', 'darwin'] :
         cmd='lib/tSNE_maci'
     elif platform == 'win32' :
-        cmd='lib/tSNE_win'
+        cmd='lib\\tSNE_win'
     elif platform == 'linux2' :
         cmd='lib/tSNE_linux'
     else :
@@ -192,8 +192,12 @@ def clear_interim_data():
     Clears files data.dat and result.dat
     """
     print 'Clearing interim data files'
-    os.system('rm %s'%PCA_INTERIM_FILE)
-    os.system('rm %s'%TSNE_OUTPUT_FILE)
+    if sys.platform == 'win32' :
+        os.system('del %s'%PCA_INTERIM_FILE)
+        os.system('del %s'%TSNE_OUTPUT_FILE)
+    else :
+        os.system('rm %s'%PCA_INTERIM_FILE)
+        os.system('rm %s'%TSNE_OUTPUT_FILE)
 
 def write_data(data_matrix,NO_DIMS,PERPLEX,LANDMARKS):
     print 'Writing data.dat'

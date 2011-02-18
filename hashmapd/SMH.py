@@ -252,12 +252,16 @@ class SMH(object):
 
         pretrain_fns = []
         for rbm in self.rbm_layers:
-
-            # get the cost and the updates list
-            # using CD-k here (persisent=None) for training each RBM.
-            # TODO: change cost function to reconstruction error
-            cost,updates = rbm.get_cost_updates(learning_rate, persistent=None, k =k)
-
+            
+            # initialize storage for the persistent chain (state = hidden layer of chain)
+            persistent_chain = theano.shared(numpy.zeros((batch_size,rbm.n_hidden),dtype=theano.config.floatX))
+            
+            # get the cost and the gradient corresponding to one step of PCD-k
+            cost, updates = rbm.get_cost_updates(lr=learning_rate, persistent=persistent_chain, k=3)
+            
+            # (use CD instead)
+            #cost,updates = rbm.get_cost_updates(learning_rate, persistent=None, k=k)
+            
             # compile the theano function    
             fn = theano.function(inputs = [index, 
                               theano.Param(learning_rate, default = 0.1)],
