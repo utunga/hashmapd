@@ -163,7 +163,7 @@ class RBM(object):
         pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h1_sample)
         return [pre_sigmoid_h1, h1_mean, h1_sample, pre_sigmoid_v1, v1_mean, v1_sample]
  
-    def get_cost_updates(self, lr = 0.1, persistent=None, k =1):
+    def get_cost_updates(self, lr = 0.1, persistent=None, k=1):
         """ 
         This functions implements one step of CD-k or PCD-k
 
@@ -190,11 +190,15 @@ class RBM(object):
         if persistent is None:
             chain_start = ph_sample
         else:
-            # should pcd start from a zero filled matrix (like the deep learning tutorials)?
-            if T.mean(persistent) == 0 :
-                chain_start = ph_sample
-            else :
-                chain_start = persistent
+            # instead of starting pcd with a zero filled matrix (as per the deep
+            # learning tutorials), we could start from the first minibatch data
+            # values. it seems to not make much difference though (and if we did
+            # want to start from the data values, it should be implemented better
+            # than this)
+            # if T.sum(T.abs(persistent)) == 0 :
+            #     chain_start = ph_sample
+            # else :
+            chain_start = persistent
 
         # perform actual negative phase
         # in order to implement CD-k/PCD-k we need to scan over the 

@@ -257,7 +257,7 @@ class SMH(object):
             persistent_chain = theano.shared(numpy.zeros((batch_size,rbm.n_hidden),dtype=theano.config.floatX))
             
             # get the cost and the gradient corresponding to one step of PCD-k
-            cost, updates = rbm.get_cost_updates(lr=learning_rate, persistent=persistent_chain, k=3)
+            cost, updates = rbm.get_cost_updates(lr=learning_rate, persistent=persistent_chain, k=5)
             
             # (use CD instead)
             #cost,updates = rbm.get_cost_updates(learning_rate, persistent=None, k=k)

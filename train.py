@@ -31,7 +31,7 @@ def load_data(dataset_file):
     return rval
     
 def train_SMH( finetune_lr = 0.3, pretraining_epochs = 100, \
-              pretrain_lr = 0.1, k = 1, training_epochs = 100, \
+              pretrain_lr = 0.01, k = 1, training_epochs = 100, \
               dataset='data/truncated_mnist.pkl.gz', batch_size = 10, mid_layer_sizes=[200], inner_code_length=10, n_ins=784,
               skip_trace_images=False):
 
