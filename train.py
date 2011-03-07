@@ -2,29 +2,28 @@
 Script for training deep belief net on on mnist images
 """
 import os, sys, getopt
+import logging
 import numpy, time, cPickle, gzip, PIL.Image
 import theano
 from hashmapd import SMH, tile_raster_images, LoadConfig, DefaultConfig
 
 def load_data(dataset_file):
-    ''' Loads the dataset
+    """
+    Reads the data from file, and returns the
+    data as a tuple of theano arrays (the training
+    data, the validation data, and the test data).
+    The function expects both the supervised
+    and the unsupervised data to be supplied in pairs
 
-    :type dataset: string
-    :param dataset: the path to the dataset (here MNIST)
-    '''
+    dataset_file: path to the MNIST data (string)
 
-    #############
-    # LOAD DATA #
-    #############
-    print '... loading data from ' + dataset_file
+    """
+    logging.info('Loading data from ' % (dataset_file,))
 
-    # Load the dataset  - expecting both supervised and unsupervised 
-    # data to be supplied (in pairs)
-    data_file = gzip.open(dataset_file,'rb')
+    data_file = gzip.open(dataset_file, 'rb')
     train_set, valid_set, test_set = cPickle.load(data_file)
     data_file.close()
 
-    # Shared datasets
     train_set_x = theano.shared(numpy.asarray(train_set, 
         dtype=theano.config.floatX))
     valid_set_x = theano.shared(numpy.asarray(valid_set, 
@@ -32,10 +31,11 @@ def load_data(dataset_file):
     test_set_x  = theano.shared(numpy.asarray(test_set, 
         dtype=theano.config.floatX)) 
 
-    rval = [train_set_x, valid_set_x, test_set_x]
-    return rval
+    return train_set_x, valid_set_x, test_set_x
     
-def train_smh(finetune_lr = 0.3, 
+class train_smh(object):
+    def __init__(self,
+        finetune_lr = 0.3, 
         pretraining_epochs = 1, 
         pretrain_lr = 0.01, 
         k = 1, 
@@ -46,28 +46,26 @@ def train_smh(finetune_lr = 0.3,
         inner_code_length = 10, 
         n_ins = 784,
         skip_trace_images = False):
-    datasets = load_data(dataset)
-    train_set_x = datasets[0]
-    valid_set_x = datasets[1]
-    test_set_x   = datasets[2]
+
+    train_set_x, valid_set_x, test_set_x = load_data(dataset)
 
     # compute number of minibatches for training, validation and testing
     n_train_batches = train_set_x.value.shape[0] / batch_size
 
     # numpy random generator
     numpy_rng = numpy.random.RandomState(123)
-    print '... building the model'
+    
     # construct the Deep Belief Network
+    logging.info('Building the model')
     smh = SMH(numpy_rng = numpy_rng, 
         inner_code_length = inner_code_length, 
         mid_layer_sizes = mid_layer_sizes,
         n_ins = n_ins)      
-    
 
     #########################
     # PRETRAINING THE MODEL #
     #########################
-    print '... getting the pretraining functions'
+    logging.info('Getting the pretraining functions')
     pretraining_fns = smh.pretraining_functions(
             train_set_x = train_set_x, 
             batch_size = batch_size,
