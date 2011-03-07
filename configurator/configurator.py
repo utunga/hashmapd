@@ -1,18 +1,31 @@
+"""
+An extension to the config module to allow 
+hiearchical loading of config files. A base
+configuration file and a local configuration
+file may be specified.
+"""
 import os
 from config import Config, ConfigMerger
 
 BASE_DIR = os.path.join('.', 'config')
 
 class ConfigLoader(object):
-    """Loads configs in a clever way"""
+    """Loads config files hierachically. If the
+    base config file has an attribute 'sections_to_merge'
+    then the listed sections will be merged, otherwise
+    they will be overwritten."""
 
     def __init__(self, base_dir = BASE_DIR):
         self.base_dir = base_dir
         self.sections_to_merge = ()
 
-    def merge_by_overwrite(self, cfg1, cfg2, key):
-        if key in self.sections_to_merge: 
-            print key
+    def merge_by_overwrite(self, cfg1, cfg2, section_key):
+        """
+        Resolver function, that returns 'merge' if
+        the corrsponding sections are to be merged
+        """
+        if section_key in self.sections_to_merge: 
+            print section_key
             return "merge"
         else:
             return "overwrite"
@@ -36,14 +49,19 @@ class ConfigLoader(object):
             self.sections_to_merge = base_cfg.sections_to_merge 
             merger = ConfigMerger(self.merge_by_overwrite)
             merger.merge(base_cfg, this_cfg)
-            return base_cfg, this_cfg
         return base_cfg
 
     def load_default(self):
         return Config(open(os.path.join(self.base_dir, 'base.cfg')))
 
 def default_config():
+    """
+    Load the base configuration file
+    """
     return ConfigLoader().load_default()
     
 def load_config(config_name):
+    """
+    Load the configuration files
+    """
     return ConfigLoader().load(config_name)
