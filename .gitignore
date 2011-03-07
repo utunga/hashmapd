@@ -1,4 +1,5 @@
 *.pyc
 *.swp
 trace/*
+configurator/build/*
 
