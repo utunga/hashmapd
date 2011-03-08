@@ -16,9 +16,9 @@ from utils import tile_raster_images
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 
-class RBM(object):
+class RBM_Poisson(object):
     """Restricted Boltzmann Machine (RBM)  """
-    def __init__(self, input=None, n_visible=784, n_hidden=500, \
+    def __init__(self, input=None, input_sums=None, n_visible=784, n_hidden=500, \
         W = None, hbias = None, vbias = None, numpy_rng = None, 
         theano_rng = None):
         """ 
@@ -82,8 +82,12 @@ class RBM(object):
 
         # initialize input layer for standalone RBM or layer0 of DBN
         self.input = input 
+        self.input_sums = input_sums
         if not input:
             self.input = T.matrix('input')
+            self.input_sums = T.imatrix('input_sums')
+
+        self.binomial_approx_val = theano.shared(value = float(100000), name = 'binomial_approx_val');
 
         self.W          = W
         self.hbias      = hbias
@@ -96,10 +100,30 @@ class RBM(object):
 
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''
+        # TODO: vbias term should be:
+        
+        # (-(bias_v*sample_v)) + (sample_v*log(S/N_i)) + log(v!)
+        #   where S = sum_k(bias_k+sum_j(value_j*weight_kj)), ie: sum of all input activations
+        #         N = no_words_in_doc
+        
+        # computing this would require computing the log of a factorial, which theano can't do by default (no factorial operation)
+        #   a seemingly reasonable implementation is available from (no gpu implementation however):
+        #   http://deeplearning.net/software/pylearn/api/pylearn.algorithms.sandbox.cost-pysrc.html
+        
+        # given the the free energy is only used to update the system parameters
+        # based on its gradient (?), and since the extra factorial term has a
+        # gradient of zero with respect to any of the parameters, there may not 
+        # be any need to concern ourselves with explicity computing the actual
+        # free energy
+        
+        # can the other term be ignored too?
+        
         wx_b = T.dot(v_sample, self.W) + self.hbias
         vbias_term = T.dot(v_sample, self.vbias)
         hidden_term = T.sum(T.log(1+T.exp(wx_b)),axis = 1)
-        return -hidden_term - vbias_term
+        # extra_vbias_term1 = T.dot(v_sample,T.log(T.sum(T.dot(T.exp(self.vbias),PRODUCT_j(1+T.exp(self.W))),axis = ?))-T.log(v_sums));
+        # extra_vbias_term2 = T.log(FACTORIAL(v_sample));
+        return -hidden_term-vbias_term 
 
     def propup(self, vis):
         ''' This function propagates the visible units activation upwards to
@@ -129,13 +153,18 @@ class RBM(object):
         '''This function propagates the hidden units activation downwards to
         the visible units
         
-        Note that we return also the pre_sigmoid_activation of the layer. As
+        Note that we return also the pre_mean_activation of the layer. As
         it will turn out later, due to how Theano deals with optimizations,
         this symbolic variable will be needed to write down a more
         stable computational graph (see details in the reconstruction cost function)
         '''
-        pre_sigmoid_activation = T.dot(hid, self.W.T) + self.vbias
-        return [pre_sigmoid_activation,T.nnet.sigmoid(pre_sigmoid_activation)]
+        
+        # compute the poisson mean 
+        
+        pre_mean_activation = T.dot(hid, self.W.T) + self.vbias
+        post_mean_activation = T.nnet.softmax(pre_mean_activation)*self.input_sums
+        
+        return [pre_mean_activation,post_mean_activation]
 
     def sample_v_given_h(self, h0_sample):
         ''' This function infers state of visible units given hidden units '''
@@ -145,18 +174,24 @@ class RBM(object):
         # Note that theano_rng.binomial returns a symbolic sample of dtype 
         # int64 by default. If we want to keep our computations in floatX 
         # for the GPU we need to specify to return the dtype floatX
-        v1_sample = self.theano_rng.binomial(size = v1_mean.shape,n = 1,p = v1_mean,
+        
+        # take a poisson sample of v1_mean (we approximate this using a binomial distribution)
+        #   (note the value of n is fairly irrelevant, but larger tends to do slightly better,
+        #   so we set it to be one million for now)
+        
+        v1_sample = self.theano_rng.binomial(size = v1_mean.shape, n = self.binomial_approx_val, p = v1_mean/self.binomial_approx_val,
                 dtype = theano.config.floatX)
+        
         return [pre_sigmoid_v1, v1_mean, v1_sample]
 
-    def gibbs_hvh(self, h0_sample):
+    def gibbs_hvh(self, h0_sample, v0_sums):
         ''' This function implements one step of Gibbs sampling, 
             starting from the hidden state'''
         pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h0_sample)
         pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v1_sample)
         return [pre_sigmoid_v1, v1_mean, v1_sample, pre_sigmoid_h1, h1_mean, h1_sample]
  
-    def gibbs_vhv(self, v0_sample):
+    def gibbs_vhv(self, v0_sample, v0_sums):
         ''' This function implements one step of Gibbs sampling, 
             starting from the visible state'''
         pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v0_sample)
@@ -191,7 +226,7 @@ class RBM(object):
             chain_start = ph_sample
         else:
             chain_start = persistent
-
+        
         # perform actual negative phase
         # in order to implement CD-k/PCD-k we need to scan over the 
         # function that implements one gibbs step k times. 
@@ -204,6 +239,7 @@ class RBM(object):
                     # chain_start is the initial state corresponding to the 
                     # 6th output
                     outputs_info = [None, None, None,None,None,chain_start],
+                    non_sequences = self.input_sums,
                     n_steps = k)
 
         # determine gradients on RBM parameters
@@ -216,8 +252,14 @@ class RBM(object):
 
         # constructs the update dictionary
         for gparam, param in zip(gparams, self.params):
-            # make sure that the learning rate is of the right dtype 
-            updates[param] = param - gparam * T.cast(lr, dtype = theano.config.floatX)
+            # make sure that the learning rate is of the right dtype
+            
+            # we also now use an ~30x smaller learning rate for the weights/vis bias
+            # as the visible values are much larger than they would be if sigmoid units   
+            if param.name == 'W' or param.name == 'vbias':
+                updates[param] = param - gparam * T.cast(lr/T.mean(self.input_sums), dtype = theano.config.floatX)
+            else:
+                updates[param] = param - gparam * T.cast(lr, dtype = theano.config.floatX)
         if persistent:
             # Note that this works only if persistent is a shared variable
             updates[persistent] = nh_samples[-1]
@@ -283,8 +325,8 @@ class RBM(object):
         """
 
         cross_entropy = T.mean(
-                T.sum(self.input*T.log(T.nnet.sigmoid(pre_sigmoid_nv)) + 
-                (1 - self.input)*T.log(1-T.nnet.sigmoid(pre_sigmoid_nv)), axis = 1))
+                T.sum(self.input*T.log(T.nnet.softmax(pre_sigmoid_nv)) + 
+                (1 - self.input)*T.log(1-(T.nnet.softmax(pre_sigmoid_nv))), axis = 1))
 
         return cross_entropy
 

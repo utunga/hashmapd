@@ -11,6 +11,7 @@ from theano.tensor.shared_randomstreams import RandomStreams
 
 from HiddenLayer import HiddenLayer
 from rbm import RBM
+from rbm_poisson_vis import RBM_Poisson
 from logistic_sgd import LogisticRegression
 
 
@@ -27,7 +28,7 @@ class SMH(object):
     
     """
 
-    def __init__(self, numpy_rng, theano_rng = None, n_ins = 784, mid_layer_sizes=[200], inner_code_length = 10):
+    def __init__(self, numpy_rng, theano_rng = None, first_layer_type = 'bernoulli', n_ins = 784, mid_layer_sizes=[200], inner_code_length = 10):
         """This class is made to support a variable number of layers. 
 
         :type numpy_rng: numpy.random.RandomState
@@ -58,12 +59,13 @@ class SMH(object):
      
         # allocate symbolic variables for the data
         
+        self.x_sums = T.imatrix('x_sums')
         if (theano.config.floatX == "float32"):
             self.x  = T.matrix('x')  #
             self.y  = T.matrix('y') # the output (after finetuning) should look the same as the input
         else:
             if (theano.config.floatX == "float64"):
-                self.x  = T.dmatrix('x')  # 
+                self.x  = T.dmatrix('x')  #
                 self.y  = T.dmatrix('y') # the output (after finetuning) should look the same as the input
             else:        
                 raise Exception #not sure whats up here..
@@ -75,9 +77,9 @@ class SMH(object):
         # to chainging the weights of the MLP as well) During finetuning we will finish
         # training the SMH by doing stochastic gradient descent on the MLP.
 
-        self.init_layers()
+        self.init_layers(first_layer_type)
     
-    def init_layers(self):
+    def init_layers(self, first_layer_type):
         
         ### input-layer 0 (n_ins->50) *including RBM
       
@@ -88,32 +90,50 @@ class SMH(object):
         num_hidden = len(hidden_layer_sizes)
         for i in xrange(num_hidden):
             # the input is x if we are on the first layer, otherwise input to this layer is output of layer below
-            if i == 0 :
+            n_out = hidden_layer_sizes[i]
+            
+            if i == 0 and first_layer_type == 'poisson':
                 n_in = self.n_ins
                 layer_input = self.x
+                sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
+                                        input = layer_input, 
+                                        poisson_layer = True,
+                                        n_in  = n_in, 
+                                        n_out = n_out,
+                                        activation = T.nnet.sigmoid)
             else:
                 n_in = hidden_layer_sizes[i-1]
                 layer_input = self.sigmoid_layers[-1].output
-
-            n_out = hidden_layer_sizes[i]
-
-            sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
+                sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
                                         input = layer_input, 
                                         n_in  = n_in, 
                                         n_out = n_out,
                                         activation = T.nnet.sigmoid)
+
+            
             print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)            
             self.sigmoid_layers.append(sigmoid_layer)
             self.params.extend(sigmoid_layer.params)
-        
-            # Construct an RBM that shared weights with this layer
-            rbm_layer = RBM(numpy_rng = self.numpy_rng,
-                            theano_rng = self.theano_rng, 
-                            input = layer_input, 
-                            n_visible = n_in, 
-                            n_hidden  = n_out,
-                            W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
-                            hbias = sigmoid_layer.b)
+            
+            # Construct an RBM that shared weights with this layer (first layer is Poisson)
+            if i == 0 and first_layer_type == 'poisson':
+                rbm_layer = RBM_Poisson(numpy_rng = self.numpy_rng,
+                                theano_rng = self.theano_rng, 
+                                input = layer_input, 
+                                input_sums = self.x_sums,
+                                n_visible = n_in, 
+                                n_hidden  = n_out,
+                                W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
+                                hbias = sigmoid_layer.b)
+            else :
+                rbm_layer = RBM(numpy_rng = self.numpy_rng,
+                                theano_rng = self.theano_rng, 
+                                input = layer_input, 
+                                n_visible = n_in, 
+                                n_hidden  = n_out,
+                                W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
+                                hbias = sigmoid_layer.b)
+            
             #print 'created rbm (n_in:%d n_out:%d)'%(rbm_layer.n_in,rbm_layer.n_out)                  
             self.rbm_layers.append(rbm_layer)
         
@@ -122,23 +142,42 @@ class SMH(object):
         self.n_rbm_layers = len(self.rbm_layers)
         self.n_sigmoid_layers = len(self.sigmoid_layers)
     
-    def unroll_layers(self):
+    def unroll_layers(self, cost, noise_std_dev):
     
         inner_code_length = self.inner_code_length
         hidden_layer_sizes = self.mid_layer_sizes + [inner_code_length]
         num_hidden = len(hidden_layer_sizes)
         
+        # create a new random stream for generating gaussian noise
+        srng = RandomStreams(numpy.random.RandomState(234).randint(2**30))
+        
         for i in xrange(num_hidden):
             reverse_indx = num_hidden-i-1 
             mirror_layer = self.sigmoid_layers[reverse_indx];
-            layer_input = self.sigmoid_layers[-1].output 
-            sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
+            
+            # add gaussian noise to codes (the middle layer) for fine tuning
+            if i == 0 and noise_std_dev > 0:
+                layer_input = self.sigmoid_layers[-1].output+srng.normal(self.sigmoid_layers[-1].output.shape,avg=0.0,std=noise_std_dev);
+            else:
+                layer_input = self.sigmoid_layers[-1].output
+            
+            # create the relevant layer (last layer is a softmax layer which we calculate the cross entropy error of during fine tuning)
+            if i == num_hidden and cost == 'cross_entropy':
+                self.logRegressionLayer = HiddenLayer(
+                                  input = layer_input,
+                                  n_in  = mirror_layer.n_out,
+                                  n_out = mirror_layer.n_in,
+                                  init_W = mirror_layer.W.value.T,
+                                  activation = T.nnet.softmax)
+            else:
+                sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
                                         input = layer_input, 
                                         n_in  = mirror_layer.n_out, 
                                         n_out = mirror_layer.n_in,
                                         init_W = mirror_layer.W.value.T,
                                         #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1), #cant for the life of me think of a good default for this 
                                         activation = T.nnet.sigmoid)
+            
             print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)
             self.sigmoid_layers.append(sigmoid_layer)
             self.params.extend(sigmoid_layer.params) ##NB NN training gradients are computed with respect to self.params
@@ -146,9 +185,12 @@ class SMH(object):
         self.y = self.sigmoid_layers[-1].output; 
         self.n_sigmoid_layers = len(self.sigmoid_layers)
         
-        # compute the cost for second phase of training
+        # compute the cost (cross entropy) for second phase of training
         # can't get nll to work so just use squared diff to get something working! (MKT)
-        self.finetune_cost = self.squared_diff_cost() #negative_log_likelihood()    
+        if cost == 'cross_entropy':
+            self.finetune_cost = self.cross_entropy_error()
+        else:
+            self.finetune_cost = self.squared_diff_cost()
     
     #static versions of above - useful for debugging
     #def static_init_layers(self):
@@ -226,7 +268,7 @@ class SMH(object):
         
         return output_fn();
 
-    def pretraining_functions(self, train_set_x, batch_size,k):
+    def pretraining_functions(self, train_set_x, train_set_x_sums, batch_size, method, k):
         ''' Generates a list of functions, for performing one step of gradient descent at a
         given layer. The function will require as input the minibatch index, and to train an
         RBM you just need to iterate, calling the corresponding function on all minibatch
@@ -253,26 +295,37 @@ class SMH(object):
         pretrain_fns = []
         for rbm in self.rbm_layers:
             
-            # initialize storage for the persistent chain (state = hidden layer of chain)
-            persistent_chain = theano.shared(numpy.zeros((batch_size,rbm.n_hidden),dtype=theano.config.floatX))
-            
-            # get the cost and the gradient corresponding to one step of PCD-k
-            cost, updates = rbm.get_cost_updates(lr=learning_rate, persistent=persistent_chain, k=5)
-            
-            # (use CD instead)
-            #cost,updates = rbm.get_cost_updates(learning_rate, persistent=None, k=k)
+            if method == 'pcd':
+                # initialize storage for the persistent chain (state = hidden layer of chain)
+                persistent_chain = theano.shared(numpy.zeros((batch_size,rbm.n_hidden),dtype=theano.config.floatX))
+                # get the cost and the gradient corresponding to one step of PCD-k
+                cost,updates = rbm.get_cost_updates(lr=learning_rate, persistent=persistent_chain, k=k)
+            else:
+                # default = use CD instead
+                cost,updates = rbm.get_cost_updates(learning_rate, persistent=None, k=k)
             
             # compile the theano function    
             fn = theano.function(inputs = [index, 
                               theano.Param(learning_rate, default = 0.1)],
                     outputs = cost, 
                     updates = updates,
-                    givens  = {self.x :train_set_x[batch_begin:batch_end]})
+                    givens  = {self.x:train_set_x[batch_begin:batch_end],
+                               self.x_sums:train_set_x_sums[batch_begin:batch_end]}
+                    #,mode=theano.compile.debugmode.DebugMode(stability_patience=5)
+                    )
             # append `fn` to the list of functions
             pretrain_fns.append(fn)
 
         return pretrain_fns
 
+    # compute the cross entropy error between the data and its reconstruction
+    def cross_entropy_error(self):
+        recon = self.sigmoid_layers[-1].output
+        x = self.x
+        cross_entropy = (x*T.log(recon) + (1-x)*T.log(1-recon)).sum(axis = 1)
+        return -cross_entropy.mean()
+
+    # compute the mean squared error between the data and its reconstruction
     def squared_diff_cost(self):
         recon = self.sigmoid_layers[-1].output
         x = self.x

@@ -36,7 +36,7 @@ def load_data_with_labels(dataset):
     train_set, valid_set, test_set = cPickle.load(f)
     f.close()
     
-    train_set_x, train_set_labels = train_set
+    train_set_x, train_set_labels, train_set_sums = train_set
 
     print "render data has shape:"
     print train_set_x.shape
@@ -55,12 +55,12 @@ def save_model(smh, weights_file='data/last_smh_model_params.pkl.gz'):
     cPickle.dump(smh.export_model(), save_file, cPickle.HIGHEST_PROTOCOL);
     save_file.close();
 
-def load_model(n_ins=784,  mid_layer_sizes = [200],
+def load_model(cost_method, n_ins=784,  mid_layer_sizes = [200],
                inner_code_length = 10, weights_file='data/last_smh_model_params.pkl.gz'):
     
     numpy_rng = numpy.random.RandomState(212)
     smh = SMH(numpy_rng = numpy_rng,  mid_layer_sizes = mid_layer_sizes, inner_code_length = inner_code_length, n_ins = n_ins)
-    smh.unroll_layers() #need to unroll before loading params so that we have right number of layers
+    smh.unroll_layers(cost_method,0) #need to unroll before loading params so that we have right number of layers
     save_file=open(weights_file,'rb')
     smh_params = cPickle.load(save_file)
     save_file.close()
@@ -274,13 +274,15 @@ def main(argv = sys.argv):
     pca_dims = cfg.tsne.pca_dims; #set this to inner_code_length to effectively skip the PCA step
     perplexity = cfg.tsne.perplexity; #roughly 'the optimal number of neighbours'
     
+    cost_method = cfg.train.cost;
+    
     # load weights file and initialize smh
     if (render_file_has_labels):
         dataset_x, dataset_labels = load_data_with_labels(dataset=render_file)
     else:
         dataset_x = load_data_without_labels(dataset=render_file)
     
-    smh = load_model(n_ins=input_vector_length,  mid_layer_sizes = mid_layer_sizes,
+    smh = load_model(cost_method, n_ins=input_vector_length,  mid_layer_sizes = mid_layer_sizes,
                     inner_code_length = inner_code_length, weights_file=weights_file)
     
     # check it is setup right by reconstructing the input
