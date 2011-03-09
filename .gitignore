@@ -1,3 +1,7 @@
 *.pyc
 *.swp
-
+trace/*
+out/*
+density_maps/*
+**/.DS_Store
+other/*
