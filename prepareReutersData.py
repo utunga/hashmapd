@@ -1,7 +1,6 @@
 from hashmapd import *
 
 import numpy
-import shelve
 import sys
 import os
 import csv
@@ -10,44 +9,44 @@ import cPickle
 import gzip
 import theano
 
-# Some fileconstants
-
 #reuters data
 CODES_DESCRIPTION_FILE = "data/reuters/rcv1-v2.topics.qrels.gz";
 DOC_CODES_FILE = "data/reuters/rcv1-v2.topics.qrels.gz";
-WORD_VECTORS_FILE = "data/reuters/lyrl2004_tokens_train.dat.gz";
-
-PICKLED_WORDS_FILE = "data/reuters_words.pkl.gz";
-PICKLED_DOC_CODES_FILE = "data/reuters_doc_codes.pkl.gz";
-PICKLED_WORD_VECTORS_FILE = "data/reuters_data.pkl.gz";
-PICKLED_WORD_VECTORS_RENDER_FILE = "data/reuters_data_render.pkl.gz";
-
 DOC_FILES = ["data/reuters/lyrl2004_tokens_test_pt0.dat.gz","data/reuters/lyrl2004_tokens_test_pt1.dat.gz","data/reuters/lyrl2004_tokens_test_pt2.dat.gz","data/reuters/lyrl2004_tokens_test_pt3.dat.gz","data/reuters/lyrl2004_tokens_train.dat.gz"];
 
-CATEGORIES = ["GDIS","E212","C151","M143","G154"]
+PICKLED_WORDS_FILE = "data/reuters/reuters_words.pkl.gz";                  # word_id -> word, total_frequency
+PICKLED_TOPICS_FILE = "data/reuters/reuters_topics.pkl.gz";                # topic_id -> reuters_topic_id
+PICKLED_DOCS_FILE = "data/reuters/reuters_docs.pkl.gz";                    # doc_id -> reuters_doc_id
+PICKLED_WORD_VECTORS_TRAINING_FILE_PREFIX = "data/reuters/reuters_training_data";   # doc_id,word_id -> doc_word_frequency
+PICKLED_WORD_VECTORS_VALIDATION_FILE_PREFIX = "data/reuters/reuters_validation_data"; # doc_id,word_id -> doc_word_frequency
+PICKLED_WORD_VECTORS_TESTING_FILE_PREFIX = "data/reuters/reuters_testing_data";    # doc_id,word_id -> doc_word_frequency
+PICKLED_WORD_VECTORS_FILE_POSTFIX = ".pkl.gz";
 
-# plan of attack:
+# data info (no train/validate/test batches, no files, no batches per file, mean word count)
+PICKLED_WORD_VECTORS_FILE_INFO = "data/reuters_data_info.pkl.gz"
 
-# PREPARE STEP
+
+
+# TOPIC DESCRIPTIONS
 # 1) unzip codes description file
-# 2) parse codes description file and build dictionary of "topic_id -> topic_desc" (ignore hierarchy information for now)
-# 3) save a pkl file "topic_id -> topic_desc"
+# 2) parse codes description file and build dictionary of "reuters_topic_id -> topic_desc" (ignore hierarchy information for now)
+# 3) save a pkl file "reuters_topic_id -> topic_desc"
 
-# 4) unzip doc codes file
-# 5) parse doc codes file and build dictionary of "doc_code -> topic_code"
-# 6) save a pkl file "doc_id -> topic_code"
+# TOTAL WORD COUNTS
+# 1) unzip all document files
+# 2) parse the documents files and build a dictionary of "word_id -> word,word_count" for the top 2,000 (most used) words
+# 3) save a pkl file "word_id -> word,word_count"
 
-# 7) unzip doc word vectors file
-# 8) parse doc word vectors file and build the following dictionaries:
-#      "word_id -> word, total_frequency"
-#      "doc_id,word_id -> , doc_word_frequency"
-# 9) generate a list of the top x words with the highest frequency 
-# 10) remove from the word info and doc word count dictionary any words not in this list
-# 11) save a pkl file "word_id -> word, total_frequency"
-# 12) save a pkl file "doc_id,word_id -> doc_word_frequency"
+# DOC_IDS, TOPIC_IDS, AND DOC_WORD_COUNTS
+# 1) unzip all document files
+# 2) parse the documents files and build a dictionary of:
+# 3)   "doc_id -> topic_id"
+# 4)   "doc_id -> reuters_doc_id"
+# 5)   "doc_id,word_id" -> doc_word_count"
+# 6) while parsing, save a pkl file per batch containing "doc_id,word_id" -> doc_word_count"
+# 7) save a pkl file "doc_id -> topic_id"
+# 8) save a pkl file "doc_id -> reuters_doc_id"
 
-# TRAIN STEP
-# 1) run through the hashmapd autoencoder training process
 
 def read_topic_descriptions():
     f = gzip.open(CODES_DESCRIPTION_FILE,'r');
@@ -148,31 +147,44 @@ def output_pickled_words(word_ids):
     print '...  pickling and zipping data to '+ PICKLED_WORDS_FILE;
     
     f = gzip.open(PICKLED_WORDS_FILE,'wb');
-    cPickle.dump(word_ids,f, cPickle.HIGHEST_PROTOCOL);
+    cPickle.dump(word_ids, f, cPickle.HIGHEST_PROTOCOL);
     f.close();
 
 
-def read_doc_word_counts(words_to_ids, batch_size, num_words = 2000, num_train = 1000, num_valid = 0, num_test = 0):
-    
-    # TODO finish batch splitting (load into memory in pieces and save as shelve persistent dictionary)
-    
-    # determine total amount of data to load in
-    num_total = num_train + num_valid + num_test;
-    # determine how many batches of data should be loaded in at once (assume 200MB of memory for now)
-    mini_batches_per_mega_batch = (200*1024*1024)/(num_words*batch_size*4);
-    words_per_mega_batch = mini_batches_per_mega_batch*batch_size;
-    # determine no. mega-batches
-    no_mega_batches = math.ceil(num_total/float(words_per_mega_batch));
-    
-    # dictionary of mega-batch -> data/labels/sums
-    #persistentData = shelve.open(PICKLED_WORD_VECTORS_FILE);
-    
+def read_doc_word_counts(counts, words_to_ids, batch_size = 10, num_words = 2000, num_total = 1000, num_training = 800, num_validation = 150, num_testing = 50):
     """
     Reads in data from reuters/lyrl2004_tokens_train.dat.gz
     """
-    print "attempting to read " + WORD_VECTORS_FILE;
     
-    # STEP 1) parse the document word vectors
+    # truncate num_total to fit batch_sizes if necessary
+    no_training_batches = int(math.floor(num_training/batch_size));
+    no_validation_batches = int(math.floor(num_validation/batch_size));
+    no_testing_batches = int(math.floor(num_testing/batch_size));
+    no_mini_batches = no_training_batches+no_validation_batches+no_testing_batches;
+    num_total = no_mini_batches*batch_size;
+    # determine how many mini batches of data should be stored in each file (assume 500MB of memory for now)
+    batches_per_file = int(math.floor((512*1024*1024)/((num_words+1+103)*batch_size*4)));
+    # determine how many words are going to be stored in each file
+    words_per_file = batches_per_file*batch_size;
+    # determine the number of files needed
+    no_training_files = int(math.ceil(num_training/float(words_per_file)));
+    no_validation_files = int(math.ceil(num_validation/float(words_per_file)));
+    no_testing_files = int(math.ceil(num_testing/float(words_per_file)));
+    no_files = no_training_files+no_validation_files+no_testing_files;
+    
+    print ''
+    print 'storing data in '+str(no_files)+' segment(s)'
+    print 'each segment has (up to) '+str(batches_per_file)+' batches containing '+str(batch_size)+' docs each ('+str(words_per_file*num_words*4/float(1024*1024))+'MB)'
+    print ''
+    
+    #===========================================================================
+    # STEP 1) parse and save the document word vectors
+    # 
+    #  Note this involves reading through the files of data in sequence and once
+    #  batches_per_file batches of data have been read, the data is saved.
+    # 
+    #  Separate files are created for the training, validation, and testing sets.
+    #===========================================================================
     
     # file format:
     # .I <doc_id>
@@ -180,22 +192,26 @@ def read_doc_word_counts(words_to_ids, batch_size, num_words = 2000, num_train =
     # <space/line separated list of stemmed words>
     # [blankline]
     
-    f = gzip.open(WORD_VECTORS_FILE,'r');
+    mean_doc_size = 0; # used to determine the mean training document size
     
+    doc_ids_to_reuters_ids = {}; # save this information for reference
     reuters_ids_to_doc_ids = {}; # for quick access to doc ids
-    raw_counts = numpy.zeros((num_total,num_words), dtype=theano.config.floatX);
+    raw_counts = numpy.zeros((min(words_per_file,num_training),num_words), dtype=theano.config.floatX);
     
-    mega_batch_iter = 0;
-    doc_iter = 0;
+    set_iter = 0;   # 0 = training, 1 = validation, 2 = testing
+    file_iter = 0;  # the number of files saved so far in this data set
+    file_count = 0; # number of documents parsed that will be saved in this file
+    doc_iter = 0;   # total number of documents parsed
     for file in DOC_FILES :
         if doc_iter >= num_total:
             break;
-            
+        
         print 'attempting to read file '+ file;
         f = gzip.open(file,'r');
         
         while True :
-            if doc_iter >= num_total:
+            # check if all the data has been read
+            if doc_iter >= num_total :
                 break;
             
             line = f.readline();
@@ -205,40 +221,16 @@ def read_doc_word_counts(words_to_ids, batch_size, num_words = 2000, num_train =
             # debug
             if doc_iter%10000 == 0 :
                 print 'reading doc '+ str(doc_iter) + '..';
-            doc_iter += 1;
-            # check if its time to save the data
-#            if doc_iter > 0 and doc_iter%(words_per_mega_batch-1)==0:
-#                print 'saving batch '+ str(mega_batch_iter) + '..';
-#                
-#                sums = raw_counts.sum(axis=1)
-#                
-#                train_set_x = raw_counts[0:num_train,:]
-#                valid_set_x = raw_counts[num_train:num_train+num_valid,:]
-#                test_set_x = raw_counts[num_train+num_valid:num_train+num_valid+num_test,:]
-#                
-#                train_set_y = labels[0:num_train]
-#                valid_set_y = labels[num_train:num_train+num_valid]
-#                test_set_y = labels[num_train+num_valid:num_train+num_valid+num_test]
-#                
-#                train_sums = sums[0:num_train]
-#                valid_sums = sums[num_train:num_train+num_valid]
-#                test_sums = sums[num_train+num_valid:num_train+num_valid+num_test]
-#                
-#                persistentData[mega_batch_iter] = (train_set_x,train_set_y,train_sums),(valid_set_x,valid_set_y,valid_sums),(test_set_x,test_set_y,test_sums);
-#                
-#                mega_batch_iter += 1;
             # extract reuters_id
             reuters_id = line[3:-1];
-            if reuters_id in reuters_ids_to_doc_ids :
-                doc_id = reuters_ids_to_doc_ids[reuters_id];
-            else :
-                doc_id = doc_iter;
-                reuters_ids_to_doc_ids[reuters_id] = doc_id;
-                doc_iter += 1;
+            doc_id = doc_iter;
+            reuters_ids_to_doc_ids[reuters_id] = doc_id;
+            doc_ids_to_reuters_ids[doc_id] = reuters_id;
             # ignore .W line
             f.readline();
             
             # extract words
+            no_words = 0;
             while True :
                 line = f.readline();
                 # when an empty line is encountered, break
@@ -250,23 +242,65 @@ def read_doc_word_counts(words_to_ids, batch_size, num_words = 2000, num_train =
                     if word[-1:] == "\n" :
                         word = word[:-1];
                     if word in words_to_ids :
+                        no_words += 1;
                         # update doc word count
-                        raw_counts[doc_id,words_to_ids[word]] += 1;
+                        raw_counts[file_count,words_to_ids[word]] += 1;
+            
+            if set_iter == 0 : mean_doc_size += no_words;
+            
+            doc_iter += 1;
+            file_count += 1;
+            
+            # check if its time to save the data
+            if (file_count > 0 and file_count%(words_per_file)==0) or \
+                    (doc_iter == num_training) or \
+                    (doc_iter == num_validation+num_training) or \
+                    (doc_iter == num_total) :
+                
+                print 'saving set '+str(set_iter)+', batch '+ str(file_iter) + '..';
+                
+                # save batch information
+                if set_iter == 0 :   file_prefix = PICKLED_WORD_VECTORS_TRAINING_FILE_PREFIX;
+                elif set_iter == 1 : file_prefix = PICKLED_WORD_VECTORS_VALIDATION_FILE_PREFIX;
+                elif set_iter == 2 : file_prefix = PICKLED_WORD_VECTORS_TESTING_FILE_PREFIX;
+                g = gzip.open(file_prefix+str(file_iter)+PICKLED_WORD_VECTORS_FILE_POSTFIX,'wb');
+                cPickle.dump((raw_counts,raw_counts.sum(axis=1)), g, cPickle.HIGHEST_PROTOCOL);
+                g.close();
+                
+                # update counts
+                file_iter += 1;
+                file_count = 0;
+                
+                if doc_iter == num_training or doc_iter == num_validation+num_training or doc_iter == doc_iter == num_validation+num_training:
+                    set_iter += 1;
+                    file_iter = 0;
+                
+                if set_iter == 0 :   raw_counts = numpy.zeros((min(words_per_file,num_training-doc_iter),num_words), dtype=theano.config.floatX);
+                elif set_iter == 1 : raw_counts = numpy.zeros((min(words_per_file,num_validation+num_training-doc_iter),num_words), dtype=theano.config.floatX);
+                elif set_iter == 2 : raw_counts = numpy.zeros((min(words_per_file,num_total-doc_iter),num_words), dtype=theano.config.floatX);
     
-    f.close();
-    # persistentData.close();
+        f.close();
     
-    # STEP 2) Parse the document topics (while we have the assigned doc_id info available)
+    mean_doc_size = mean_doc_size/doc_iter;
+    
+    print 'mean doc size: ' + str(mean_doc_size) + ' words';
+    print ''
+    
+    #===========================================================================
+    # STEP 2) parse the document topics
+    #===========================================================================
     
     print 'attempting to read document topics from ' + DOC_CODES_FILE;
+    
+    num_topics = 103
     
     # file format:
     #   <topic_id> <doc_id> 1
     
     f = gzip.open(DOC_CODES_FILE,'r');
-    labels = numpy.zeros(num_total, dtype=theano.config.floatX);
     doc_topics = {};
-    topic_ids = {};
+    reuters_data_to_topic_ids = {};
+    topic_ids_to_reuters_data = {};
     
     iter = 0;
     topic_iter = 0;
@@ -280,88 +314,102 @@ def read_doc_word_counts(words_to_ids, batch_size, num_words = 2000, num_train =
             break;
         # extract doc info
         data = line.split(' ',1);
+        reuters_data = data[0];
         reuters_id = data[1][:-3];
         if reuters_id in reuters_ids_to_doc_ids :
             doc_id = reuters_ids_to_doc_ids[reuters_id];
-            # for now, record the first label for the file only (later we will have to get pre-determined topic ids)
-            if data[0] not in topic_ids :
-                topic_ids[data[0]] = topic_iter;
+            # assign an id to this topic if necessary
+            if reuters_data not in reuters_data_to_topic_ids :
+                topic_id = topic_iter;
+                reuters_data_to_topic_ids[reuters_data] = topic_id;
+                topic_ids_to_reuters_data[topic_id] = reuters_data;
                 topic_iter += 1;
-            
+            # store the topic id with this doc id
             if doc_id in doc_topics :
-                doc_topics[doc_id].append(data[0]);
+                doc_topics[doc_id].append(reuters_data_to_topic_ids[reuters_data]);
             else :
                 doc_topics[doc_id] = [];
-                doc_topics[doc_id].append(data[0]);
-                labels[doc_id] = topic_ids[data[0]];
+                doc_topics[doc_id].append(reuters_data_to_topic_ids[reuters_data]);
     
-    sums = raw_counts.sum(axis=1);
+    print 'num topics discovered: '+str(topic_iter)
+    print ''
     
-    train_set_x = raw_counts[0:num_train,:]
-    valid_set_x = raw_counts[num_train:num_train+num_valid,:]
-    test_set_x = raw_counts[num_train+num_valid:num_train+num_valid+num_test,:]
+    #===========================================================================
+    # STEP 3) save the labels along with the word counts
+    #===========================================================================
     
-    train_set_y = labels[0:num_train]
-    valid_set_y = labels[num_train:num_train+num_valid]
-    test_set_y = labels[num_train+num_valid:num_train+num_valid+num_test]
+    print 'saving document labels'
     
-    train_sums = sums[0:num_train]
-    valid_sums = sums[num_train:num_train+num_valid]
-    test_sums = sums[num_train+num_valid:num_train+num_valid+num_test]
-    
-    # quick debug (total word counts in these documents)
-    word_sums = raw_counts.sum(axis=0);
-    word_ids = {}
-    for word,id in words_to_ids.iteritems() :
-        word_ids[id] = word;
-    list = []
-    for i in xrange(len(word_sums)):
-        list.append((word_sums[i],word_ids[i]));
-    list.sort();
-    for i in xrange(len(list)):
-        list.append(list[i]);
+    doc_iter = 0;
+    file_iter = 0;
+    file_prefix = PICKLED_WORD_VECTORS_TRAINING_FILE_PREFIX;
+    for i in xrange(no_files) :
+        # load the relevant word count file
+        if i == no_training_files :
+            file_prefix = PICKLED_WORD_VECTORS_VALIDATION_FILE_PREFIX;
+            file_iter = 0;
+        elif i == no_training_files+no_validation_files :
+            file_prefix = PICKLED_WORD_VECTORS_TESTING_FILE_PREFIX;
+            file_iter = 0;
+        f = gzip.open(file_prefix+str(file_iter)+PICKLED_WORD_VECTORS_FILE_POSTFIX,'rb');
+        raw_counts,sums = cPickle.load(f);
+        f.close();
+        # for each category type a document belongs to, set the corresponding label value to one
+        labels = numpy.zeros((raw_counts.shape[0],num_topics), dtype=theano.config.floatX);
+        for j in xrange(raw_counts.shape[0]) :
+            for k in doc_topics[doc_iter] :
+                labels[j,k] = 1.0;
+            doc_iter += 1;
+        # save labels with data
+        f = gzip.open(file_prefix+str(file_iter)+PICKLED_WORD_VECTORS_FILE_POSTFIX,'wb');
+        if (counts): cPickle.dump((raw_counts,sums,labels), f, cPickle.HIGHEST_PROTOCOL);
+        else:        cPickle.dump((raw_counts/numpy.array([x_sums]*(x.shape[1])).transpose(),sums,labels), f, cPickle.HIGHEST_PROTOCOL);
+        f.close();
         
-    print list
+        file_iter += 1;
     
+    print ''
+    print 'saving data info'
+    
+    f = gzip.open(PICKLED_WORD_VECTORS_FILE_INFO,'wb');
+    cPickle.dump((PICKLED_WORD_VECTORS_TRAINING_FILE_PREFIX,no_training_files,no_training_batches,
+                    PICKLED_WORD_VECTORS_VALIDATION_FILE_PREFIX,no_validation_files,no_validation_batches,
+                    PICKLED_WORD_VECTORS_TESTING_FILE_PREFIX,no_testing_files,no_testing_batches,
+                        batches_per_file,mean_doc_size), f, cPickle.HIGHEST_PROTOCOL);
+    f.close();
+    
+    print ''
     print 'done reading input';
     
-    print train_set_x;
-    print valid_set_x;
-    print test_set_x;
+    return no_training_files,no_validation_files,no_testing_files,topic_ids_to_reuters_data,doc_ids_to_reuters_ids;
     
-    print train_set_y;
-    print valid_set_y;
-    print test_set_y;
-    
-    return doc_topics,train_set_x,valid_set_x,test_set_x,train_set_y,valid_set_y,test_set_y,train_sums,valid_sums,test_sums;
 
-
-def output_pickled_doc_topics(doc_topics):
+def output_pickled_topics(topic_ids):
     
-    print "outputting doc topics";
-    print '...  pickling and zipping data to '+ PICKLED_DOC_CODES_FILE;
+    print "outputting topics";
+    print '...  pickling and zipping data to '+ PICKLED_TOPICS_FILE;
     
-    f = gzip.open(PICKLED_DOC_CODES_FILE,'wb');
-    cPickle.dump(doc_topics,f, cPickle.HIGHEST_PROTOCOL);
+    f = gzip.open(PICKLED_TOPICS_FILE,'wb');
+    cPickle.dump(topic_ids, f, cPickle.HIGHEST_PROTOCOL);
     f.close();
 
 
-def output_pickled_data(train_set,valid_set,test_set,train_set_y,valid_set_y,test_set_y,train_sums,valid_sums,test_sums):
+def output_pickled_docs(doc_ids):
     
-    print "outputting full data set";
-    print '...  pickling and zipping data to '+ PICKLED_WORD_VECTORS_FILE;
+    print "outputting docs";
+    print '...  pickling and zipping data to '+ PICKLED_DOCS_FILE;
     
-    f = gzip.open(PICKLED_WORD_VECTORS_FILE,'wb');
-    cPickle.dump(((train_set,train_set_y,train_sums),(valid_set,valid_set_y,valid_sums),(test_set,test_set_y,test_sums)),f, cPickle.HIGHEST_PROTOCOL);
+    f = gzip.open(PICKLED_DOCS_FILE,'wb');
+    cPickle.dump(doc_ids, f, cPickle.HIGHEST_PROTOCOL);
     f.close();
 
 
-def test_pickling(dataset=PICKLED_WORD_VECTORS_FILE):
-
-    f = gzip.open(dataset,'rb');
-    train_set,valid_set,test_set = cPickle.load(f);
+def test_pickling(filename):
+    
+    f = gzip.open(filename,'rb');
+    x,x_sums,y = cPickle.load(f);
     f.close();
-
+    
     def shared_dataset(data_x):
         """ Function that loads the dataset into shared variables
         
@@ -374,29 +422,15 @@ def test_pickling(dataset=PICKLED_WORD_VECTORS_FILE):
         shared_x = theano.shared(numpy.asarray(data_x, dtype=theano.config.floatX));
         return shared_x;
     
-    train_set_x = shared_dataset(train_set[0]);
-    valid_set_x = shared_dataset(valid_set[0]);
-    test_set_x = shared_dataset(test_set[0]);
+    train_set_x = shared_dataset(x);
+    train_sums = shared_dataset(x_sums);
+    train_set_y = shared_dataset(y);
     
-    train_set_y = shared_dataset(train_set[1]);
-    valid_set_y = shared_dataset(valid_set[1]);
-    test_set_y = shared_dataset(test_set[1]);
-    
-    train_sums = shared_dataset(train_set[2]);
-    valid_sums = shared_dataset(valid_set[2]);
-    test_sums = shared_dataset(test_set[2]);
-    
-    print(train_set_x.value.shape);
-    print(valid_set_x.value.shape);
-    print(test_set_x.value.shape);
-    
-    print(train_set_y.value.shape);
-    print(valid_set_y.value.shape);
-    print(test_set_y.value.shape);
-    
-    print(train_sums.value.shape);
-    print(valid_sums.value.shape);
-    print(test_sums.value.shape);
+    print ''
+    print 'batch '+str(filename)+' restored data sizes:'
+    print('x: '+str(train_set_x.value.shape));
+    print('x_sums: '+str(train_sums.value.shape));
+    print('y: '+str(train_set_y.value.shape));
 
 
 def main(argv = sys.argv):
@@ -411,6 +445,7 @@ def main(argv = sys.argv):
         output_pickled_words(word_ids)
         
     elif (args[0]=='prepare_data'):
+        
         # load word ids
         f = gzip.open(PICKLED_WORDS_FILE,'rb');
         ids_to_words = cPickle.load(f);
@@ -422,14 +457,18 @@ def main(argv = sys.argv):
             words_to_ids[word] = id;
         
         # read in the data
-        doc_topics,train_set_x,valid_set_x,test_set_x,train_set_y,valid_set_y,test_set_y,train_sums,valid_sums,test_sums = \
-            read_doc_word_counts(words_to_ids,cfg.train.train_batch_size,cfg.shape.input_vector_length,cfg.input.number_for_training,cfg.input.number_for_validation,cfg.input.number_for_testing);
+        no_training_files,no_validation_files,no_testing_files,topic_ids,doc_ids = read_doc_word_counts(cfg.train.first_layer_type=='poisson',words_to_ids,cfg.train.train_batch_size,cfg.shape.input_vector_length,cfg.input.number_of_examples,cfg.input.number_for_training,cfg.input.number_for_validation,cfg.input.number_for_testing);
         
         # output the data
-        output_pickled_doc_topics(doc_topics);
-        output_pickled_data(train_set_x,valid_set_x,test_set_x,train_set_y,valid_set_y,test_set_y,train_sums,valid_sums,test_sums);
+        output_pickled_topics(topic_ids);
+        output_pickled_docs(doc_ids);
         
-        test_pickling()
+        for i in xrange(no_training_files):
+            test_pickling(PICKLED_WORD_VECTORS_TRAINING_FILE_PREFIX+str(i)+PICKLED_WORD_VECTORS_FILE_POSTFIX);
+        for i in xrange(no_validation_files):
+            test_pickling(PICKLED_WORD_VECTORS_VALIDATION_FILE_PREFIX+str(i)+PICKLED_WORD_VECTORS_FILE_POSTFIX);
+        for i in xrange(no_testing_files):
+            test_pickling(PICKLED_WORD_VECTORS_TESTING_FILE_PREFIX+str(i)+PICKLED_WORD_VECTORS_FILE_POSTFIX);
 
 
 if __name__ == '__main__':

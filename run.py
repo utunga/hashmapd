@@ -15,17 +15,18 @@ def load_data_without_labels(dataset):
     print '... loading render data, without labels'
 
     f = gzip.open(dataset,'rb')
-    data_x = cPickle.load(f)
+    x = cPickle.load(f)
     f.close()
 
     print "render data has shape:"
-    print data_x.shape
+    print x.shape
 
-    return data_x
+    return x
+
     #not sure if making these things 'shared' helps the GPU out but just in case we may as well do that
-    #data_x_shared  = theano.shared(numpy.asarray(data_x, dtype=theano.config.floatX))
+    #x_shared  = theano.shared(numpy.asarray(x, dtype=theano.config.floatX))
     
-    #return data_x_shared
+    #return x_shared
 
 def load_data_with_labels(dataset):
 
@@ -33,21 +34,28 @@ def load_data_with_labels(dataset):
     print '... loading render data, expecting input and labels in pairs'
 
     f = gzip.open(dataset,'rb')
-    train_set, valid_set, test_set = cPickle.load(f)
+    x, x_sums, labels = cPickle.load(f)
     f.close()
     
-    train_set_x, train_set_labels, train_set_sums = train_set
-
     print "render data has shape:"
-    print train_set_x.shape
+    print x.shape
     
-    return [train_set_x, train_set_labels]
+    # for now, for multi-label data, take the last (most-specific?) label only 
+    if labels.shape[0] > 1 and labels.shape[1] > 1:
+        concat_labels = []
+        for i in xrange(labels.shape[0]):
+            concat_labels.append(-1);
+            for j in xrange(labels.shape[1]):
+                if labels[i,j] == 1:
+                    concat_labels[i] = j;
+    
+    return [x,concat_labels]
     
     #not sure if making these things 'shared' helps the GPU out but just in case we may as well do that
-    #train_set_x_shared  = theano.shared(numpy.asarray(train_set_x[0:500], dtype=theano.config.floatX))
-    #train_set_labels_shared  = theano.shared(numpy.asarray(train_set_labels[0:500], dtype=theano.config.floatX))
+    #x_shared  = theano.shared(numpy.asarray(x[0:500], dtype=theano.config.floatX))
+    #labels_shared  = theano.shared(numpy.asarray(labels[0:500], dtype=theano.config.floatX))
     
-    #return [train_set_x_shared, train_set_labels_shared]
+    #return [x_shared, labels_shared]
 
 
 def save_model(smh, weights_file='data/last_smh_model_params.pkl.gz'):
@@ -256,6 +264,7 @@ def main(argv = sys.argv):
     cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
     #validate_config(cfg)
 
+    data_info_file = cfg.input.train_data_info
     render_file = cfg.input.render_data #NB includes labels or sometimes not?
     render_file_has_labels = cfg.input.render_data_has_labels
     weights_file = cfg.train.weights_file
@@ -276,11 +285,20 @@ def main(argv = sys.argv):
     
     cost_method = cfg.train.cost;
     
+    f = gzip.open(data_info_file,'rb')
+    training_prefix,n_training_files,n_training_batches,\
+        validation_prefix,n_validation_files,n_validation_batches,\
+        testing_prefix,n_testing_files,n_testing_batches,\
+        batches_per_file,mean_doc_size = cPickle.load(f)
+    f.close()
     # load weights file and initialize smh
     if (render_file_has_labels):
-        dataset_x, dataset_labels = load_data_with_labels(dataset=render_file)
+        dataset_x, dataset_labels = load_data_with_labels(training_prefix+'0.pkl.gz')
     else:
-        dataset_x = load_data_without_labels(dataset=render_file)
+        dataset_x = load_data_without_labels(training_prefix+'0.pkl.gz')
+    
+    if (render_file_has_labels):
+        write_csv_labels(dataset_labels, labels_file)
     
     smh = load_model(cost_method, n_ins=input_vector_length,  mid_layer_sizes = mid_layer_sizes,
                     inner_code_length = inner_code_length, weights_file=weights_file)

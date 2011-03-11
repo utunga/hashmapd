@@ -7,7 +7,7 @@ from utils import tile_raster_images
 from logistic_sgd import LogisticRegression
 
 class HiddenLayer(object):
-    def __init__(self,  rng, poisson_layer=False, input=None, n_in=784, n_out=500, init_W=None, init_b=None, activation = T.tanh):
+    def __init__(self,  rng, poisson_layer=False, mean_doc_size=1, input=None, n_in=784, n_out=500, init_W=None, init_b=None, activation = T.tanh):
         """
         Typical hidden layer of a MLP: units are fully-connected and have
         sigmoidal activation function. Weight matrix W is of shape (n_in,n_out)
@@ -49,7 +49,7 @@ class HiddenLayer(object):
             if activation == theano.tensor.nnet.sigmoid:
                 W_values *= 4
             if poisson_layer == True:
-                W_values *= .01;
+                W_values *= 1/mean_doc_size;
     
             #print 'using shared weights, randomized' #init case
             self.W = theano.shared(value = W_values, name ='W')

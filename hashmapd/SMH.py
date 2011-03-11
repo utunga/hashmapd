@@ -28,7 +28,7 @@ class SMH(object):
     
     """
 
-    def __init__(self, numpy_rng, theano_rng = None, first_layer_type = 'bernoulli', n_ins = 784, mid_layer_sizes=[200], inner_code_length = 10):
+    def __init__(self, numpy_rng, theano_rng = None, first_layer_type = 'bernoulli', mean_doc_size = 1, n_ins = 784, mid_layer_sizes=[200], inner_code_length = 10):
         """This class is made to support a variable number of layers. 
 
         :type numpy_rng: numpy.random.RandomState
@@ -46,6 +46,9 @@ class SMH(object):
         :param n_code_length: how many codes to squash down to in the middle layer
         """
         
+        self.first_layer_type = first_layer_type;
+        self.mean_doc_size = mean_doc_size;
+        
         self.sigmoid_layers = []
         self.rbm_layers     = []
         self.params         = []
@@ -59,13 +62,14 @@ class SMH(object):
      
         # allocate symbolic variables for the data
         
-        self.x_sums = T.imatrix('x_sums')
         if (theano.config.floatX == "float32"):
             self.x  = T.matrix('x')  #
+            self.x_sums = T.matrix('x_sums')
             self.y  = T.matrix('y') # the output (after finetuning) should look the same as the input
         else:
             if (theano.config.floatX == "float64"):
                 self.x  = T.dmatrix('x')  #
+                self.x_sums = T.dmatrix('x_sums')
                 self.y  = T.dmatrix('y') # the output (after finetuning) should look the same as the input
             else:        
                 raise Exception #not sure whats up here..
@@ -77,33 +81,38 @@ class SMH(object):
         # to chainging the weights of the MLP as well) During finetuning we will finish
         # training the SMH by doing stochastic gradient descent on the MLP.
 
-        self.init_layers(first_layer_type)
+        self.init_layers()
     
-    def init_layers(self, first_layer_type):
+    def init_layers(self):
         
         ### input-layer 0 (n_ins->50) *including RBM
       
         inner_code_length = self.inner_code_length
         hidden_layer_sizes = self.mid_layer_sizes + [inner_code_length]
-                
+        
         # middle layer/layers
         num_hidden = len(hidden_layer_sizes)
         for i in xrange(num_hidden):
             # the input is x if we are on the first layer, otherwise input to this layer is output of layer below
             n_out = hidden_layer_sizes[i]
             
-            if i == 0 and first_layer_type == 'poisson':
+            if i == 0 and self.first_layer_type == 'poisson':
                 n_in = self.n_ins
                 layer_input = self.x
                 sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
                                         input = layer_input, 
                                         poisson_layer = True,
+                                        mean_doc_size = self.mean_doc_size,
                                         n_in  = n_in, 
                                         n_out = n_out,
                                         activation = T.nnet.sigmoid)
             else:
-                n_in = hidden_layer_sizes[i-1]
-                layer_input = self.sigmoid_layers[-1].output
+                if i == 0:
+                    n_in = self.n_ins
+                    layer_input = self.x
+                else:
+                    n_in = hidden_layer_sizes[i-1]
+                    layer_input = self.sigmoid_layers[-1].output
                 sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
                                         input = layer_input, 
                                         n_in  = n_in, 
@@ -116,11 +125,12 @@ class SMH(object):
             self.params.extend(sigmoid_layer.params)
             
             # Construct an RBM that shared weights with this layer (first layer is Poisson)
-            if i == 0 and first_layer_type == 'poisson':
+            if i == 0 and self.first_layer_type == 'poisson':
                 rbm_layer = RBM_Poisson(numpy_rng = self.numpy_rng,
                                 theano_rng = self.theano_rng, 
                                 input = layer_input, 
                                 input_sums = self.x_sums,
+                                mean_doc_size = self.mean_doc_size,
                                 n_visible = n_in, 
                                 n_hidden  = n_out,
                                 W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
@@ -268,33 +278,25 @@ class SMH(object):
         
         return output_fn();
 
-    def pretraining_functions(self, train_set_x, train_set_x_sums, batch_size, method, k):
+    def pretraining_functions(self, batch_size, method, k):
         ''' Generates a list of functions, for performing one step of gradient descent at a
-        given layer. The function will require as input the minibatch index, and to train an
-        RBM you just need to iterate, calling the corresponding function on all minibatch
-        indexes.
-
-        :type train_set_x: theano.tensor.TensorType
-        :param train_set_x: Shared var. that contains all datapoints used for training the RBM
+        given layer. The function will require as input a minibatch of data, and to train an
+        RBM you just need to iterate, calling the corresponding function on all minibatches.
+        
         :type batch_size: int
         :param batch_size: size of a [mini]batch
+        :type method: string
+        :param method: type of Gibbs sampling to perform: 'cd' (default) or 'pcd'
+        :type k: int
         :param k: number of Gibbs steps to do in CD-k / PCD-k
         '''
-
-        # index to a [mini]batch
-        index            = T.lscalar('index')   # index to a minibatch
-        learning_rate    = T.scalar('lr')    # learning rate to use
-
-        # number of batches
-        n_batches = train_set_x.value.shape[0] / batch_size
-        # begining of a batch, given `index`
-        batch_begin = index * batch_size
-        # ending of a batch given `index`
-        batch_end = batch_begin+batch_size
-
+        
+        learning_rate = T.scalar('lr')    # learning rate to use
+        train_set_x = T.matrix('train_set_x')
+        train_set_x_sums = T.matrix('train_set_x_sums')
+        
         pretrain_fns = []
         for rbm in self.rbm_layers:
-            
             if method == 'pcd':
                 # initialize storage for the persistent chain (state = hidden layer of chain)
                 persistent_chain = theano.shared(numpy.zeros((batch_size,rbm.n_hidden),dtype=theano.config.floatX))
@@ -302,33 +304,46 @@ class SMH(object):
                 cost,updates = rbm.get_cost_updates(lr=learning_rate, persistent=persistent_chain, k=k)
             else:
                 # default = use CD instead
-                cost,updates = rbm.get_cost_updates(learning_rate, persistent=None, k=k)
+                cost,updates = rbm.get_cost_updates(lr=learning_rate, persistent=None, k=k)
             
             # compile the theano function    
-            fn = theano.function(inputs = [index, 
-                              theano.Param(learning_rate, default = 0.1)],
-                    outputs = cost, 
+            fn = theano.function(inputs = [train_set_x,train_set_x_sums,
+                        theano.Param(learning_rate, default = 0.1)],
+                    outputs = cost,
                     updates = updates,
-                    givens  = {self.x:train_set_x[batch_begin:batch_end],
-                               self.x_sums:train_set_x_sums[batch_begin:batch_end]}
-                    #,mode=theano.compile.debugmode.DebugMode(stability_patience=5)
+                    givens  = {self.x:train_set_x,
+                               self.x_sums:train_set_x_sums}
+                    # uncomment the following line to perform debugging:
+                    #   ,mode=theano.compile.debugmode.DebugMode(stability_patience=5)
                     )
+            
             # append `fn` to the list of functions
             pretrain_fns.append(fn)
 
         return pretrain_fns
 
     # compute the cross entropy error between the data and its reconstruction
+    #     NB: this is the multiple classes (softmax) form - as per bishop
     def cross_entropy_error(self):
+        # infer reconstructed data
         recon = self.sigmoid_layers[-1].output
+        # convert intput data to probabilities if appropriate
         x = self.x
-        cross_entropy = (x*T.log(recon) + (1-x)*T.log(1-recon)).sum(axis = 1)
+        if self.first_layer_type == 'poisson':
+            x = x/self.x_sums;
+        # determine error (see note below about potentially the using mean instead of the sum)
+        cross_entropy = (x*T.log(recon)).sum(axis = 1)
         return -cross_entropy.mean()
 
     # compute the mean squared error between the data and its reconstruction
     def squared_diff_cost(self):
+        # infer reconstructed data, and scale output up to match input if appropriate
         recon = self.sigmoid_layers[-1].output
+        # convert intput data to probabilities if appropriate
         x = self.x
+        if self.first_layer_type == 'poisson':
+            x = x/self.x_sums;
+        # determine error
         squared_diff = (x-recon)**2
         return squared_diff.mean()
         
@@ -345,62 +360,49 @@ class SMH(object):
     #def errors(self):
     #    return T.mean(self.negative_log_likelihood(), axis=0)
 
-    def build_finetune_functions(self, datasets, batch_size, learning_rate):
+    def build_finetune_functions(self, batch_size, learning_rate):
         '''Generates a function `train` that implements one step of finetuning, a function
         `validate` that computes the error on a batch from the validation set, and a function
         `test` that computes the error on a batch from the testing set
-    
-        :type datasets: list of pairs of theano.tensor.TensorType
-        :param datasets: It is a list that contain all the datasets;  the has to contain three
-        pairs, `train`, `valid`, `test` in this order, where each pair is formed of two Theano
-        variables, one for the datapoints, the other for the labels
+        
         :type batch_size: int
         :param batch_size: size of a minibatch
         :type learning_rate: float
         :param learning_rate: learning rate used during finetune stage
         '''
         
-        train_set_x = datasets[0]
-        valid_set_x = datasets[1]
-        test_set_x = datasets[2]
-    
-        # compute number of minibatches for training, validation and testing
-        n_valid_batches = valid_set_x.value.shape[0] / batch_size
-        n_test_batches  = test_set_x.value.shape[0]  / batch_size
-    
-        index   = T.lscalar('index')    # index to a [mini]batch 
-    
+        train_set_x = T.matrix('train_set_x')
+        train_set_x_sums = T.matrix('train_set_x_sums')
+        valid_set_x = T.matrix('valid_set_x')
+        valid_set_x_sums = T.matrix('valid_set_x_sums')
+        test_set_x = T.matrix('test_set_x')
+        test_set_x_sums = T.matrix('test_set_x_sums')
+        
         # compute the gradients with respect to the model parameters
         gparams = T.grad(self.finetune_cost, self.params)
-    
+        
         # compute list of fine-tuning updates
         updates = {}
         for param, gparam in zip(self.params, gparams):
             updates[param] = param - gparam*learning_rate
-    
-        train_fn = theano.function(inputs = [index], 
+        
+        train_fn = theano.function(inputs = [train_set_x, train_set_x_sums], 
               outputs =  self.finetune_cost, 
               updates = updates,
-              givens  = { self.x : train_set_x[index*batch_size:(index+1)*batch_size]})
+              givens  = { self.x : train_set_x,
+                          self.x_sums : train_set_x_sums })
+        
+        valid_score_i = theano.function([valid_set_x, valid_set_x_sums], self.finetune_cost,
+              givens  = { self.x : valid_set_x,
+                          self.x_sums : valid_set_x_sums })
+        
+        test_score_i = theano.function([test_set_x, test_set_x_sums], self.finetune_cost,
+              givens  = { self.x : test_set_x,
+                          self.x_sums : test_set_x_sums })
+        
+        return train_fn, valid_score_i, test_score_i
     
-        test_score_i = theano.function([index], self.finetune_cost,
-                 givens = {
-                   self.x: test_set_x[index*batch_size:(index+1)*batch_size]})
     
-        valid_score_i = theano.function([index], self.finetune_cost,
-              givens = {
-                 self.x: valid_set_x[index*batch_size:(index+1)*batch_size]})
-
-        # Create a function that scans the entire validation set
-        def valid_score():
-            return [valid_score_i(i) for i in xrange(n_valid_batches)]
-    
-        # Create a function that scans the entire test set
-        def test_score():
-            return [test_score_i(i) for i in xrange(n_test_batches)]
-    
-        return train_fn, valid_score, test_score
-
     #added MKT
     def export_model(self):
         joint_params = []
