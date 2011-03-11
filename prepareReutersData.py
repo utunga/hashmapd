@@ -363,7 +363,8 @@ def read_doc_word_counts(counts, words_to_ids, batch_size = 10, num_words = 2000
         # save labels with data
         f = gzip.open(file_prefix+str(file_iter)+PICKLED_WORD_VECTORS_FILE_POSTFIX,'wb');
         if (counts): cPickle.dump((raw_counts,sums,labels), f, cPickle.HIGHEST_PROTOCOL);
-        else:        cPickle.dump((raw_counts/numpy.array([x_sums]*(x.shape[1])).transpose(),sums,labels), f, cPickle.HIGHEST_PROTOCOL);
+        else:        cPickle.dump((raw_counts/numpy.array([sums]*(raw_counts.shape[1])).transpose(),sums,labels), f, cPickle.HIGHEST_PROTOCOL);
+        
         f.close();
         
         file_iter += 1;
