@@ -10,17 +10,18 @@ import numpy, time, cPickle, gzip, PIL.Image
 
 import theano
 import theano.tensor as T
-import os
+import os, sys, getopt
 
 from utils import tile_raster_images
-from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
-
+from theano.tensor.shared_randomstreams import RandomStreams
+from ConfigLoader import *
+import rbm
 
 class RBM_Poisson(object):
     """Restricted Boltzmann Machine (RBM)  """
-    def __init__(self, input=None, input_sums=None, n_visible=784, n_hidden=500, \
-        W = None, hbias = None, vbias = None, numpy_rng = None, 
-        theano_rng = None):
+    def __init__(self, input=None, input_sums=None, mean_doc_size=1, 
+        n_visible=784, n_hidden=500, W = None, hbias = None, vbias = None, 
+        numpy_rng = None, theano_rng = None):
         """ 
         RBM constructor. Defines the parameters of the model along with
         basic operations for inferring hidden from visible (and vice-versa), 
@@ -45,6 +46,8 @@ class RBM_Poisson(object):
         pointing to a shared visible units bias
         """
 
+        self.mean_doc_size = mean_doc_size
+
         self.n_visible = n_visible
         self.n_hidden  = n_hidden
 
@@ -62,10 +65,11 @@ class RBM_Poisson(object):
            # the output of uniform if converted using asarray to dtype 
            # theano.config.floatX so that the code is runable on GPU
            initial_W = numpy.asarray( numpy_rng.uniform( 
-                     low = -4*numpy.sqrt(6./(n_hidden+n_visible)), 
-                     high = 4*numpy.sqrt(6./(n_hidden+n_visible)), 
+                     low = -4.*numpy.sqrt(6./(n_hidden+n_visible)), 
+                     high = 4.*numpy.sqrt(6./(n_hidden+n_visible)), 
                      size = (n_visible, n_hidden)), 
                      dtype = theano.config.floatX)
+           initial_W *= 1/self.mean_doc_size
            # theano shared variables for weights and biases
            W = theano.shared(value = initial_W, name = 'W')
 
@@ -85,7 +89,7 @@ class RBM_Poisson(object):
         self.input_sums = input_sums
         if not input:
             self.input = T.matrix('input')
-            self.input_sums = T.imatrix('input_sums')
+            self.input_sums = T.matrix('input_sums')
 
         self.binomial_approx_val = theano.shared(value = float(100000), name = 'binomial_approx_val');
 
@@ -100,30 +104,29 @@ class RBM_Poisson(object):
 
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''
-        # TODO: vbias term should be:
+        # see http://www.cs.toronto.edu/~hinton/absps/sh.pdf
         
+        # vbias term should include:
+        #
         # (-(bias_v*sample_v)) + (sample_v*log(S/N_i)) + log(v!)
         #   where S = sum_k(bias_k+sum_j(value_j*weight_kj)), ie: sum of all input activations
         #         N = no_words_in_doc
         
-        # computing this would require computing the log of a factorial, which theano can't do by default (no factorial operation)
-        #   a seemingly reasonable implementation is available from (no gpu implementation however):
+        # if needed, possible factorial implementation in theano (no gpu support):
         #   http://deeplearning.net/software/pylearn/api/pylearn.algorithms.sandbox.cost-pysrc.html
         
         # given the the free energy is only used to update the system parameters
         # based on its gradient (?), and since the extra factorial term has a
         # gradient of zero with respect to any of the parameters, there may not 
         # be any need to concern ourselves with explicity computing the actual
-        # free energy
-        
-        # can the other term be ignored too?
+        # free energy ... and according to hinton, the udpate rule is unchanged
         
         wx_b = T.dot(v_sample, self.W) + self.hbias
         vbias_term = T.dot(v_sample, self.vbias)
         hidden_term = T.sum(T.log(1+T.exp(wx_b)),axis = 1)
         # extra_vbias_term1 = T.dot(v_sample,T.log(T.sum(T.dot(T.exp(self.vbias),PRODUCT_j(1+T.exp(self.W))),axis = ?))-T.log(v_sums));
         # extra_vbias_term2 = T.log(FACTORIAL(v_sample));
-        return -hidden_term-vbias_term 
+        return -hidden_term-vbias_term
 
     def propup(self, vis):
         ''' This function propagates the visible units activation upwards to
@@ -149,7 +152,7 @@ class RBM_Poisson(object):
                 dtype = theano.config.floatX)
         return [pre_sigmoid_h1, h1_mean, h1_sample]
 
-    def propdown(self, hid):
+    def propdown(self, hid, v_sums):
         '''This function propagates the hidden units activation downwards to
         the visible units
         
@@ -162,14 +165,14 @@ class RBM_Poisson(object):
         # compute the poisson mean 
         
         pre_mean_activation = T.dot(hid, self.W.T) + self.vbias
-        post_mean_activation = T.nnet.softmax(pre_mean_activation)*self.input_sums
+        post_mean_activation = T.nnet.softmax(pre_mean_activation)*v_sums
         
         return [pre_mean_activation,post_mean_activation]
 
-    def sample_v_given_h(self, h0_sample):
+    def sample_v_given_h(self, h0_sample, v_sums):
         ''' This function infers state of visible units given hidden units '''
         # compute the activation of the visible given the hidden sample
-        pre_sigmoid_v1, v1_mean = self.propdown(h0_sample)
+        pre_sigmoid_v1, v1_mean = self.propdown(h0_sample, v_sums)
         # get a sample of the visible given their activation
         # Note that theano_rng.binomial returns a symbolic sample of dtype 
         # int64 by default. If we want to keep our computations in floatX 
@@ -184,18 +187,18 @@ class RBM_Poisson(object):
         
         return [pre_sigmoid_v1, v1_mean, v1_sample]
 
-    def gibbs_hvh(self, h0_sample, v0_sums):
+    def gibbs_hvh(self, h0_sample, v_sums):
         ''' This function implements one step of Gibbs sampling, 
             starting from the hidden state'''
-        pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h0_sample)
+        pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h0_sample,v_sums)
         pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v1_sample)
         return [pre_sigmoid_v1, v1_mean, v1_sample, pre_sigmoid_h1, h1_mean, h1_sample]
  
-    def gibbs_vhv(self, v0_sample, v0_sums):
+    def gibbs_vhv(self, v0_sample, v_sums):
         ''' This function implements one step of Gibbs sampling, 
             starting from the visible state'''
         pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v0_sample)
-        pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h1_sample)
+        pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h1_sample,v_sums)
         return [pre_sigmoid_h1, h1_mean, h1_sample, pre_sigmoid_v1, v1_mean, v1_sample]
  
     def get_cost_updates(self, lr = 0.1, persistent=None, k=1):
@@ -215,10 +218,10 @@ class RBM_Poisson(object):
         also an update of the shared variable used to store the persistent
         chain, if one is used.
         """
-
+        
         # compute positive phase
         pre_sigmoid_ph, ph_mean, ph_sample = self.sample_h_given_v(self.input)
-
+        
         # decide how to initialize persistent chain:
         # for CD, we use the newly generate hidden sample
         # for PCD, we initialize from the old state of the chain
@@ -238,26 +241,30 @@ class RBM_Poisson(object):
                     # the None are place holders, saying that
                     # chain_start is the initial state corresponding to the 
                     # 6th output
-                    outputs_info = [None, None, None,None,None,chain_start],
+                    outputs_info = [None,None,None,None,None,chain_start],
                     non_sequences = self.input_sums,
                     n_steps = k)
-
+        
         # determine gradients on RBM parameters
         # not that we only need the sample at the end of the chain
         chain_end = nv_samples[-1]
-
+        
         cost = T.mean(self.free_energy(self.input)) - T.mean(self.free_energy(chain_end))
         # We must not compute the gradient through the gibbs sampling 
         gparams = T.grad(cost, self.params,consider_constant = [chain_end])
-
+        
         # constructs the update dictionary
         for gparam, param in zip(gparams, self.params):
             # make sure that the learning rate is of the right dtype
             
-            # we also now use an ~30x smaller learning rate for the weights/vis bias
-            # as the visible values are much larger than they would be if sigmoid units   
-            if param.name == 'W' or param.name == 'vbias':
-                updates[param] = param - gparam * T.cast(lr/T.mean(self.input_sums), dtype = theano.config.floatX)
+            # we also need to divide the learning rate by the average input size
+            # as the visible values are N times larger than the [0-1] inputs into
+            # the other layers
+            if param.name == 'W':
+                updates[param] = param - gparam * T.cast(lr/(5*self.mean_doc_size), dtype = theano.config.floatX)
+            elif param.name == 'vbias':
+                # vbiases don't make sense?
+                updates[param] = param - gparam * T.cast(lr*0, dtype = theano.config.floatX)
             else:
                 updates[param] = param - gparam * T.cast(lr, dtype = theano.config.floatX)
         if persistent:
@@ -324,10 +331,345 @@ class RBM_Poisson(object):
         can catch and optimize the expression.
         """
 
-        cross_entropy = T.mean(
-                T.sum(self.input*T.log(T.nnet.softmax(pre_sigmoid_nv)) + 
-                (1 - self.input)*T.log(1-(T.nnet.softmax(pre_sigmoid_nv))), axis = 1))
-
+        cross_entropy = T.mean(T.sum((self.input/self.input_sums)*T.log(T.nnet.softmax(pre_sigmoid_nv)), axis = 1))
         return cross_entropy
 
+# test the poisson layer by pre-training on a dataset, and printing out samples
+def test_rbm(argv = sys.argv):
+    opts, args = getopt.getopt(argv[1:], "h", ["help"])
+    
+    cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
+    
+    info = load_data_info(cfg.input.train_data_info);
+    training_prefix = info[0];
+    n_training_files = info[1];
+    n_training_batches = 10;#info[2];
+    # batches_per_file = info[9];
+    dataset_postfix = '.pkl.gz';
+    batch_size = cfg.train.train_batch_size;
+    
+    training_data = load_poisson_data(training_prefix+'0'+dataset_postfix)
+    
+    train_data = training_data[0]
+    train_data_sums = training_data[1]
+    max_doc_size = training_data[2]
+    
+    numpy_rng = numpy.random.RandomState(123)
+    theano_rng = RandomStreams(numpy_rng.randint(2**30))
+    
+    index  = T.lscalar()    # index to a [mini]batch
+    x      = T.matrix('input')  # the data is presented as rasterized images
+    x_sums = T.matrix('input_sums')
+    
+    p_rbm = RBM_Poisson(numpy_rng = numpy_rng,
+            theano_rng = theano_rng, 
+            mean_doc_size = max_doc_size,
+            input = x,
+            input_sums = x_sums,
+            n_visible = cfg.shape.input_vector_length, 
+            n_hidden  = 500)
+    
+    # get the cost and the gradient corresponding to CD
+    cost, updates = p_rbm.get_cost_updates(lr=0.1, persistent=None, k = 1)
+    
+    #################################
+    #     Training the RBM          #
+    #################################
+    
+    print 'compiling pretraining function'
+    
+    # it is ok for a theano function to have no output
+    # the purpose of train_rbm is solely to update the RBM parameters
+    train_rbm = theano.function(inputs = [index],
+        outputs = cost,
+        updates = updates,
+        givens  = {x:train_data[index*batch_size:(index+1)*batch_size,:],
+                   x_sums:train_data_sums[index*batch_size:(index+1)*batch_size,:]});
+    
+    print 'pretraining'
+    
+    start_time = time.clock()
+    
+    # go through training epochs
+    for epoch in xrange(30):
+        
+        # go through the training set
+        mean_cost = []
+        for batch_index in xrange(n_training_batches):
+            print 'batch %d, cost is '%batch_index, numpy.mean(mean_cost)
+            print 'batch '+str(batch_index)+', mean weight is '+str(numpy.mean(p_rbm.W.value))+', max weight is '+str(numpy.amax(p_rbm.W.value))
+            print 'batch '+str(batch_index)+', mean vbias is '+str(numpy.mean(p_rbm.vbias.value))+', max vbias is '+str(numpy.amax(p_rbm.vbias.value))
+            print 'batch '+str(batch_index)+', mean hbias is '+str(numpy.mean(p_rbm.hbias.value))+', max hbias is '+str(numpy.amax(p_rbm.hbias.value))
+            mean_cost += [train_rbm(batch_index)]
+    
+        print 'Training epoch %d, cost is '%epoch, numpy.mean(mean_cost)
+    
+    end_time = time.clock()
+    pretraining_time = (end_time - start_time)
+    print ('Training took %f minutes' %(pretraining_time/60.))
+    
+    #################################
+    #     Sampling from the RBM     #
+    #################################
 
+    print 'sampling'
+
+    n_chains = 10
+    n_samples = 10
+
+    # pick random test examples, with which to initialize the persistent chain
+    test_idx = numpy_rng.randint(n_training_batches*batch_size-n_chains)
+    persistent_vis_chain = theano.shared(numpy.asarray(
+            train_data.get_value()[test_idx:test_idx+n_chains],
+            dtype=theano.config.floatX))
+    sums = theano.shared(numpy.asarray(
+            train_data_sums.get_value()[test_idx:test_idx+n_chains],
+            dtype=theano.config.floatX))
+
+    plot_every = 1000
+    # define one step of Gibbs sampling (mf = mean-field)
+    # define a function that does `plot_every` steps before returning the sample for
+    # plotting
+    [presig_hids, hid_mfs, hid_samples, presig_vis, vis_mfs, vis_samples], updates =  \
+                        theano.scan(p_rbm.gibbs_vhv,
+                                outputs_info = [None,None,None,None,None,persistent_vis_chain],
+                                non_sequences = sums,
+                                n_steps = plot_every)
+
+    # add to updates the shared variable that takes care of our persistent
+    # chain :.
+    updates.update({ persistent_vis_chain: vis_samples[-1]})
+    # construct the function that implements our persistent chain.
+    # we generate the "mean field" activations for plotting and the actual
+    # samples for reinitializing the state of our persistent chain
+    sample_fn = theano.function([], [vis_mfs[-1], vis_samples[-1]],
+                                updates = updates,
+                                name = 'sample_fn')
+
+    # create a space to store the image for plotting ( we need to leave
+    # room for the tile_spacing as well)
+    image_data = numpy.zeros((29*(n_samples+1)+1,29*n_chains-1),dtype='uint8')
+    
+    # generate plot of original data (before any sampling is done)
+    image_data[0:28,:] = tile_raster_images(
+        X = (numpy.asarray(train_data.get_value()[test_idx:test_idx+n_chains],dtype=theano.config.floatX)/sums.value),
+        img_shape = (28,28),
+        tile_shape = (1, n_chains),
+        tile_spacing = (1,1))
+    
+    for idx in xrange(n_samples):
+        # generate `plot_every` intermediate samples that we discard, because successive samples in the chain are too correlated
+        vis_mf, vis_sample = sample_fn()
+        print ' ... plotting sample ', idx
+        
+        image_data[29*(idx+1):29*(idx+1)+28,:] = tile_raster_images(
+                X = (vis_mf/sums.value),
+                img_shape = (28,28),
+                tile_shape = (1, n_chains),
+                tile_spacing = (1,1))
+        # construct image
+
+    image = PIL.Image.fromarray(image_data)
+    image.save('trace/poisson_test_samples.png')
+    
+    
+    # now repeat for regular rbm
+    
+    training_data = load_data(training_prefix+'0'+dataset_postfix)
+    
+    train_data = training_data[0]
+    
+    numpy_rng = numpy.random.RandomState(123)
+    theano_rng = RandomStreams(numpy_rng.randint(2**30))
+    
+    index  = T.lscalar()    # index to a [mini]batch
+    x      = T.matrix('input')  # the data is presented as rasterized images
+    
+    b_rbm = rbm.RBM(numpy_rng = numpy_rng,
+            theano_rng = theano_rng, 
+            input = x,
+            n_visible = cfg.shape.input_vector_length, 
+            n_hidden  = 500)
+    
+    # get the cost and the gradient corresponding to CD
+    cost, updates = b_rbm.get_cost_updates(lr=0.1, persistent=None, k = 1)
+    
+    #################################
+    #     Training the RBM          #
+    #################################
+    
+    print 'compiling pretraining function'
+    
+    # it is ok for a theano function to have no output
+    # the purpose of train_rbm is solely to update the RBM parameters
+    train_rbm = theano.function(inputs = [index],
+        outputs = cost,
+        updates = updates,
+        givens  = {x:train_data[index*batch_size:(index+1)*batch_size,:]});
+    
+    print 'pretraining'
+    
+    start_time = time.clock()
+    
+    # go through training epochs
+    for epoch in xrange(30):
+        
+        # go through the training set
+        mean_cost = []
+        for batch_index in xrange(n_training_batches):
+            print 'batch %d, cost is '%batch_index, numpy.mean(mean_cost)
+            print 'batch '+str(batch_index)+', mean weight is '+str(numpy.mean(b_rbm.W.value))+', max weight is '+str(numpy.amax(b_rbm.W.value))
+            print 'batch '+str(batch_index)+', mean vbias is '+str(numpy.mean(b_rbm.vbias.value))+', max vbias is '+str(numpy.amax(b_rbm.vbias.value))
+            print 'batch '+str(batch_index)+', mean hbias is '+str(numpy.mean(b_rbm.hbias.value))+', max hbias is '+str(numpy.amax(b_rbm.hbias.value))
+            mean_cost += [train_rbm(batch_index)]
+    
+        print 'Training epoch %d, cost is '%epoch, numpy.mean(mean_cost)
+    
+    end_time = time.clock()
+    pretraining_time = (end_time - start_time)
+    print ('Training took %f minutes' %(pretraining_time/60.))
+    
+    #################################
+    #     Sampling from the RBM     #
+    #################################
+
+    print 'sampling'
+
+    n_chains = 10
+    n_samples = 10
+
+    # pick random test examples, with which to initialize the persistent chain
+    test_idx = numpy_rng.randint(n_training_batches*batch_size-n_chains)
+    persistent_vis_chain = theano.shared(numpy.asarray(
+            train_data.get_value()[test_idx:test_idx+n_chains],
+            dtype=theano.config.floatX))
+
+    plot_every = 1000
+    # define one step of Gibbs sampling (mf = mean-field)
+    # define a function that does `plot_every` steps before returning the sample for
+    # plotting
+    [presig_hids, hid_mfs, hid_samples, presig_vis, vis_mfs, vis_samples], updates =  \
+                        theano.scan(b_rbm.gibbs_vhv,
+                                outputs_info = [None,None,None,None,None,persistent_vis_chain],
+                                n_steps = plot_every)
+
+    # add to updates the shared variable that takes care of our persistent
+    # chain :.
+    updates.update({ persistent_vis_chain: vis_samples[-1]})
+    # construct the function that implements our persistent chain.
+    # we generate the "mean field" activations for plotting and the actual
+    # samples for reinitializing the state of our persistent chain
+    sample_fn = theano.function([], [vis_mfs[-1], vis_samples[-1]],
+                                updates = updates,
+                                name = 'sample_fn')
+
+    # create a space to store the image for plotting ( we need to leave
+    # room for the tile_spacing as well)
+    image_data = numpy.zeros((29*(n_samples+1)+1,29*n_chains-1),dtype='uint8')
+    
+    # generate plot of original data (before any sampling is done)
+    image_data[0:28,:] = tile_raster_images(
+        X = numpy.asarray(train_data.get_value()[test_idx:test_idx+n_chains],dtype=theano.config.floatX),
+        img_shape = (28,28),
+        tile_shape = (1, n_chains),
+        tile_spacing = (1,1))
+    
+    for idx in xrange(n_samples):
+        # generate `plot_every` intermediate samples that we discard, because successive samples in the chain are too correlated
+        vis_mf, vis_sample = sample_fn()
+        print ' ... plotting sample ', idx
+        
+        image_data[29*(idx+1):29*(idx+1)+28,:] = tile_raster_images(
+                X = vis_mf,
+                img_shape = (28,28),
+                tile_shape = (1, n_chains),
+                tile_spacing = (1,1))
+        # construct image
+
+    image = PIL.Image.fromarray(image_data)
+    image.save('trace/test_samples.png')
+    
+
+def load_data_info(info_file):
+    ''' Loads info about the dataset '''
+    
+    print '... loading data info from ' + info_file
+    
+    # Load the dataset  - expecting both supervised and unsupervised data to be supplied
+    f = gzip.open(info_file,'rb')
+    
+    training_prefix,n_training_files,n_training_batches,\
+        validation_prefix,n_validation_files,n_validation_batches,\
+        testing_prefix,n_testing_files,n_testing_batches,\
+        batches_per_file,mean_doc_size = cPickle.load(f)
+    
+    f.close()
+    
+    return [training_prefix,n_training_files,n_training_batches,
+                validation_prefix,n_validation_files,n_validation_batches,
+                testing_prefix,n_testing_files,n_testing_batches,
+                batches_per_file,mean_doc_size]
+
+
+def load_poisson_data(dataset_file):
+    ''' Loads the dataset
+
+    :type dataset: string
+    :param dataset: the path to the dataset (here MNIST)
+    '''
+
+    #############
+    # LOAD DATA #
+    #############
+    print '... loading data from file ' + dataset_file
+
+    # Load the dataset  - expecting both supervised and unsupervised data to be supplied (in pairs)
+    f = gzip.open(dataset_file,'rb')
+    x, x_sums, y = cPickle.load(f)
+    f.close()
+
+    x = x[0:100]
+
+    x *= 255
+    x = x.round()
+    x_sums = x.sum(axis=1)
+
+    max_doc_size = int(round(numpy.max(x_sums)))
+
+    # shared_dataset
+    shared_x = theano.shared(numpy.asarray(x,dtype=theano.config.floatX))
+
+    # build a replcated 2d array of sums so operations can be performed efficiently
+    shared_x_sums = theano.shared(numpy.asarray(numpy.array([x_sums]*(x.shape[1])).transpose(),dtype=theano.config.floatX))
+    
+    rval = [shared_x,shared_x_sums,max_doc_size]
+    return rval
+
+def load_data(dataset_file):
+    ''' Loads the dataset
+
+    :type dataset: string
+    :param dataset: the path to the dataset (here MNIST)
+    '''
+
+    #############
+    # LOAD DATA #
+    #############
+    print '... loading data from file ' + dataset_file
+
+    # Load the dataset  - expecting both supervised and unsupervised data to be supplied (in pairs)
+    f = gzip.open(dataset_file,'rb')
+    x, x_sums, y = cPickle.load(f)
+    f.close()
+
+    # shared_dataset
+    shared_x = theano.shared(numpy.asarray(x,dtype=theano.config.floatX))
+
+    # build a replcated 2d array of sums so operations can be performed efficiently
+    shared_x_sums = theano.shared(numpy.asarray(numpy.array([x_sums]*(x.shape[1])).transpose(),dtype=theano.config.floatX))
+    
+    rval = [shared_x,shared_x_sums]
+    return rval
+
+if __name__ == '__main__':
+    sys.exit(test_rbm())
