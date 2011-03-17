@@ -281,7 +281,7 @@ def read_doc_word_counts(counts, words_to_ids, batch_size = 10, num_words = 2000
     
         f.close();
     
-    mean_doc_size = mean_doc_size/doc_iter;
+    mean_doc_size = int(round(mean_doc_size/doc_iter));
     
     print 'mean doc size: ' + str(mean_doc_size) + ' words';
     print ''

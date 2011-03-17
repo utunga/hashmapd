@@ -1,0 +1,50 @@
+
+We want a process that :
+
+ - given a twitter screen name
+ - goes to twitter and downloads their *whole* timeline
+      - this involves paging back through about 30 'pages' of tweets **for now grab 10 pages simultaenously**
+ - saves each tweet as a document into couchdb with following modifications
+       - adds a 'doc_type' field to the json and sets it to 'raw_tweet' (or something)
+       - add a provider_namespace field (set it to 'twitter')
+       - add a provider_id field (set it to their twitter screenname)
+- it should do this by POST ing the json file into couchdb (with appropirate user/pass)
+
+You may find the code at 
+https://github.com/utunga/xtract/ to be useful by example since it does the same thing in C# (or maybe not)
+
+Obviously you want to use a good python twitter library (I'm not sure what is the best one)
+
+That should be relatively easy so don't spend too long on it because we then need to up the game in the following ways:
+ - we should register via oAuth before connecting so that we have a registered account when we download
+ - we need to check the rate limit before *every* request and scale back if not ready for new requests
+ - you need to be able to recover from various random errors that twitter will throw at you and not recover by 
+   proceeding to hammer on the twitter service which wil only get us banned (ideally we need to throttle back then try again,
+   speed up again as we get more 200 returns)
+ - we need to work out which people are speaking something resembling english and which are talking foreign languages
+    ideally we'd save time and stop downloading the non-english speaking people  see
+    https://github.com/utunga/xtract/blob/master/XtractLib/Trigram/LanguageModel.cs and the link to python recipe referenced from there
+
+Code that does the above is at the above url - in C# - which is not so different from twitter.
+
+- We will need to be able to run this code in parallel - so, given a single twitter screen name we fire off a
+ multi-thread series of tasks that each attempt to request one of the pages we will need.
+
+- We will also  need to be able to run this code even more parallel than that  - so, given a list of names
+we fire up a series of 'processing' threads that download the names as fast as possible (we'll need
+a message queue library and some sort of thread pool management thing for this I think). You probably
+want to reach for Java at this point, but I think we'd prefer to keep everything in Python.
+
+- Finally we'll need to write some code to parse a tweet into a series of tokens so we can count the tokens per user.
+The current thinking is that the dividing into tokens and then subsequent counting would all occur internally to couchdb
+ (so would be written in javascript). But all of this can come later.
+
+For now what we need is just some simple python code to download a timeline of tweets
+and push them into couchdb.
+
+Anyway I'll come chat with you about it soon.
+
+Some links for more info:
+http://dev.twitter.com/doc/get/statuses/public_timeline 
+http://dev.twitter.com/pages/responses_errors 
+http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html

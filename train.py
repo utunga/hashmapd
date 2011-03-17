@@ -58,7 +58,8 @@ def load_data(dataset_file):
 def train_SMH(finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.01, training_epochs = 100, \
               first_layer_type = 'bernoulli', method = 'cd', k = 1, noise_std_dev = 0, cost_method = 'squared_diff', \
               dataset_info='data/truncated_mnist_info.pkl.gz', \
-              batch_size = 10, mid_layer_sizes=[200], inner_code_length=10, n_ins=784, skip_trace_images=False):
+              batch_size = 10, mid_layer_sizes=[200], inner_code_length=10, n_ins=784, \
+              skip_trace_images=False, weights_file=None):
     
     # load info file to determine how files are stored
     info = load_data_info(dataset_info);
@@ -163,6 +164,10 @@ def train_SMH(finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.01, t
     print >> sys.stderr, ('The pretraining code for file '+os.path.split(__file__)[1]+' ran for %.2fm' % ((end_time-start_time)/60.))
     
     smh.unroll_layers(cost_method,noise_std_dev);
+    
+    # save model after pretraining
+    if weights_file is not None:
+        save_model(smh, weights_file=weights_file)
     
     # load in first file of test data for output trace
     if n_training_files > 1: testing_data = load_data(testing_prefix+'0'+dataset_postfix)
@@ -309,7 +314,10 @@ def output_trace_info(smh, testing_data_x, prefix, skip_trace_images):
     #output state of weights
     for layer in xrange(smh.n_sigmoid_layers):
         sigmoid_layer = smh.sigmoid_layers[layer]
-        sigmoid_layer.export_weights_image('trace/%s_weights_%i.png'%(prefix,layer))
+        try:
+            sigmoid_layer.export_weights_image('trace/%s_weights_%i.png'%(prefix,layer))
+        except IOError:
+            pass
     
     if skip_trace_images:
         return
@@ -389,7 +397,8 @@ def main(argv = sys.argv):
                     k = k,
                     noise_std_dev = noise_std_dev,
                     cost_method = cost_method,
-                    skip_trace_images = skip_trace_images)
+                    skip_trace_images = skip_trace_images,
+                    weights_file=weights_file)
     
     #double check that save/load worked OK
     info = load_data_info(data_info_file);
