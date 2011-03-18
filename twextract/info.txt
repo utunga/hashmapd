@@ -1,9 +1,33 @@
 
+STILL TO DO:
+
+ - we should register via oAuth before connecting so that we have a registered account when we download
+ - you need to be able to recover from various random errors that twitter will throw at you and not recover by 
+   proceeding to hammer on the twitter service which will only get us banned (ideally we need to throttle back then try again,
+   speed up again as we get more 200 returns)
+ - we need to work out which people are speaking something resembling english and which are talking foreign languages
+    ideally we'd save time and stop downloading the non-english speaking people  see
+    https://github.com/utunga/xtract/blob/master/XtractLib/Trigram/LanguageModel.cs and the link to python recipe referenced from there
+
+- It would also be awesome if you could set up some nosetests so that you can test stuff - especially the queue stuff above.
+  Of course the big problem there is you need to have a mock type thing of, well i guess of whatever else the code you are 
+  testing depends on. Perhaps for the queue manager this could be done without using fake 'task runner' objects...? For testing 
+  the code that hits tweepy well.. actually I'm not sure what is a good way to handle this type of thing in python so you might 
+  want to google around a bit. Well, the thing is it would be great if we had some nosetests for this whole thing basically.
+
+- Finally we'll need to write some code to parse a tweet into a series of tokens so we can count the tokens per user.
+  The current thinking is that the dividing into tokens and then subsequent counting would all occur internally to couchdb
+  (so would be written in javascript). But all of this can come later.
+
+
+
+DONE:
+
 We want a process that :
 
  - given a twitter screen name
  - goes to twitter and downloads their *whole* timeline
-      - this involves paging back through about 30 'pages' of tweets **for now grab 10 pages simultaenously**
+      - this involves paging back through about 30 'pages' of tweets
  - saves each tweet as a document into couchdb with following modifications
        - adds a 'doc_type' field to the json and sets it to 'raw_tweet' (or something)
        - add a provider_namespace field (set it to 'twitter')
@@ -16,14 +40,7 @@ https://github.com/utunga/xtract/ to be useful by example since it does the same
 Obviously you want to use a good python twitter library (I'm not sure what is the best one)
 
 That should be relatively easy so don't spend too long on it because we then need to up the game in the following ways:
- - we should register via oAuth before connecting so that we have a registered account when we download
  - we need to check the rate limit before *every* request and scale back if not ready for new requests
- - you need to be able to recover from various random errors that twitter will throw at you and not recover by 
-   proceeding to hammer on the twitter service which wil only get us banned (ideally we need to throttle back then try again,
-   speed up again as we get more 200 returns)
- - we need to work out which people are speaking something resembling english and which are talking foreign languages
-    ideally we'd save time and stop downloading the non-english speaking people  see
-    https://github.com/utunga/xtract/blob/master/XtractLib/Trigram/LanguageModel.cs and the link to python recipe referenced from there
 
 Code that does the above is at the above url - in C# - which is not so different from twitter.
 
@@ -35,10 +52,6 @@ we fire up a series of 'processing' threads that download the names as fast as p
 a message queue library and some sort of thread pool management thing for this I think). You probably
 want to reach for Java at this point, but I think we'd prefer to keep everything in Python.
 
-- Finally we'll need to write some code to parse a tweet into a series of tokens so we can count the tokens per user.
-The current thinking is that the dividing into tokens and then subsequent counting would all occur internally to couchdb
- (so would be written in javascript). But all of this can come later.
-
 For now what we need is just some simple python code to download a timeline of tweets
 and push them into couchdb.
 
@@ -48,3 +61,22 @@ Some links for more info:
 http://dev.twitter.com/doc/get/statuses/public_timeline 
 http://dev.twitter.com/pages/responses_errors 
 http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
+
+More stuff:
+
+I think its worth tidying up what you did a bit before going too much further:
+ - sort it out so that the couchdb server and database are configured (using the base.cfg stuff -- see some of the other couch python files for example.
+ - make it so it does take the screen name as parameter
+ - probably move the download and store into separate files (and add a class for the download step).
+
+I think there is something wrong with the tweepy rate_limit_status.. or at least maybe that's not how you are supposed to use it? You might want to look at that. It seems to not update from before to after? Dig into the tweepy source code to see how that looks.
+
+After its probably OK to start scaling up things so you can have a queue of requests not all to the same username - i guess you may maybe? want to have a little blip of 'request config' that you put on one queue then create a seperate queue of actually operating download requests. The reason I would suggest that is so that you make sure that there is a 'manager' for the second queue that can make sure
+ - the number of requests doesn't exceed the rate limit
+ - the number of download requests operating at any given time doesn't exceed some set limit (in configuration). 
+
+I think you may want to see it 'work' in practice so perhaps dig into the views I created under fake_txt - namely $/hashmapd/data/fake_txt/couchapp/views/count/map.js and tweak that so that it produces the counts for user/token on the twitter feed. To be clear - and let me emphasize - I'm not suggesting that you dig too deep into implementing that 'for real'. Rather this might be something you set up as a quick way to see that something is working as expected in the couchdb. 
+
+ 
+
+
