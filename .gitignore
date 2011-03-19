@@ -2,4 +2,8 @@
 *.swp
 trace/*
 configurator/build/*
-
+out/*
+trace/*
+density_maps/*
+**/.DS_Store
+other/*
