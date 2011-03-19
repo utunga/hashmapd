@@ -9,7 +9,7 @@ def trivial_resolver(cfg1, cfg2, key):
     return "merge"
 
 def key_resolver(cfg1, cfg2, key):
-    if key == "mergeme":
+    if key == "merge":
         return "merge"
     else:
         return "overwrite"
@@ -17,29 +17,24 @@ def key_resolver(cfg1, cfg2, key):
 def test_simple():
     test = Config(os.path.join(path, 'test.cfg'))
     base = Config(os.path.join(path, 'base.cfg'))
-    assert test.mergeme.test.b == 2
-    assert base.mergeme.base.a == 1
-   
-def test_merge_trivial():
-    test = Config(os.path.join(path, 'test.cfg'))
-    base = Config(os.path.join(path, 'base.cfg'))
-    assert not hasattr(base.mergeme.base, 'b')
-    assert not hasattr(base.mergeme, 'test')
-    merger = ConfigMerger(trivial_resolver)
-    merger.merge(base, test)
-    assert base.mergeme.test.b == 2
-    assert hasattr(base.mergeme.base, 'a')
-    assert hasattr(base.mergeme.base, 'b')
-    assert hasattr(base.mergeme, 'test')
-    
+    assert test.overwrite.x.b == 2
+    assert base.overwrite.x.a == 1
+           
 def test_merge_key():
     test = Config(os.path.join(path, 'test.cfg'))
     base = Config(os.path.join(path, 'base.cfg'))
-    assert not hasattr(base.mergeme.base, 'b')
-    assert not hasattr(base.mergeme, 'test')
+    assert not hasattr(base.merge, 'test')
+    assert base.merge.base == 'from base'
+    
     merger = ConfigMerger(key_resolver)
     merger.merge(base, test)
-    assert base.mergeme.test.b == 2
-    assert hasattr(base.mergeme.base, 'a')
-    assert hasattr(base.mergeme.base, 'b')
-    assert hasattr(base.mergeme, 'test')
+    assert base.merge.base == 'from test'
+    assert base.merge.test == 'from test'
+
+def test_merge_overwrite():
+    test = Config(os.path.join(path, 'test.cfg'))
+    base = Config(os.path.join(path, 'base.cfg'))
+    merger = ConfigMerger(key_resolver)
+    merger.merge(base, test)
+    assert base.baseonly.x.a == 1
+    assert base.overwrite.x.a == 2
