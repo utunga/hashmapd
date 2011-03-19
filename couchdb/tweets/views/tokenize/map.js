@@ -27,6 +27,8 @@ function stripNonWords(w){
  
  
 map = function(doc) { 
+  if (doc.doc_type != "raw_tweet") return;
+  
   var body = stripNonWords(doc.text).toLowerCase();
   var terms = [];
   var words = body.split(/\s+/);
