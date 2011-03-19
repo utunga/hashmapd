@@ -8,12 +8,11 @@ from threading import Thread
 from time import sleep
 import urllib
 
-from auth import BasicAuthHandler
-from models import Status
-from api import API
-from error import TweepError
+from tweepy.models import Status
+from tweepy.api import API
+from tweepy.error import TweepError
 
-from utils import import_simplejson
+from tweepy.utils import import_simplejson
 json = import_simplejson()
 
 STREAM_VERSION = 1
@@ -68,33 +67,43 @@ class Stream(object):
 
     host = 'stream.twitter.com'
 
-    def __init__(self, username, password, listener, timeout=5.0, retry_count = None,
-                    retry_time = 10.0, snooze_time = 5.0, buffer_size=1500, headers=None):
-        self.auth = BasicAuthHandler(username, password)
-        self.running = False
-        self.timeout = timeout
-        self.retry_count = retry_count
-        self.retry_time = retry_time
-        self.snooze_time = snooze_time
-        self.buffer_size = buffer_size
+    def __init__(self, auth, listener, **options):
+        self.auth = auth
         self.listener = listener
+        self.running = False
+        self.timeout = options.get("timeout") or 5.0
+        self.retry_count = options.get("retry_count")
+        self.retry_time = options.get("retry_time") or 10.0
+        self.snooze_time = options.get("snooze_time") or 5.0
+        self.buffer_size = options.get("buffer_size") or 1500
+        if options.get("secure"):
+            self.scheme = "https"
+        else:
+            self.scheme = "http"
+
         self.api = API()
-        self.headers = headers or {}
+        self.headers = options.get("headers") or {}
+        self.parameters = None
         self.body = None
 
     def _run(self):
-        # setup
-        self.auth.apply_auth(None, None, self.headers, None)
+        # Authenticate
+        url = "%s://%s%s" % (self.scheme, self.host, self.url)
+        self.auth.apply_auth(url, 'POST', self.headers, self.parameters)
 
-        # enter loop
+        # Connect and process the stream
         error_counter = 0
         conn = None
+        exception = None
         while self.running:
             if self.retry_count and error_counter > self.retry_count:
                 # quit if error count greater than retry count
                 break
             try:
-                conn = httplib.HTTPConnection(self.host)
+                if self.scheme == "http":
+                    conn = httplib.HTTPConnection(self.host)
+                else:
+                    conn = httplib.HTTPSConnection(self.host)
                 conn.connect()
                 conn.sock.settimeout(self.timeout)
                 conn.request('POST', self.url, self.body, headers=self.headers)
@@ -114,7 +123,7 @@ class Stream(object):
                     break
                 conn.close()
                 sleep(self.snooze_time)
-            except Exception:
+            except Exception, exception:
                 # any other exception is fatal, so kill loop
                 break
 
@@ -122,6 +131,9 @@ class Stream(object):
         self.running = False
         if conn:
             conn.close()
+
+        if exception:
+            raise exception
 
     def _read_loop(self, resp):
         data = ''
@@ -155,6 +167,7 @@ class Stream(object):
             self._run()
 
     def firehose(self, count=None, async=False):
+        self.parameters = {'delimited': 'length'}
         if self.running:
             raise TweepError('Stream object already connected!')
         self.url = '/%i/statuses/firehose.json?delimited=length' % STREAM_VERSION
@@ -163,12 +176,14 @@ class Stream(object):
         self._start(async)
 
     def retweet(self, async=False):
+        self.parameters = {'delimited': 'length'}
         if self.running:
             raise TweepError('Stream object already connected!')
         self.url = '/%i/statuses/retweet.json?delimited=length' % STREAM_VERSION
         self._start(async)
 
     def sample(self, count=None, async=False):
+        self.parameters = {'delimited': 'length'}
         if self.running:
             raise TweepError('Stream object already connected!')
         self.url = '/%i/statuses/sample.json?delimited=length' % STREAM_VERSION
@@ -176,17 +191,23 @@ class Stream(object):
             self.url += '&count=%s' % count
         self._start(async)
 
-    def filter(self, follow=None, track=None, async=False):
-        params = {}
+    def filter(self, follow=None, track=None, async=False, locations=None, count = None):
+        self.parameters = {}
         self.headers['Content-type'] = "application/x-www-form-urlencoded"
         if self.running:
             raise TweepError('Stream object already connected!')
         self.url = '/%i/statuses/filter.json?delimited=length' % STREAM_VERSION
         if follow:
-            params['follow'] = ','.join(map(str, follow))
+            self.parameters['follow'] = ','.join(map(str, follow))
         if track:
-            params['track'] = ','.join(map(str, track))
-        self.body = urllib.urlencode(params)
+            self.parameters['track'] = ','.join(map(str, track))
+        if locations and len(locations) > 0:
+            assert len(locations) % 4 == 0
+            self.parameters['locations'] = ','.join(['%.2f' % l for l in locations])
+	if count:
+		self.parameters['count'] = count
+        self.body = urllib.urlencode(self.parameters)
+        self.parameters['delimited'] = 'length'
         self._start(async)
 
     def disconnect(self):

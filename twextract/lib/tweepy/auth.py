@@ -5,9 +5,9 @@
 from urllib2 import Request, urlopen
 import base64
 
-import oauth
-from error import TweepError
-from api import API
+from tweepy import oauth
+from tweepy.error import TweepError
+from tweepy.api import API
 
 
 class AuthHandler(object):
@@ -37,7 +37,7 @@ class BasicAuthHandler(AuthHandler):
 class OAuthHandler(AuthHandler):
     """OAuth authentication handler"""
 
-    OAUTH_HOST = 'twitter.com'
+    OAUTH_HOST = 'api.twitter.com'
     OAUTH_ROOT = '/oauth/'
 
     def __init__(self, consumer_key, consumer_secret, callback=None, secure=False):

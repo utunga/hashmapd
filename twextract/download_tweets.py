@@ -61,7 +61,7 @@ class RetrieveTweets(threading.Thread):
             self.manager.notifyFailed(self,self.screen_name,self.page,err)
     
     def retrieve_data_from_twitter(self):
-        return api.user_timeline(screen_name=self.screen_name,count=count,page=self.page)
+        return api.user_timeline(screen_name=self.screen_name,count=count,page=self.page,include_entities=True,trim_user=True,include_rts=False)
     
     def pickle_data(self,tweet_data):
         f = open('twextract'+os.sep+'stored_tweets'+os.sep+str(self.screen_name)+str(self.page),'wb')

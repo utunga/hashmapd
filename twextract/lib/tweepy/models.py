@@ -2,8 +2,8 @@
 # Copyright 2009-2010 Joshua Roesslein
 # See LICENSE for details.
 
-from error import TweepError
-from utils import parse_datetime, parse_html_value, parse_a_href, \
+from tweepy.error import TweepError
+from tweepy.utils import parse_datetime, parse_html_value, parse_a_href, \
         parse_search_datetime, unescape_html
 
 
@@ -35,7 +35,8 @@ class Model(object):
         """Parse a list of JSON objects into a result set of model instances."""
         results = ResultSet()
         for obj in json_list:
-            results.append(cls.parse(api, obj))
+            if obj:
+                results.append(cls.parse(api, obj))
         return results
 
 
@@ -57,6 +58,7 @@ class Status(Model):
                     setattr(status, 'source_url', parse_a_href(v))
                 else:
                     setattr(status, k, v)
+                    setattr(status, 'source_url', None)
             elif k == 'retweeted_status':
                 setattr(status, k, Status.parse(api, v))
             else:
