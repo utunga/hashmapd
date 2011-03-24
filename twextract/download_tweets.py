@@ -2,7 +2,7 @@ import os
 import sys
 import getopt
 # move the working dir up one level so we can import hashmapd stuff
-sys.path[0] = sys.path[0]+'\\..'
+sys.path[0] = sys.path[0]+os.sep+'..'
 
 from Queue import Queue
 import threading
@@ -55,7 +55,7 @@ class RetrieveTweets(threading.Thread):
             
             # notify manager that data has been retrieved
             self.manager.notifyCompleted(self)
-        
+            
         except Exception, err:
             # notify manager of error
             self.manager.notifyFailed(self,self.screen_name,self.page,err)
@@ -94,6 +94,7 @@ class Manager(threading.Thread):
         self.semaphore = semaphore = threading.Semaphore(max_simultaneous_requests)
         self.use_test_data = use_test_data
         self.save_test_data = save_test_data
+        self.terminate = False
     
     def notifyCompleted(self,thread):
         self.worker_threads.remove(thread)
@@ -108,7 +109,7 @@ class Manager(threading.Thread):
     def run(self):
         # - obtain a twitter screen name from file
         # spawn a thread for each page
-        while terminate == False:
+        while self.terminate == False:
             # get the next request
             next_request = tweet_request_queue.next()
             # if the queue is empty, check for new data (every 5 seconds for now)
@@ -145,6 +146,10 @@ class Manager(threading.Thread):
         print ''
         print 'exited download_tweets.py, hits left: '+str(limit['remaining_hits'])
         print '(reset time: '+str(limit['reset_time']+')')
+    
+    
+    def exit(self):
+        self.terminate = True;
 
 
 #==============================================================================
@@ -186,7 +191,6 @@ if __name__ == '__main__':
         cfg = DefaultConfig()
     
     # run the manager
-    terminate = False
     thread = Manager(cfg.raw.couch_server_url,cfg.raw.couch_db,cfg.raw.max_simultaneous_requests,use_test_data,save_test_data);
     thread.start()
     
@@ -195,7 +199,7 @@ if __name__ == '__main__':
     while True:
         input = raw_input("type \'exit\' to terminate:\n");
         if input == 'exit':
-            terminate = True
+            thread.exit();
             print 'terminating ...'
             break
 

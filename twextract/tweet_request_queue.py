@@ -2,13 +2,11 @@ import os
 import sys
 import getopt
 # move the working dir up one level so we can import hashmapd stuff
-sys.path[0] = sys.path[0]+'\\..'
+sys.path[0] = sys.path[0]+os.sep+'..'
 
 import couchdb
 
 from hashmapd import LoadConfig,DefaultConfig
-
-n_pages = 3;
 
 #==============================================================================
 # Manages the Tweet Request database.
@@ -17,6 +15,8 @@ n_pages = 3;
 # "Queue".
 #==============================================================================
 class TweetRequestQueue(object):
+    
+    n_pages = 3;
     
     def __init__(self,server_url='http://127.0.0.1:5984',db_name='tweet_request_queue'):
         self.db = couchdb.Server(server_url)[db_name]
@@ -49,7 +49,7 @@ class TweetRequestQueue(object):
         self.db['back'] = back
     
     def add_screen_name(self,screen_name):
-        for page in xrange(1,n_pages+1):
+        for page in xrange(1,self.n_pages+1):
             self.add(screen_name,page)
 
 

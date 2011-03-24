@@ -14,18 +14,13 @@ CODES_DESCRIPTION_FILE = "data/reuters/rcv1-v2.topics.qrels.gz";
 DOC_CODES_FILE = "data/reuters/rcv1-v2.topics.qrels.gz";
 DOC_FILES = ["data/reuters/lyrl2004_tokens_test_pt0.dat.gz","data/reuters/lyrl2004_tokens_test_pt1.dat.gz","data/reuters/lyrl2004_tokens_test_pt2.dat.gz","data/reuters/lyrl2004_tokens_test_pt3.dat.gz","data/reuters/lyrl2004_tokens_train.dat.gz"];
 
-PICKLED_WORDS_FILE = "data/reuters/reuters_words.pkl.gz";                  # word_id -> word, total_frequency
-PICKLED_TOPICS_FILE = "data/reuters/reuters_topics.pkl.gz";                # topic_id -> reuters_topic_id
-PICKLED_DOCS_FILE = "data/reuters/reuters_docs.pkl.gz";                    # doc_id -> reuters_doc_id
-PICKLED_WORD_VECTORS_TRAINING_FILE_PREFIX = "data/reuters/reuters_training_data";   # doc_id,word_id -> doc_word_frequency
-PICKLED_WORD_VECTORS_VALIDATION_FILE_PREFIX = "data/reuters/reuters_validation_data"; # doc_id,word_id -> doc_word_frequency
-PICKLED_WORD_VECTORS_TESTING_FILE_PREFIX = "data/reuters/reuters_testing_data";    # doc_id,word_id -> doc_word_frequency
-PICKLED_WORD_VECTORS_FILE_POSTFIX = ".pkl.gz";
-
-# data info (no train/validate/test batches, no files, no batches per file, mean word count)
-PICKLED_WORD_VECTORS_FILE_INFO = "data/reuters_data_info.pkl.gz"
-
-
+PICKLED_WORDS_FILE = "data/reuters/reuters_words.pkl.gz";         # word_id -> word, total_frequency
+PICKLED_TOPICS_FILE = "data/reuters/reuters_topics.pkl.gz";       # topic_id -> reuters_topic_id
+PICKLED_DOCS_FILE = "data/reuters/reuters_docs.pkl.gz";           # doc_id -> reuters_doc_id
+PICKLED_WORD_VECTORS_TRAINING_FILE_POSTFIX = "training_data";     # doc_id,word_id -> doc_word_frequency
+PICKLED_WORD_VECTORS_VALIDATION_FILE_POSTFIX = "validation_data"; # doc_id,word_id -> doc_word_frequency
+PICKLED_WORD_VECTORS_TESTING_FILE_POSTFIX = "testing_data";      # doc_id,word_id -> doc_word_frequency
+PICKLED_FILE_TYPE = ".pkl.gz"
 
 # TOPIC DESCRIPTIONS
 # 1) unzip codes description file
@@ -151,7 +146,7 @@ def output_pickled_words(word_ids):
     f.close();
 
 
-def read_doc_word_counts(counts, words_to_ids, batch_size = 10, num_words = 2000, num_total = 1000, num_training = 800, num_validation = 150, num_testing = 50):
+def read_doc_word_counts(pickled_info_file, pickled_data_files_prefix, counts, words_to_ids, batch_size = 10, num_words = 2000, num_total = 1000, num_training = 800, num_validation = 150, num_testing = 50):
     """
     Reads in data from reuters/lyrl2004_tokens_train.dat.gz
     """
@@ -260,10 +255,10 @@ def read_doc_word_counts(counts, words_to_ids, batch_size = 10, num_words = 2000
                 print 'saving set '+str(set_iter)+', batch '+ str(file_iter) + '..';
                 
                 # save batch information
-                if set_iter == 0 :   file_prefix = PICKLED_WORD_VECTORS_TRAINING_FILE_PREFIX;
-                elif set_iter == 1 : file_prefix = PICKLED_WORD_VECTORS_VALIDATION_FILE_PREFIX;
-                elif set_iter == 2 : file_prefix = PICKLED_WORD_VECTORS_TESTING_FILE_PREFIX;
-                g = gzip.open(file_prefix+str(file_iter)+PICKLED_WORD_VECTORS_FILE_POSTFIX,'wb');
+                if set_iter == 0 :   file_postfix = PICKLED_WORD_VECTORS_TRAINING_FILE_POSTFIX;
+                elif set_iter == 1 : file_postfix = PICKLED_WORD_VECTORS_VALIDATION_FILE_POSTFIX;
+                elif set_iter == 2 : file_postfix = PICKLED_WORD_VECTORS_TESTING_FILE_POSTFIX;
+                g = gzip.open(pickled_data_files_prefix+file_postfix+str(file_iter)+PICKLED_FILE_TYPE,'wb');
                 cPickle.dump((raw_counts,raw_counts.sum(axis=1)), g, cPickle.HIGHEST_PROTOCOL);
                 g.close();
                 
@@ -342,16 +337,16 @@ def read_doc_word_counts(counts, words_to_ids, batch_size = 10, num_words = 2000
     
     doc_iter = 0;
     file_iter = 0;
-    file_prefix = PICKLED_WORD_VECTORS_TRAINING_FILE_PREFIX;
+    file_postfix = PICKLED_WORD_VECTORS_TRAINING_FILE_POSTFIX;
     for i in xrange(no_files) :
         # load the relevant word count file
         if i == no_training_files :
-            file_prefix = PICKLED_WORD_VECTORS_VALIDATION_FILE_PREFIX;
+            file_postfix = PICKLED_WORD_VECTORS_VALIDATION_FILE_POSTFIX;
             file_iter = 0;
         elif i == no_training_files+no_validation_files :
-            file_prefix = PICKLED_WORD_VECTORS_TESTING_FILE_PREFIX;
+            file_postfix = PICKLED_WORD_VECTORS_TESTING_FILE_POSTFIX;
             file_iter = 0;
-        f = gzip.open(file_prefix+str(file_iter)+PICKLED_WORD_VECTORS_FILE_POSTFIX,'rb');
+        f = gzip.open(pickled_data_files_prefix+file_postfix+str(file_iter)+PICKLED_FILE_TYPE,'rb');
         raw_counts,sums = cPickle.load(f);
         f.close();
         # for each category type a document belongs to, set the corresponding label value to one
@@ -361,7 +356,7 @@ def read_doc_word_counts(counts, words_to_ids, batch_size = 10, num_words = 2000
                 labels[j,k] = 1.0;
             doc_iter += 1;
         # save labels with data
-        f = gzip.open(file_prefix+str(file_iter)+PICKLED_WORD_VECTORS_FILE_POSTFIX,'wb');
+        f = gzip.open(pickled_data_files_prefix+file_postfix+str(file_iter)+PICKLED_FILE_TYPE,'wb');
         if (counts): cPickle.dump((raw_counts,sums,labels), f, cPickle.HIGHEST_PROTOCOL);
         else:        cPickle.dump((raw_counts/numpy.array([sums]*(raw_counts.shape[1])).transpose(),sums,labels), f, cPickle.HIGHEST_PROTOCOL);
         
@@ -372,10 +367,10 @@ def read_doc_word_counts(counts, words_to_ids, batch_size = 10, num_words = 2000
     print ''
     print 'saving data info'
     
-    f = gzip.open(PICKLED_WORD_VECTORS_FILE_INFO,'wb');
-    cPickle.dump((PICKLED_WORD_VECTORS_TRAINING_FILE_PREFIX,no_training_files,no_training_batches,
-                    PICKLED_WORD_VECTORS_VALIDATION_FILE_PREFIX,no_validation_files,no_validation_batches,
-                    PICKLED_WORD_VECTORS_TESTING_FILE_PREFIX,no_testing_files,no_testing_batches,
+    f = gzip.open(pickled_info_file,'wb');
+    cPickle.dump((pickled_data_files_prefix+PICKLED_WORD_VECTORS_TRAINING_FILE_POSTFIX,no_training_files,no_training_batches,
+                    pickled_data_files_prefix+PICKLED_WORD_VECTORS_VALIDATION_FILE_POSTFIX,no_validation_files,no_validation_batches,
+                    pickled_data_files_prefix+PICKLED_WORD_VECTORS_TESTING_FILE_POSTFIX,no_testing_files,no_testing_batches,
                         batches_per_file,mean_doc_size), f, cPickle.HIGHEST_PROTOCOL);
     f.close();
     
@@ -458,18 +453,18 @@ def main(argv = sys.argv):
             words_to_ids[word] = id;
         
         # read in the data
-        no_training_files,no_validation_files,no_testing_files,topic_ids,doc_ids = read_doc_word_counts(cfg.train.first_layer_type=='poisson',words_to_ids,cfg.train.train_batch_size,cfg.shape.input_vector_length,cfg.input.number_of_examples,cfg.input.number_for_training,cfg.input.number_for_validation,cfg.input.number_for_testing);
+        no_training_files,no_validation_files,no_testing_files,topic_ids,doc_ids = read_doc_word_counts(cfg.input.train_data_info,cfg.input.train_data,cfg.train.first_layer_type=='poisson',words_to_ids,cfg.train.train_batch_size,cfg.shape.input_vector_length,cfg.input.number_of_examples,cfg.input.number_for_training,cfg.input.number_for_validation,cfg.input.number_for_testing);
         
         # output the data
         output_pickled_topics(topic_ids);
         output_pickled_docs(doc_ids);
         
         for i in xrange(no_training_files):
-            test_pickling(PICKLED_WORD_VECTORS_TRAINING_FILE_PREFIX+str(i)+PICKLED_WORD_VECTORS_FILE_POSTFIX);
+            test_pickling(cfg.input.train_data+PICKLED_WORD_VECTORS_TRAINING_FILE_POSTFIX+str(i)+PICKLED_FILE_TYPE);
         for i in xrange(no_validation_files):
-            test_pickling(PICKLED_WORD_VECTORS_VALIDATION_FILE_PREFIX+str(i)+PICKLED_WORD_VECTORS_FILE_POSTFIX);
+            test_pickling(cfg.input.train_data+PICKLED_WORD_VECTORS_VALIDATION_FILE_POSTFIX+str(i)+PICKLED_FILE_TYPE);
         for i in xrange(no_testing_files):
-            test_pickling(PICKLED_WORD_VECTORS_TESTING_FILE_PREFIX+str(i)+PICKLED_WORD_VECTORS_FILE_POSTFIX);
+            test_pickling(cfg.input.train_data+PICKLED_WORD_VECTORS_TESTING_FILE_POSTFIX+str(i)+PICKLED_FILE_TYPE);
 
 
 if __name__ == '__main__':
