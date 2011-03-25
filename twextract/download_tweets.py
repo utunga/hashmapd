@@ -4,12 +4,16 @@ import getopt
 # move the working dir up one level so we can import hashmapd stuff
 sys.path[0] = sys.path[0]+os.sep+'..'
 
+from mock import Mock
+
 from Queue import Queue
 import threading
 import time
 
 import cPickle
 import gzip
+
+import datetime
 
 import couchdb
 
@@ -27,53 +31,67 @@ api = tweepy.API(parser=tweepy.parsers.JSONParser());
 
 
 #==============================================================================
+# Factory to produce RetrieveTweet worker threads
+#==============================================================================
+class RetrieveTweetsFactory(object):
+    
+    def __init__(self,use_mock_data=False,save_mock_data=False):
+        self.use_mock_data = use_mock_data;
+        self.save_mock_data = save_mock_data;
+     
+    def get_worker_thread(self,manager,screen_name,page,db,request_id):
+        thread = RetrieveTweets(manager,screen_name,page,db,request_id)
+        
+        if (self.use_mock_data):
+            thread.retrieve_data_from_twitter = Mock()
+            thread.retrieve_data_from_twitter.side_effect = self.retrieve_pickled_data
+        elif (self.save_mock_data):
+            thread.retrieve_data_from_twitter = Mock()
+            thread.retrieve_data_from_twitter.side_effect = self.pickle_data
+        
+        return thread
+    
+    def retrieve_pickled_data(thread,screen_name,page):
+        f = open('twextract'+os.sep+'stored_tweets'+os.sep+str(screen_name)+str(page),'rb')
+        tweet_data = cPickle.load(f)
+        f.close()
+        return tweet_data
+    
+    def pickle_data(thread,screen_name,page):
+        tweet_data = thread.retrieve_data_from_twitter(self.screen_name,self.page);
+        f = open('twextract'+os.sep+'stored_tweets'+os.sep+str(screen_name)+str(page),'wb')
+        cPickle.dump(tweet_data,f,cPickle.HIGHEST_PROTOCOL)
+        f.close()
+
+
+#==============================================================================
 # Get the specified page of tweets for the specified user, and store them in
 # the specified db
 #==============================================================================
 class RetrieveTweets(threading.Thread):
     
-    def __init__(self,manager,screen_name,page,db,use_test_data=False,save_test_data=False):
+    def __init__(self,manager,screen_name,page,db,request_id):
         threading.Thread.__init__(self)
         self.manager = manager
         self.screen_name = screen_name
         self.page = page
         self.db = db        
-        self.use_test_data = use_test_data
-        self.save_test_data = save_test_data
+        self.request_id = request_id
     
     def run(self):
         try:
             # obtain tweet data
-            if self.use_test_data:
-                tweet_data = self.retrieve_pickled_data();
-            else:
-                tweet_data = self.retrieve_data_from_twitter();
-                if self.save_test_data: self.pickle_data(tweet_data);
-            
+            tweet_data = self.retrieve_data_from_twitter(self.screen_name,self.page);
             # store the tweets in specified db
             store_tweets.store(self.screen_name,tweet_data,self.db)
-            
-            # notify manager that data has been retrieved
-            self.manager.notifyCompleted(self)
-            
         except Exception, err:
             # notify manager of error
-            self.manager.notifyFailed(self,self.screen_name,self.page,err)
+            self.manager.notifyFailed(self,err)
+        # notify manager that data has been retrieved
+        self.manager.notifyCompleted(self)
     
-    def retrieve_data_from_twitter(self):
-        return api.user_timeline(screen_name=self.screen_name,count=count,page=self.page,include_entities=True,trim_user=True,include_rts=False)
-    
-    def pickle_data(self,tweet_data):
-        f = open('twextract'+os.sep+'stored_tweets'+os.sep+str(self.screen_name)+str(self.page),'wb')
-        cPickle.dump(tweet_data,f,cPickle.HIGHEST_PROTOCOL)
-        f.close()
-    
-    def retrieve_pickled_data(self):
-        f = open('twextract'+os.sep+'stored_tweets'+os.sep+str(self.screen_name)+str(self.page),'rb')
-        tweet_data = cPickle.load(f)
-        f.close()
-        return tweet_data
-
+    def retrieve_data_from_twitter(self,screen_name,page):
+        return api.user_timeline(screen_name=screen_name,count=count,page=page,include_entities=True,trim_user=True,include_rts=False)
 
 #==============================================================================
 # Loop until user terminates program. Obtain tweet requests from the queue and
@@ -86,25 +104,35 @@ class RetrieveTweets(threading.Thread):
 #==============================================================================
 class Manager(threading.Thread):
     
-    def __init__(self,server_url='http://127.0.0.1:5984',db_name='fake_txt',\
-                 max_simultaneous_requests=5,use_test_data=False,save_test_data=False):
+    def __init__(self,server_url='http://127.0.0.1:5984',db_name='hashmapd',\
+            retrieval_factory=RetrieveTweetsFactory(),max_simultaneous_requests=5):
         threading.Thread.__init__(self)
         self.db = couchdb.Server(server_url)[db_name]
+        self.retrieval_factory = retrieval_factory
         self.worker_threads = []
         self.semaphore = semaphore = threading.Semaphore(max_simultaneous_requests)
-        self.use_test_data = use_test_data
-        self.save_test_data = save_test_data
         self.terminate = False
     
     def notifyCompleted(self,thread):
         self.worker_threads.remove(thread)
         self.semaphore.release()
+        # write finished time
+        row = self.db[thread.request_id]
+        row['completed_time'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+        self.db[thread.request_id] = row
+        # print notification of completion
+        print 'Retrieved tweets ('+str(thread.screen_name)+','+str(thread.page)+')'
     
-    def notifyFailed(self,thread,screen_name,page,err):
+    def notifyFailed(self,thread,err):
         self.worker_threads.remove(thread)
         self.semaphore.release()
-        # TODO: better error handling here
-        print >> sys.stderr, 'Error retrieving tweets ('+str(screen_name)+','+str(page)+'):\n'+str(err)
+        # clear started time, so that job will be restarted
+        # TODO: (is this a good idea? what if the job keeps failing over and over for some reason?)  
+        row = self.db[thread.request_id]
+        del row['started_time']
+        self.db[thread.request_id] = row
+        # print error message
+        print >> sys.stderr, 'Error retrieving tweets ('+str(thread.screen_name)+','+str(thread.page)+'):\n'+str(err)
     
     def run(self):
         # - obtain a twitter screen name from file
@@ -118,21 +146,22 @@ class Manager(threading.Thread):
                 time.sleep(5)
                 continue;
             
-            screen_name = next_request['screen_name']
+            screen_name = next_request['username']
             page = next_request['page']
+            request_id = next_request['_id']
             
             # check that there are enough twitter hits left
             # TODO: this may be able to be done more efficiently by examining 
             #         the header of the most recently returned data
             rate_limit = tweepy.api.rate_limit_status()
             if rate_limit['remaining_hits'] < min_hits:
-                print >> sys.stderr, 'only '+rate_limit['remaining_hits']+' hits allowed until '+rate_limit['reset_time']
+                print >> sys.stderr, 'only '+str(rate_limit['remaining_hits'])+' hits allowed until '+str(rate_limit['reset_time'])
                 break
             
             # acquire a lock before creating new thread
             self.semaphore.acquire()
             # spawn a worker thread to retreive the specified tweet data
-            thread = RetrieveTweets(self,screen_name,page,self.db,self.use_test_data,self.save_test_data)
+            thread = self.retrieval_factory.get_worker_thread(self,screen_name,page,self.db,request_id)
             self.worker_threads.append(thread)
             thread.start()
         
@@ -168,7 +197,7 @@ if __name__ == '__main__':
     
     # parse command line arguments
     try:
-        opts,args = getopt.getopt(sys.argv[1:], "c:ts", ["config=","test","save"])
+        opts,args = getopt.getopt(sys.argv[1:], "c:", ["config="])
     except getopt.GetoptError, err:
         print >> sys.stderr, 'error: ' + str(err)
         print >> sys.stderr, usage()
@@ -180,10 +209,6 @@ if __name__ == '__main__':
     for o,a in opts:
         if o in ("-c", "--config"):
             cfg = LoadConfig(a)
-        elif o in ("-t", "--test"):
-            use_test_data = True
-        elif o in ("-s", "--save"):
-            save_test_data = True
         else:
             assert False, "unhandled option"
     
@@ -191,11 +216,12 @@ if __name__ == '__main__':
         cfg = DefaultConfig()
     
     # run the manager
-    thread = Manager(cfg.raw.couch_server_url,cfg.raw.couch_db,cfg.raw.max_simultaneous_requests,use_test_data,save_test_data);
+    factory = RetrieveTweetsFactory(use_mock_data=True);
+    thread = Manager(cfg.raw.couch_server_url,cfg.raw.couch_db,factory,cfg.raw.max_simultaneous_requests);
     thread.start()
     
     # keep running until user types 'exit', then terminate nicely
-    # (ie: allow all currently running threads to complete before closing) 
+    # (ie: allow all currently running jobs to complete before closing) 
     while True:
         input = raw_input("type \'exit\' to terminate:\n");
         if input == 'exit':

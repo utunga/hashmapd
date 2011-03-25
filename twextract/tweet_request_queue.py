@@ -5,8 +5,11 @@ import getopt
 sys.path[0] = sys.path[0]+os.sep+'..'
 
 import couchdb
+import datetime
 
 from hashmapd import LoadConfig,DefaultConfig
+
+import inspect
 
 #==============================================================================
 # Manages the Tweet Request database.
@@ -18,40 +21,47 @@ class TweetRequestQueue(object):
     
     n_pages = 3;
     
-    def __init__(self,server_url='http://127.0.0.1:5984',db_name='tweet_request_queue'):
+    def __init__(self,server_url='http://127.0.0.1:5984',db_name='hashmapd'):
         self.db = couchdb.Server(server_url)[db_name]
     
+    # dequeue the front item (request) in the queue 
     def next(self):
-        front = self.db['front']
-        back = self.db['back']
+        # 1) produce view of underway requests
+        queue_view = self.db['_design/queue']['views']['underway_download_requests']['map'];
+        results = self.db.query(queue_view)
         
-        front_val = front['value']
+        # 2) if the oldest request has been underway for too long (2m for now), return that (as it has probably failed)
+        for result in results:
+            row = self.db[result.id]
+            try:
+                if (datetime.datetime.strptime(row['started_time'],"%Y-%m-%dT%H:%M:%S.%f") > datetime.datetime.now()-datetime.timedelta(minutes=2)):
+                    break
+                row['started_time'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+                self.db[result.id] = row
+                return row
+            except KeyError:
+                break
         
-        # check to see if the db (queue) is empty
-        if back['value'] < front_val:
-            return None
+        # produce view of requests
+        queue_view = self.db['_design/queue']['views']['queued_download_requests']['map'];
+        results = self.db.query(queue_view)    
         
-        # note we can get away with this not being an atomic update as long
-        # as this method never runs multiple times simultaneously
-        next = self.db[str(front_val)]
-        del self.db[str(front_val)]
-        front['value'] += 1
-        self.db['front'] = front
-        return next
+        # get the first result (first request in the queue), update the start time field, and begin work
+        for result in results:
+            row = self.db[result.id]
+            row['started_time'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+            self.db[result.id] = row
+            return row
     
+    # enqueue an item (request) to the back of the queue 
     def add(self,screen_name,page):
-        back = self.db['back']
-        
-        # note we can get away with this not being an atomic update as long
-        # as this method never runs multiple times simultaneously
-        self.db[str(back['value']+1)] = {'screen_name':screen_name,'page':page}
-        back['value'] += 1
-        self.db['back'] = back
+        self.db.save({'username':screen_name,'page':page,\
+          'request_time':datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),'type':'download_request'})
     
+    # enqueue a series of requests (several pages) for a user to the back of the queue 
     def add_screen_name(self,screen_name):
         for page in xrange(1,self.n_pages+1):
             self.add(screen_name,page)
-
 
 #==============================================================================
 # Main method to add a tweet request (or a series of tweet requests) to the 
