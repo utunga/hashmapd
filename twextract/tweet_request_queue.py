@@ -2,7 +2,8 @@ import os
 import sys
 import getopt
 # move the working dir up one level so we can import hashmapd stuff
-sys.path[0] = sys.path[0]+os.sep+'..'
+if (not sys.path[0].endswith(os.sep+'..')):
+    sys.path[0] = sys.path[0]+os.sep+'..'
 
 import couchdb
 import datetime
@@ -24,44 +25,73 @@ class TweetRequestQueue(object):
     def __init__(self,server_url='http://127.0.0.1:5984',db_name='hashmapd'):
         self.db = couchdb.Server(server_url)[db_name]
     
-    # dequeue the front item (request) in the queue 
-    def next(self):
+    # dequeue the front item (request) in the queue (queue_name = 'download' or 'hash')
+    def next(self,queue_name):
         # 1) produce view of underway requests
-        queue_view = self.db['_design/queue']['views']['underway_download_requests']['map'];
+        queue_view = self.db['_design/queue']['views']['underway_'+queue_name+'_requests']['map'];
         results = self.db.query(queue_view)
         
-        # 2) if the oldest request has been underway for too long (2m for now), return that (as it has probably failed)
+        # 2) if the oldest request has been underway for too long (30s for now - may want to reduce this),
+        #    return that (as it has probably failed)
         for result in results:
             row = self.db[result.id]
             try:
-                if (datetime.datetime.strptime(row['started_time'],"%Y-%m-%dT%H:%M:%S.%f") > datetime.datetime.now()-datetime.timedelta(minutes=2)):
+                if (datetime.datetime.strptime(row['started_time'],"%Y-%m-%dT%H:%M:%S.%f") > datetime.datetime.now()-datetime.timedelta(seconds=30)):
                     break
-                row['started_time'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-                self.db[result.id] = row
+                self.started_request(row,result.id);
                 return row
             except KeyError:
                 break
         
         # produce view of requests
-        queue_view = self.db['_design/queue']['views']['queued_download_requests']['map'];
+        queue_view = self.db['_design/queue']['views']['queued_'+queue_name+'_requests']['map'];
         results = self.db.query(queue_view)    
         
         # get the first result (first request in the queue), update the start time field, and begin work
         for result in results:
             row = self.db[result.id]
-            row['started_time'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-            self.db[result.id] = row
+            self.started_request(row,result.id);
             return row
     
-    # enqueue an item (request) to the back of the queue 
-    def add(self,screen_name,page):
-        self.db.save({'username':screen_name,'page':page,\
-          'request_time':datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),'type':'download_request'})
+    # enqueue an item (hash request) to the back of the queue 
+    def add_hash_request(self,username):
+        self.db.save({'username':username,\
+          'request_time':datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),'doc_type':'hash_request'})
     
-    # enqueue a series of requests (several pages) for a user to the back of the queue 
-    def add_screen_name(self,screen_name):
+    # enqueue an item (download request) to the back of the queue 
+    def add_download_request(self,username,page):
+        self.db.save({'username':username,'page':page,\
+          'request_time':datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),'doc_type':'download_request'})
+    
+    # enqueue a series of download requests (several pages) for a user to the back of the queue 
+    def add_download_requests_for_username(self,username):
         for page in xrange(1,self.n_pages+1):
-            self.add(screen_name,page)
+            self.add_download_request(username,page)
+    
+    # mark a request as started (work is underway) 
+    def started_request(self,row,request_id):
+        row['started_time'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+        self.db[request_id] = row
+    
+    # mark a request as completed
+    def completed_request(self,row,request_id):
+        row['completed_time'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+        self.db[request_id] = row
+    
+    # work on a request has failed - so clear the started field, and increment
+    # the number of attempts field
+    def failed_request(self,row,request_id):
+        # clear started field
+        del row['started_time']
+        # increment number of attempts field
+        try:
+            fails = row['attempts']
+        except KeyError:
+            fails = 0
+        row['attempts'] = (fails+1)
+        # store the update row in the db
+        self.db[request_id] = row
+    
 
 #==============================================================================
 # Main method to add a tweet request (or a series of tweet requests) to the 
@@ -109,9 +139,9 @@ if __name__ == '__main__':
     # add request for user's tweet to the db queue
     tweet_request_queue = TweetRequestQueue(cfg.raw.couch_server_url,cfg.raw.request_queue_db)
     if page is None:
-        tweet_request_queue.add_screen_name(screen_name)
+        tweet_request_queue.add_download_requests_for_username(screen_name)
     else:
-        tweet_request_queue.add(screen_name,page)
+        tweet_request_queue.add_download_request(screen_name,page)
 
 
 

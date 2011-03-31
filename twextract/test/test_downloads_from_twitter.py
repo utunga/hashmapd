@@ -3,11 +3,15 @@ Tests the queue tasks in the twextract module
 """
 import sys, os
 from mock import Mock
+# move the working dir up two levels so we can import hashmapd stuff
+sys.path[0] = sys.path[0]+os.sep+'..'+os.sep+'..'
 
 import cPickle
 import gzip
 
 import couchdb
+
+import hashmapd
 
 from twextract.tweet_request_queue import TweetRequestQueue
 from twextract.store_tweets import StoreTweets
@@ -31,6 +35,7 @@ def test_downloads():
 
 
 def retrieve_pickled_data(username,page):
+    print sys.path[0]
     f = open(sys.path[0]+os.sep+'twextract'+os.sep+'stored_tweets'+os.sep+str(username)+str(page),'rb')
     tweet_data = cPickle.load(f)
     f.close()

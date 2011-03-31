@@ -41,7 +41,7 @@ map = function(doc) {
         terms.push(word);
         var weight = words.count(word);
         
-          emit([doc.screen_name, word], weight);
+          emit([doc.username, word], weight);
         
       }
     }

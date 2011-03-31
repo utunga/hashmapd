@@ -2,7 +2,8 @@ import os
 import sys
 import getopt
 # move the working dir up one level so we can import hashmapd stuff
-sys.path[0] = sys.path[0]+os.sep+'..'
+if (not sys.path[0].endswith(os.sep+'..')):
+    sys.path[0] = sys.path[0]+os.sep+'..'
 
 from mock import Mock
 
@@ -18,13 +19,14 @@ import datetime
 import couchdb
 
 from hashmapd import LoadConfig,DefaultConfig
+from twextract.store_user import StoreUser
 from twextract.store_tweets import StoreTweets
 from twextract.tweet_request_queue import TweetRequestQueue
 import twextract.lib.tweepy as tweepy
 
 
 min_hits = 50;
-count = 10; # TODO: why is this only returning half as many as is requested?
+count = 100;
 store_tweets = StoreTweets();
 tweet_request_queue = TweetRequestQueue();
 api = tweepy.API(parser=tweepy.parsers.JSONParser());
@@ -35,9 +37,9 @@ api = tweepy.API(parser=tweepy.parsers.JSONParser());
 #==============================================================================
 class RetrieveTweetsFactory(object):
     
-    def __init__(self,use_mock_data=False,save_mock_data=False):
+    def __init__(self,use_mock_data=False,save_data=False):
         self.use_mock_data = use_mock_data;
-        self.save_mock_data = save_mock_data;
+        self.save_data = save_data;
      
     def get_worker_thread(self,manager,screen_name,page,db,request_id):
         thread = RetrieveTweets(manager,screen_name,page,db,request_id)
@@ -45,23 +47,24 @@ class RetrieveTweetsFactory(object):
         if (self.use_mock_data):
             thread.retrieve_data_from_twitter = Mock()
             thread.retrieve_data_from_twitter.side_effect = self.retrieve_pickled_data
-        elif (self.save_mock_data):
+        elif (self.save_data):
             thread.retrieve_data_from_twitter = Mock()
             thread.retrieve_data_from_twitter.side_effect = self.pickle_data
         
         return thread
     
-    def retrieve_pickled_data(thread,screen_name,page):
+    def retrieve_pickled_data(self,screen_name,page):
         f = open('twextract'+os.sep+'stored_tweets'+os.sep+str(screen_name)+str(page),'rb')
         tweet_data = cPickle.load(f)
         f.close()
         return tweet_data
     
-    def pickle_data(thread,screen_name,page):
-        tweet_data = thread.retrieve_data_from_twitter(self.screen_name,self.page);
+    def pickle_data(self,screen_name,page):
+        tweet_data = api.user_timeline(screen_name=screen_name,page=page,count=count,include_entities=True,trim_user=True,include_rts=False)
         f = open('twextract'+os.sep+'stored_tweets'+os.sep+str(screen_name)+str(page),'wb')
         cPickle.dump(tweet_data,f,cPickle.HIGHEST_PROTOCOL)
         f.close()
+        return tweet_data
 
 
 #==============================================================================
@@ -75,7 +78,7 @@ class RetrieveTweets(threading.Thread):
         self.manager = manager
         self.screen_name = screen_name
         self.page = page
-        self.db = db        
+        self.db = db
         self.request_id = request_id
     
     def run(self):
@@ -87,11 +90,18 @@ class RetrieveTweets(threading.Thread):
         except Exception, err:
             # notify manager of error
             self.manager.notifyFailed(self,err)
+            return
+        
         # notify manager that data has been retrieved
         self.manager.notifyCompleted(self)
     
     def retrieve_data_from_twitter(self,screen_name,page):
-        return api.user_timeline(screen_name=screen_name,count=count,page=page,include_entities=True,trim_user=True,include_rts=False)
+        # TODO: we do not actually get back "count" tweets. we get back all the
+        #       "non-retweets" over the last 100 tweets that the user has made.
+        #       is this a big problem? (if so, there is a separate call to get
+        #       retweets, but there doesn't appear to be a single call that gets
+        #       both "statuses" and "retweets")
+        return api.user_timeline(screen_name=screen_name,page=page,count=count,include_entities=True,trim_user=True,include_rts=False)
 
 #==============================================================================
 # Loop until user terminates program. Obtain tweet requests from the queue and
@@ -116,43 +126,66 @@ class Manager(threading.Thread):
     def notifyCompleted(self,thread):
         self.worker_threads.remove(thread)
         self.semaphore.release()
-        # write finished time
-        row = self.db[thread.request_id]
-        row['completed_time'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-        self.db[thread.request_id] = row
+        # report to the queue that the job finished successfully
+        row = self.db[thread.request_id];
+        tweet_request_queue.completed_request(row,thread.request_id);
+        # create hash request if completed downloading user requests
+        self.createHashRequest(thread);
         # print notification of completion
         print 'Retrieved tweets ('+str(thread.screen_name)+','+str(thread.page)+')'
     
     def notifyFailed(self,thread,err):
         self.worker_threads.remove(thread)
         self.semaphore.release()
-        # clear started time, so that job will be restarted
-        # TODO: (is this a good idea? what if the job keeps failing over and over for some reason?)  
+        # report to the queue that the job failed
         row = self.db[thread.request_id]
-        del row['started_time']
-        self.db[thread.request_id] = row
+        tweet_request_queue.failed_request(row,thread.request_id);
+        # create hash request if completed downloading user requests
+        self.createHashRequest(thread);
         # print error message
         print >> sys.stderr, 'Error retrieving tweets ('+str(thread.screen_name)+','+str(thread.page)+'):\n'+str(err)
     
+    def createHashRequest(self,thread):
+        # if there are no more pending download requests for this user,
+        # create a new hash request for the user
+        
+        # TODO:
+        #   - only want to create a hash if this was a user request 
+        #   - may want to optimize the decision here a bit more.
+        # (eg: has the user had a hash calculated recently?,
+        #      how much more data has been added for this user since last hash?,
+        #      etc.)
+        queue_view = self.db['_design/queue']['views']['queued_user_download_requests']['map'];
+        results = self.db.query(queue_view)
+        
+        if len(results[thread.screen_name]) == 0:
+            tweet_request_queue.add_hash_request(thread.screen_name);
+            pass
+    
     def run(self):
-        # - obtain a twitter screen name from file
-        # spawn a thread for each page
+        # - obtain a twitter screen name from db that needs data downloaded
+        # spawn a thread for each page of downloads
         while self.terminate == False:
             # get the next request
-            next_request = tweet_request_queue.next()
-            # if the queue is empty, check for new data (every 5 seconds for now)
+            next_request = tweet_request_queue.next('download')
+            # if the queue is empty, check for new data (every 2 seconds for now)
             # (might want to just terminate here)
             if next_request == None:
-                time.sleep(5)
+                time.sleep(2)
                 continue;
             
             screen_name = next_request['username']
             page = next_request['page']
-            request_id = next_request['_id']
+            request_id = next_request.id
+            
+            # if there is no entry in the db for this user, create one 
+            if screen_name not in self.db:
+                thread = StoreUser(screen_name,self.db,api)
+                thread.start()
             
             # check that there are enough twitter hits left
             # TODO: this may be able to be done more efficiently by examining 
-            #         the header of the most recently returned data
+            #       the header of the most recently returned data
             rate_limit = tweepy.api.rate_limit_status()
             if rate_limit['remaining_hits'] < min_hits:
                 print >> sys.stderr, 'only '+str(rate_limit['remaining_hits'])+' hits allowed until '+str(rate_limit['reset_time'])
@@ -175,7 +208,6 @@ class Manager(threading.Thread):
         print ''
         print 'exited download_tweets.py, hits left: '+str(limit['remaining_hits'])
         print '(reset time: '+str(limit['reset_time']+')')
-    
     
     def exit(self):
         self.terminate = True;
@@ -216,7 +248,7 @@ if __name__ == '__main__':
         cfg = DefaultConfig()
     
     # run the manager
-    factory = RetrieveTweetsFactory(use_mock_data=True);
+    factory = RetrieveTweetsFactory(save_data=True);
     thread = Manager(cfg.raw.couch_server_url,cfg.raw.couch_db,factory,cfg.raw.max_simultaneous_requests);
     thread.start()
     
