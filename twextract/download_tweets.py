@@ -21,14 +21,14 @@ import couchdb
 from hashmapd import LoadConfig,DefaultConfig
 from twextract.store_user import StoreUser
 from twextract.store_tweets import StoreTweets
-from twextract.tweet_request_queue import TweetRequestQueue
+from twextract.request_queue import RequestQueue
 import twextract.lib.tweepy as tweepy
 
 
 min_hits = 50;
 count = 100;
 store_tweets = StoreTweets();
-tweet_request_queue = TweetRequestQueue();
+request_queue = RequestQueue();
 api = tweepy.API(parser=tweepy.parsers.JSONParser());
 
 
@@ -54,14 +54,14 @@ class RetrieveTweetsFactory(object):
         return thread
     
     def retrieve_pickled_data(self,screen_name,page):
-        f = open('twextract'+os.sep+'stored_tweets'+os.sep+str(screen_name)+str(page),'rb')
+        f = open(sys.path[0]+os.sep+'twextract'+os.sep+'stored_tweets'+os.sep+str(screen_name)+str(page),'rb')
         tweet_data = cPickle.load(f)
         f.close()
         return tweet_data
     
     def pickle_data(self,screen_name,page):
         tweet_data = api.user_timeline(screen_name=screen_name,page=page,count=count,include_entities=True,trim_user=True,include_rts=False)
-        f = open('twextract'+os.sep+'stored_tweets'+os.sep+str(screen_name)+str(page),'wb')
+        f = open(sys.path[0]+os.sep+'twextract'+os.sep+'stored_tweets'+os.sep+str(screen_name)+str(page),'wb')
         cPickle.dump(tweet_data,f,cPickle.HIGHEST_PROTOCOL)
         f.close()
         return tweet_data
@@ -89,11 +89,11 @@ class RetrieveTweets(threading.Thread):
             store_tweets.store(self.screen_name,tweet_data,self.db)
         except Exception, err:
             # notify manager of error
-            self.manager.notifyFailed(self,err)
+            self.manager.notify_failed(self,err)
             return
         
         # notify manager that data has been retrieved
-        self.manager.notifyCompleted(self)
+        self.manager.notify_completed(self)
     
     def retrieve_data_from_twitter(self,screen_name,page):
         # TODO: we do not actually get back "count" tweets. we get back all the
@@ -123,29 +123,29 @@ class Manager(threading.Thread):
         self.semaphore = semaphore = threading.Semaphore(max_simultaneous_requests)
         self.terminate = False
     
-    def notifyCompleted(self,thread):
+    def notify_completed(self,thread):
         self.worker_threads.remove(thread)
         self.semaphore.release()
         # report to the queue that the job finished successfully
         row = self.db[thread.request_id];
-        tweet_request_queue.completed_request(row,thread.request_id);
+        request_queue.completed_request(row,thread.request_id);
         # create hash request if completed downloading user requests
-        self.createHashRequest(thread);
+        self.create_hash_request_if_finished(thread);
         # print notification of completion
         print 'Retrieved tweets ('+str(thread.screen_name)+','+str(thread.page)+')'
     
-    def notifyFailed(self,thread,err):
+    def notify_failed(self,thread,err):
         self.worker_threads.remove(thread)
         self.semaphore.release()
         # report to the queue that the job failed
         row = self.db[thread.request_id]
-        tweet_request_queue.failed_request(row,thread.request_id);
+        request_queue.failed_request(row,thread.request_id);
         # create hash request if completed downloading user requests
-        self.createHashRequest(thread);
+        self.create_hash_request_if_finished(thread);
         # print error message
         print >> sys.stderr, 'Error retrieving tweets ('+str(thread.screen_name)+','+str(thread.page)+'):\n'+str(err)
     
-    def createHashRequest(self,thread):
+    def create_hash_request_if_finished(self,thread):
         # if there are no more pending download requests for this user,
         # create a new hash request for the user
         
@@ -155,11 +155,10 @@ class Manager(threading.Thread):
         # (eg: has the user had a hash calculated recently?,
         #      how much more data has been added for this user since last hash?,
         #      etc.)
-        queue_view = self.db['_design/queue']['views']['queued_user_download_requests']['map'];
-        results = self.db.query(queue_view)
+        results = self.db.view('queue/queued_user_download_requests', reduce=False)
         
         if len(results[thread.screen_name]) == 0:
-            tweet_request_queue.add_hash_request(thread.screen_name);
+            request_queue.add_hash_request(thread.screen_name);
             pass
     
     def run(self):
@@ -167,7 +166,7 @@ class Manager(threading.Thread):
         # spawn a thread for each page of downloads
         while self.terminate == False:
             # get the next request
-            next_request = tweet_request_queue.next('download')
+            next_request = request_queue.next('download')
             # if the queue is empty, check for new data (every 2 seconds for now)
             # (might want to just terminate here)
             if next_request == None:
@@ -248,7 +247,7 @@ if __name__ == '__main__':
         cfg = DefaultConfig()
     
     # run the manager
-    factory = RetrieveTweetsFactory(save_data=True);
+    factory = RetrieveTweetsFactory();
     thread = Manager(cfg.raw.couch_server_url,cfg.raw.couch_db,factory,cfg.raw.max_simultaneous_requests);
     thread.start()
     

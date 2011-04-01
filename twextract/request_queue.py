@@ -18,7 +18,7 @@ import inspect
 # Contains methods to add request(s), or to get the next request off the db
 # "Queue".
 #==============================================================================
-class TweetRequestQueue(object):
+class RequestQueue(object):
     
     n_pages = 3;
     
@@ -28,8 +28,7 @@ class TweetRequestQueue(object):
     # dequeue the front item (request) in the queue (queue_name = 'download' or 'hash')
     def next(self,queue_name):
         # 1) produce view of underway requests
-        queue_view = self.db['_design/queue']['views']['underway_'+queue_name+'_requests']['map'];
-        results = self.db.query(queue_view)
+        results = self.db.view('queue/underway_'+queue_name+'_requests', reduce=False)
         
         # 2) if the oldest request has been underway for too long (30s for now - may want to reduce this),
         #    return that (as it has probably failed)
@@ -44,8 +43,7 @@ class TweetRequestQueue(object):
                 break
         
         # produce view of requests
-        queue_view = self.db['_design/queue']['views']['queued_'+queue_name+'_requests']['map'];
-        results = self.db.query(queue_view)    
+        results = self.db.view('queue/queued_'+queue_name+'_requests', reduce=False)
         
         # get the first result (first request in the queue), update the start time field, and begin work
         for result in results:
@@ -137,11 +135,11 @@ if __name__ == '__main__':
         cfg = DefaultConfig()
     
     # add request for user's tweet to the db queue
-    tweet_request_queue = TweetRequestQueue(cfg.raw.couch_server_url,cfg.raw.request_queue_db)
+    request_queue = RequestQueue(cfg.raw.couch_server_url,cfg.raw.request_queue_db)
     if page is None:
-        tweet_request_queue.add_download_requests_for_username(screen_name)
+        request_queue.add_download_requests_for_username(screen_name)
     else:
-        tweet_request_queue.add_download_request(screen_name,page)
+        request_queue.add_download_request(screen_name,page)
 
 
 

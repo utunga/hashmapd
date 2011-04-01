@@ -24,10 +24,13 @@ class StoreUser(threading.Thread):
     # make a record for the given user (their hash, etc will later be
     # stored here)
     def run(self):
+        if self.username in self.db:
+            return
         self.db[self.username] = {'loading':''};
+        
         try:
             self.store_user(self.api.get_user(screen_name=self.username),self.db[self.username]['_rev']);
-        except couchdb.ResourceConflict, e:
+        except couchdb.ResourceConflict:
             del self.db[self.username];
     
     def store_user(self,user_info,rev):

@@ -23,12 +23,12 @@ import theano
 
 import hashmapd
 import run
-from twextract.tweet_request_queue import TweetRequestQueue
-from twextract.store_hashes import StoreHashes
+from twextract.request_queue import RequestQueue
+from twextract.store_results import StoreResults
 
 
-tweet_request_queue = TweetRequestQueue();
-store_hashes = StoreHashes();
+request_queue = RequestQueue();
+store_results = StoreResults();
 
 
 #==============================================================================
@@ -45,11 +45,16 @@ class ComputeHashFactory(object):
         if (self.use_mock_data):
             thread.compute_hash = Mock()
             thread.compute_hash.side_effect = self.compute_fake_hash
+            thread.compute_tsne = Mock()
+            thread.compute_tsne.side_effect = self.compute_fake_coords
         
         return thread
     
     def compute_fake_hash(thread,raw_word_counts):
         return numpy.random((1,cfg.shape.inner_code_length),dtype=theano.config.floatX);
+    
+    def compute_fake_coords(thread,raw_word_counts):
+        return numpy.random((1,2),dtype=theano.config.floatX);
 
 
 #==============================================================================
@@ -71,19 +76,25 @@ class ComputeHash(threading.Thread):
             # obtain hash
             hash = self.compute_hash(self.raw_word_counts);
             # store the tweets in specified db
-            store_hashes.store(self.screen_name,hash,self.db)
-            # TODO: could also do TSNE and compute co-ordinates here
+            store_results.store_hash(self.screen_name,hash[0],self.db)
+            # TODO: also do TSNE and compute co-ordinates here
+            coords = self.calc_tsne(hash,cfg.tsne.desired_dims,cfg.tsne.perplexity,cfg.tsne.pca_dims);
+            # store the co-ordinates in specified db
+            store_results.store_coords(self.screen_name,coords[0],self.db)
             
         except Exception, err:
             # notify manager of error
-            self.manager.notifyFailed(self,err)
+            self.manager.notify_failed(self,err)
             return
         
         # notify manager that data has been retrieved
-        self.manager.notifyCompleted(self)
+        self.manager.notify_completed(self)
     
     def compute_hash(self,raw_word_counts):
-        return run.get_output_codes(self.manager.smh,raw_word_counts)[0];
+        return run.get_output_codes(self.manager.smh,raw_word_counts);
+    
+    def calc_tsne(self,hash,desired_dims,perplexity,pca_dims):
+        return run.calc_tsne(hash,desired_dims,perplexity,pca_dims);
 
 import time
 
@@ -109,32 +120,32 @@ class Manager(threading.Thread):
                        mid_layer_sizes=list(cfg.shape.mid_layer_sizes), inner_code_length=cfg.shape.inner_code_length,\
                        weights_file=cfg.train.weights_file)
     
-    def notifyCompleted(self,thread):
+    def notify_completed(self,thread):
         self.worker_threads.remove(thread)
         self.semaphore.release()
         
         # write finished time
         row = self.db[thread.request_id]
-        tweet_request_queue.completed_request(row,thread.request_id);
+        request_queue.completed_request(row,thread.request_id);
         # print notification of completion
         print 'Computed hash ('+str(thread.screen_name)+')'
     
-    def notifyFailed(self,thread,err):
+    def notify_failed(self,thread,err):
         self.worker_threads.remove(thread)
         self.semaphore.release()
         # clear started time, so that the job will be restarted
         # TODO: (is this a good idea? what if the job keeps failing over and over for some reason?)  
         row = self.db[thread.request_id]
-        tweet_request_queue.failed_request(row,thread.request_id);
+        request_queue.failed_request(row,thread.request_id);
         # print error message
-        print >> sys.stderr, 'Error computing hash ('+str(thread.screen_name)+'):\n'+str(err)
+        print >> sys.stderr, 'Error computing hash/coords ('+str(thread.screen_name)+'):\n'+str(err)
     
     def run(self):
         # - obtain a username from db that needs hash computed
         # spawn a thread for each job
         while self.terminate == False:
             # get the next request
-            next_request = tweet_request_queue.next('hash')
+            next_request = request_queue.next('hash')
             # if the queue is empty, check for new data (every 2 seconds for now)
             # (might want to just terminate here)
             if next_request == None:

@@ -1,14 +1,14 @@
 import couchdb
 
 #==============================================================================
-# Store the calculated hash in the specified db
+# Store the calculated hash or coords in the specified db
 #==============================================================================
-class StoreHashes(object):
+class StoreResults(object):
     
     def __init__(self):
         pass
     
-    def store(self, username, hash, db):
+    def store_hash(self, username, hash, db):
         # store the hash in the db under this user
         try:
             row = db[username];
@@ -18,4 +18,13 @@ class StoreHashes(object):
         except couchdb.ResourceConflict:
             return
     
+    def store_coords(self, username, coords, db):
+        # store the hash in the db under this user
+        try:
+            row = db[username];
+            row['coords'] = str(coords);
+            db[username] = row;
+            
+        except couchdb.ResourceConflict:
+            return
     

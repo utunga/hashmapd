@@ -6,6 +6,7 @@ import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
 from struct import *
 from hashmapd import *
+import tSNE
 
 #################################
 ## stuff relating to running the SMH step
@@ -49,7 +50,10 @@ def load_data_with_labels(dataset):
                 if labels[i,j] == 1:
                     concat_labels[i] = j;
     
-    return [x,concat_labels]
+    x = x[0:500];
+    x_sums = x_sums[0:500];
+    
+    return [x/numpy.array([x_sums]*(x.shape[1])).transpose(),concat_labels]
     
     #not sure if making these things 'shared' helps the GPU out but just in case we may as well do that
     #x_shared  = theano.shared(numpy.asarray(x[0:500], dtype=theano.config.floatX))
@@ -103,121 +107,15 @@ def get_output_codes(smh, data_x):
 ## stuff relating to running the t-sne step
 #################################
 
-#fixed filename in binary makes for non-scalable code (only one instance can run at a time) ;-(
-TSNE_OUTPUT_FILE = "result.dat"; #turns out it *has* to be this to play nicely with the c++ binary 
-PCA_INTERIM_FILE = "data.dat"; #turns out it *has* to be this to play nicely with the c++ binary 
-
-
 def calc_tsne(data_matrix,NO_DIMS=2,PERPLEX=30,INITIAL_DIMS=30,LANDMARKS=1):
     """
-    This is the main tsne function. In process of doing this writes, then clears up interim file(s)
-    data_matrix is a 2D numpy array containing your data (each row is a data point)
-    Remark : LANDMARKS is a ratio (0<LANDMARKS<=1)
-    If LANDMARKS == 1 , it returns the list of points in the same order as the input
+    This is the main tSNE function:
+    (uses code from http://homepage.tudelft.nl/19j49/t-SNE.html)
     """
     
-    #data_matrix=do_pca(data_matrix,INITIAL_DIMS)
-    write_data(data_matrix,NO_DIMS,PERPLEX,LANDMARKS)
-    do_tSNE()
-    Xmat,LM,costs=read_results()
-    clear_interim_data()
-    if LANDMARKS==1:
-        X=re_order(Xmat,LM)
-        return X
-    return Xmat,LM
-
-def do_tSNE():
-    """
-    Calls the tsne c++ implementation depending on the platform
-    """
-    platform=sys.platform
-    print'Platform detected : %s'%platform
-    if platform in ['mac', 'darwin'] :
-        cmd='lib/tSNE_maci'
-    elif platform == 'win32' :
-        cmd='lib\\tSNE_win'
-    elif platform == 'linux2' :
-        cmd='lib/tSNE_linux'
-    else :
-        print 'Not sure about the platform, we will try linux version...'
-        cmd='../lib/tSNE_linux'
-    print 'Calling executable "%s"'%cmd
-    os.system(cmd)
-    
-def do_pca(data_matrix, INITIAL_DIMS) :
-    """
-    Performs PCA on data.
-    Reduces the dimensionality to INITIAL_DIMS
-    """
-    print 'Performing PCA'
-
-    data_matrix= data_matrix-data_matrix.mean(axis=0)
-
-    if data_matrix.shape[1]<INITIAL_DIMS:
-        INITIAL_DIMS=data_matrix.shape[1]
-
-    (eigValues,eigVectors)=numpy.linalg.eig(numpy.cov(data_matrix.T))
-    perm=numpy.argsort(-eigValues)
-    eigVectors=eigVectors[:,perm[0:INITIAL_DIMS]]
-    data_matrix=numpy.dot(data_matrix,eigVectors)
-    return data_matrix
-
-def read_bin(type,file) :
-    """
-    used to read binary data from a file
-    """
-    return unpack(type,file.read(calcsize(type)))
-
-def read_results():
-    """
-    Reads result from result.dat
-    """
-    print 'Reading tsne results..'
-    f=open(TSNE_OUTPUT_FILE,'rb')
-    n,ND=read_bin('ii',f)
-    Xmat=numpy.empty((n,ND))
-    for i in range(n):
-        for j in range(ND):
-            Xmat[i,j]=read_bin('d',f)[0]
-    LM=read_bin('%ii'%n,f)
-    costs=read_bin('%id'%n,f)
-    f.close()
-    return (Xmat,LM,costs)
-
-def re_order(Xmat, LM):
-    """
-    Re-order the data in the original order
-    Call only if LANDMARKS==1
-    """
-    print 'Reordering results'
-    X=numpy.zeros(Xmat.shape)
-    for i,lm in enumerate(LM):
-        X[lm]=Xmat[i]
-    return X
-
-def clear_interim_data():
-    """
-    Clears files data.dat and result.dat
-    """
-    print 'Clearing interim data files'
-    if sys.platform == 'win32' :
-        os.system('del %s'%PCA_INTERIM_FILE)
-        os.system('del %s'%TSNE_OUTPUT_FILE)
-    else :
-        os.system('rm %s'%PCA_INTERIM_FILE)
-        os.system('rm %s'%TSNE_OUTPUT_FILE)
-
-def write_data(data_matrix,NO_DIMS,PERPLEX,LANDMARKS):
-    print 'Writing data.dat'
-    print 'Dimension of projection : %i \nPerplexity : %i \nLandmarks(ratio) : %f'%(NO_DIMS,PERPLEX,LANDMARKS)
-    n,d = data_matrix.shape
-    f = open('data.dat', 'wb')
-    f.write(pack('=iiid',n,d,NO_DIMS,PERPLEX))
-    f.write(pack('=d',LANDMARKS))
-    for inst in data_matrix :
-        for el in inst :
-            f.write(pack('=d',el))
-    f.close()
+    y = tSNE.tsne(data_matrix,NO_DIMS,INITIAL_DIMS,PERPLEX,True)
+    print y
+    return y
 
 def scale_to_interval(arr,max=1.0, eps=1e-8):
     """ Scales all values in the numpy array to be between 0 and max """
@@ -234,8 +132,8 @@ def write_csv_coords(coords, output_file="out/coords.csv"):
     
     print 'writing coordinates to csv'
     csv_writer = csv.writer(open(output_file, 'wb'), delimiter=',')
-    for row in coords:
-        csv_writer.writerow(["%.10f"%code for code in row]) # format with 10dp accuracy (but no '-e' format stuff)
+    for r in xrange(len(coords)):
+        csv_writer.writerow(coords[r].astype('|S12')) # format with 10dp accuracy (but no '-e' format stuff)
 
 
 def write_csv_labels(labels, output_file="out/labels.csv"):
