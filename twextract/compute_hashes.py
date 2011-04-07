@@ -11,6 +11,7 @@ from Queue import Queue
 import threading
 import time
 
+import csv
 import cPickle
 import gzip
 
@@ -116,6 +117,7 @@ class Manager(threading.Thread):
         self.semaphore = semaphore = threading.Semaphore(max_simultaneous_requests)
         self.terminate = False
         # load the SMH in once, and use to compute all hashes
+        self.words_dict = load_words_dict()
         self.smh = run.load_model(cfg.train.cost, n_ins=cfg.shape.input_vector_length,\
                        mid_layer_sizes=list(cfg.shape.mid_layer_sizes), inner_code_length=cfg.shape.inner_code_length,\
                        weights_file=cfg.train.weights_file)
@@ -155,10 +157,16 @@ class Manager(threading.Thread):
             screen_name = next_request['username']
             request_id = next_request.id
             
+            # construct histogram based on the user's tweets
+            visible_data = self.construct_histogram(screen_name)
+            # convert from sums to percentages
+            visible_data = visible_data/visible_data.sum();
+            
+            print visible_data.sum();
+            
             # acquire a lock before creating new thread
             self.semaphore.acquire()
-            # spawn a worker thread to compute a hash for the specified user
-            visible_data = self.construct_histogram(screen_name)
+            # spawn a worker thread to compute a hash for the specified user 
             thread = self.retrieval_factory.get_worker_thread(self,screen_name,visible_data,self.db,request_id)
             self.worker_threads.append(thread)
             thread.start()
@@ -181,17 +189,14 @@ class Manager(threading.Thread):
         # obtain results from this user only
         results = results[[screen_name]:[screen_name,'Z']]
         
-        # TODO: need to get an list of words that we are using to
-        #       evaluate tweets, so that we can build a histogram 
-        words_dict = {'world':0,'you':2999}
+        # build the histogram of relevant word counts for this user
         visible_data = numpy.zeros((1,cfg.shape.input_vector_length),dtype=theano.config.floatX);
-        
         # TODO: this a moderately expensive operation. consider trying to make
         #       it more efficient at some point
         for result in results:
             try:
-                visible_data[0,words_dict[result.key[1]]] = result.value
-            except:
+                visible_data[0,self.words_dict[result.key[1]]] = result.value
+            except KeyError:
                 pass
         
         return visible_data
@@ -199,6 +204,16 @@ class Manager(threading.Thread):
     def exit(self):
         self.terminate = True;
 
+def load_words_dict():
+    # load in the list of words used in trained SMH (throw away header line)
+    csvReader = csv.reader(open(cfg.input.input_words,"rb"),delimiter=',',quotechar='\"');
+    csvReader.next();
+    
+    # load data into dictionary for fast access 
+    words_dict = {}
+    for line in csvReader:
+        words_dict[line[1].lower()] = int(line[0]);
+    return words_dict;
 
 #==============================================================================
 # Main method to intialize and run the Manager indefinitely

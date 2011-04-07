@@ -17,8 +17,6 @@ class StoreTweets(object):
             tweet['doc_type'] = 'raw_tweet'
             tweet['username'] = username
             tweet['provider_namespace'] = 'twitter'
-            # TODO: should we delete the user info (which is basically redundant)? 
-            # del tweet['user']
             
             # store the tweet in the db (if this tweet was already stored in 
             # the db, ignore it - this could happen if a download is carried 

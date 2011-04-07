@@ -50,9 +50,6 @@ def load_data_with_labels(dataset):
                 if labels[i,j] == 1:
                     concat_labels[i] = j;
     
-    x = x[0:500];
-    x_sums = x_sums[0:500];
-    
     return [x/numpy.array([x_sums]*(x.shape[1])).transpose(),concat_labels]
     
     #not sure if making these things 'shared' helps the GPU out but just in case we may as well do that
@@ -98,8 +95,8 @@ def output_trace(smh, data_x, prefix="run", skip_trace_images=True):
     image.save('trace/%s_reconstruction.png'%prefix)
 
 def get_output_codes(smh, data_x):
-    
     print 'running input data forward through smh..'
+    
     output_codes = smh.output_codes_given_x(data_x);
     return output_codes; #a 2d array consisting of 'smh' representation of each input row as a row of floats
 

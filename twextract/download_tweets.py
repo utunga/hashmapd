@@ -29,7 +29,6 @@ min_hits = 50;
 count = 100;
 store_tweets = StoreTweets();
 request_queue = RequestQueue();
-api = tweepy.API(parser=tweepy.parsers.JSONParser());
 
 
 #==============================================================================
@@ -185,7 +184,7 @@ class Manager(threading.Thread):
             # check that there are enough twitter hits left
             # TODO: this may be able to be done more efficiently by examining 
             #       the header of the most recently returned data
-            rate_limit = tweepy.api.rate_limit_status()
+            rate_limit = api.rate_limit_status()
             if rate_limit['remaining_hits'] < min_hits:
                 print >> sys.stderr, 'only '+str(rate_limit['remaining_hits'])+' hits allowed until '+str(rate_limit['reset_time'])
                 break
@@ -203,7 +202,7 @@ class Manager(threading.Thread):
             thread.join()
         
         # determine no hits left after completion
-        limit = tweepy.api.rate_limit_status()
+        limit = api.rate_limit_status()
         print ''
         print 'exited download_tweets.py, hits left: '+str(limit['remaining_hits'])
         print '(reset time: '+str(limit['reset_time']+')')
@@ -221,8 +220,14 @@ def usage():
            '   [-c config]        specifies config file to load                 '
 
 if __name__ == '__main__':
+    # authenticate with oauth
+    auth = tweepy.OAuthHandler("1cjT3GVthyCrZ6RfC9cMeg","6uJ5hVQypk8MHM9Y14qEOj5ea2Rs5XlGWVuw85JotQ");
+    auth.set_access_token("5427252-3uobQYDfgj1ILyp8UFI31Bcm2k4y3eZ1KyqNXgbnE","r2daVhbHcJQZW1c7drFC3EGxn8rHS0aK7teUooqFLZY");
+    
+    api = tweepy.API(auth,parser=tweepy.parsers.JSONParser())
+    
     # determine no hits left before starting
-    limit = tweepy.api.rate_limit_status()
+    limit = api.rate_limit_status()
     print 'starting download_tweets.py, hits left: '+str(limit['remaining_hits'])
     print ''
     

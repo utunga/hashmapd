@@ -19,7 +19,7 @@ PICKLED_TOPICS_FILE = "data/reuters/reuters_topics.pkl.gz";       # topic_id -> 
 PICKLED_DOCS_FILE = "data/reuters/reuters_docs.pkl.gz";           # doc_id -> reuters_doc_id
 PICKLED_WORD_VECTORS_TRAINING_FILE_POSTFIX = "training_data";     # doc_id,word_id -> doc_word_frequency
 PICKLED_WORD_VECTORS_VALIDATION_FILE_POSTFIX = "validation_data"; # doc_id,word_id -> doc_word_frequency
-PICKLED_WORD_VECTORS_TESTING_FILE_POSTFIX = "testing_data";      # doc_id,word_id -> doc_word_frequency
+PICKLED_WORD_VECTORS_TESTING_FILE_POSTFIX = "testing_data";       # doc_id,word_id -> doc_word_frequency
 PICKLED_FILE_TYPE = ".pkl.gz"
 
 # TOPIC DESCRIPTIONS

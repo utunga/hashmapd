@@ -140,10 +140,10 @@ class RBM_Poisson(object):
         pre_sigmoid_activation = T.dot(vis, self.W) + self.hbias
         return [pre_sigmoid_activation, T.nnet.sigmoid(pre_sigmoid_activation)]
 
-    def sample_h_given_v(self, v0_sample):
+    def sample_h_given_v(self, v0_sample, v_sums):
         ''' This function infers state of hidden units given visible units '''
         # compute the activation of the hidden units given a sample of the visibles
-        pre_sigmoid_h1, h1_mean = self.propup(v0_sample)
+        pre_sigmoid_h1, h1_mean = self.propup(v0_sample/v_sums)
         # get a sample of the hiddens given their activation
         # Note that theano_rng.binomial returns a symbolic sample of dtype 
         # int64 by default. If we want to keep our computations in floatX 
@@ -191,13 +191,13 @@ class RBM_Poisson(object):
         ''' This function implements one step of Gibbs sampling, 
             starting from the hidden state'''
         pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h0_sample,v_sums)
-        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v1_sample)
+        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v1_sample,v_sums)
         return [pre_sigmoid_v1, v1_mean, v1_sample, pre_sigmoid_h1, h1_mean, h1_sample]
  
     def gibbs_vhv(self, v0_sample, v_sums):
         ''' This function implements one step of Gibbs sampling, 
             starting from the visible state'''
-        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v0_sample)
+        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v0_sample,v_sums)
         pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h1_sample,v_sums)
         return [pre_sigmoid_h1, h1_mean, h1_sample, pre_sigmoid_v1, v1_mean, v1_sample]
  
