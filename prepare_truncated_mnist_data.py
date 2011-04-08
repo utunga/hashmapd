@@ -15,7 +15,7 @@ from hashmapd.utils import tile_raster_images
 
 ##real data
 
-MNIST_FILE = 'data/mnist.pkl.gz'
+MNIST_FILE = 'data/truncated_mnist.pkl.gz'
 OUTPUT_FOLDER = 'data/mnist/'
 
     
@@ -50,19 +50,19 @@ def load_and_truncate_mnist(batch_size):
     cPickle.dump((OUTPUT_FOLDER+'mnist_training_data',1,int(math.floor(5000/batch_size)),
                 OUTPUT_FOLDER+'mnist_validation_data',1,int(math.floor(1000/batch_size)),
                 OUTPUT_FOLDER+'mnist_testing_data',1,int(math.floor(1000/batch_size)),
-                int(math.floor(5000/batch_size)),1),f, cPickle.HIGHEST_PROTOCOL)
+                int(math.floor(5000/batch_size)),train_set_x.sum()/5000),f, cPickle.HIGHEST_PROTOCOL)
     f.close()
     
     f = gzip.open(OUTPUT_FOLDER+'mnist_training_data0.pkl.gz','wb')
-    cPickle.dump((train_set_x,[0]*5000,[]),f, cPickle.HIGHEST_PROTOCOL) # no sums/labels
+    cPickle.dump((train_set_x,train_set_x.sum(axis=1),[]),f, cPickle.HIGHEST_PROTOCOL) # no sums/labels
     f.close()
     
     f = gzip.open(OUTPUT_FOLDER+'mnist_validation_data0.pkl.gz','wb')
-    cPickle.dump((valid_set_x,[0]*5000,[]),f, cPickle.HIGHEST_PROTOCOL) # no sums/labels
+    cPickle.dump((valid_set_x,valid_set_x.sum(axis=1),[]),f, cPickle.HIGHEST_PROTOCOL) # no sums/labels
     f.close()
     
     f = gzip.open(OUTPUT_FOLDER+'mnist_testing_data0.pkl.gz','wb')
-    cPickle.dump((test_set_x,[0]*5000,[]),f, cPickle.HIGHEST_PROTOCOL) # no sums/labels
+    cPickle.dump((test_set_x,test_set_x.sum(axis=1),[]),f, cPickle.HIGHEST_PROTOCOL) # no sums/labels
     f.close()
     
 

@@ -1,5 +1,5 @@
 // this view takes tweet data that was  generated in csharp, and creates an entry for each
-//    user (should be run with group=2)
+//    user (should be run with group = True)
 function(doc) {
-  emit([doc.screen_name,{username:doc.screen_name,doc_type:"user",hash:null,coords:null}],null)
+  emit([doc.screen_name,{screen_name:doc.screen_name,doc_type:"user",hash:null,coords:null}],null)
 }

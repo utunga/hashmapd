@@ -15,23 +15,23 @@ from twextract.request_queue import RequestQueue
 def test_queue_adds_request():
     # -- ARRANGE --
     # variables used to test
-    no_to_add = 5;
+    no_to_add = 5
     
     # set up result
     result = []
-    def add_result(value):
-        result.append(value);
+    def add_result(key,value):
+        result.append(value)
     
     # create a mock server
-    couchdb.client.Database.save = Mock();
-    couchdb.client.Database.save.side_effect = add_result;
+    couchdb.client.Database.__setitem__ = Mock()
+    couchdb.client.Database.__setitem__.side_effect = add_result
     
     #set up target
-    request_queue = RequestQueue('http://127.0.0.1:5984','hashmapd');
+    request_queue = RequestQueue('http://127.0.0.1:5984','hashmapd')
     
     # -- ACT --
     for i in xrange(no_to_add):
-        request_queue.add_download_request('utunga',i);
+        request_queue.add_download_request('utunga',i)
     
     # -- ASSERT --
     # ensure that the front of the queue remains unchanged, the back has been incremented, and the new values have been added
@@ -46,23 +46,23 @@ def test_queue_adds_request():
 def test_queue_adds_requests_for_username():
     # -- ARRANGE --
     # variables used to test
-    no_to_add = 5;
+    no_to_add = 5
     
     # set up result
     result = []
-    def add_result(value):
-        result.append(value);
+    def add_result(key,value):
+        result.append(value)
     
     # create a mock server
-    couchdb.client.Database.save = Mock();
-    couchdb.client.Database.save.side_effect = add_result;
+    couchdb.client.Database.__setitem__ = Mock()
+    couchdb.client.Database.__setitem__.side_effect = add_result
     
     # set up target
-    request_queue = RequestQueue('http://127.0.0.1:5984','hashmapd');
+    request_queue = RequestQueue('http://127.0.0.1:5984','hashmapd')
     
     # -- ACT --
     for i in xrange(no_to_add):
-        request_queue.add_download_requests_for_username('utunga');
+        request_queue.add_download_requests_for_username('utunga')
     
     # -- ASSERT --
     # ensure that the front of the queue remains unchanged, the back has been incremented, and the new values have been added
@@ -78,7 +78,7 @@ def test_queue_adds_requests_for_username():
 def test_download_requests_dequeued_in_order():
     # -- ARRANGE --
     # variables used to test
-    no_to_remove = 5;
+    no_to_remove = 5
     
     # set up result
     dict = {}
@@ -94,13 +94,13 @@ def test_download_requests_dequeued_in_order():
     # formatted and ordered in the same way as the relevant view would be
     def get_view_results(view,reduce):
         if (view == 'queue/queued_download_requests'):
-            return generate_view('queued','download');
+            return generate_view('queued','download')
         elif (view == 'queue/underway_download_requests'):
-            return generate_view('underway','download');
+            return generate_view('underway','download')
         elif (view == 'queue/queued_hash_requests'):
-            return generate_view('queued','hash');
+            return generate_view('queued','hash')
         elif (view == 'queue/underway_hash_requests'):
-            return generate_view('underway','hash');
+            return generate_view('underway','hash')
     
     def generate_view(doc_status,queue_name):
         if doc_status == 'queued':
@@ -131,7 +131,7 @@ def test_download_requests_dequeued_in_order():
                     except KeyError:
                         pass
             view_results.sort()
-            return view_results;
+            return view_results
     
     # populate the mock queue with entries
     for i in xrange(no_to_remove):
@@ -144,19 +144,19 @@ def test_download_requests_dequeued_in_order():
         time.sleep(0.01)
     
     # create a mock server and mock views (that contain dummy values)
-    couchdb.client.Database.__getitem__ = Mock();
-    couchdb.client.Database.__getitem__.side_effect = get_from_db;
-    couchdb.client.Database.__setitem__ = Mock();
-    couchdb.client.Database.__setitem__.side_effect = store_in_db;
-    couchdb.client.Database.view = Mock();
-    couchdb.client.Database.view.side_effect = get_view_results;
+    couchdb.client.Database.__getitem__ = Mock()
+    couchdb.client.Database.__getitem__.side_effect = get_from_db
+    couchdb.client.Database.__setitem__ = Mock()
+    couchdb.client.Database.__setitem__.side_effect = store_in_db
+    couchdb.client.Database.view = Mock()
+    couchdb.client.Database.view.side_effect = get_view_results
     
     # set up target
-    request_queue = RequestQueue('http://127.0.0.1:5984','hashmapd');
+    request_queue = RequestQueue('http://127.0.0.1:5984','hashmapd')
     
     # -- ACT --
     for i in xrange(no_to_remove):
-        result.append(request_queue.next('download'));
+        result.append(request_queue.next('download'))
     
     # -- ASSERT --
     # ensure that the requests were popped off the queue in the correct order

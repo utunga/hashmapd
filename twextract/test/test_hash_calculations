@@ -1,0 +1,7 @@
+# TODO
+
+def compute_fake_hash(thread,raw_word_counts):
+    return numpy.random((1,cfg.shape.inner_code_length),dtype=theano.config.floatX)
+
+def compute_fake_coords(thread,raw_word_counts):
+    return numpy.random((1,2),dtype=theano.config.floatX)

@@ -5,6 +5,6 @@
 //   	  ... ordered by request time
 function(doc) {
   if(doc.doc_type == 'hash_request' && doc.completed_time == null && doc.started_time == null) {
-    emit(doc.request_time, {'username':doc.username} );
+    emit([doc.priority,doc.request_time], {'username':doc.username} );
   }
 }

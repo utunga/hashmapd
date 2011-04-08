@@ -19,23 +19,26 @@ class StoreUser(threading.Thread):
         threading.Thread.__init__(self)
         self.username = username
         self.db = db
-        self.api = tweepy_api;
+        self.api = tweepy_api
     
     # make a record for the given user (their hash, etc will later be
     # stored here)
     def run(self):
-        if self.username in self.db:
+        try:
+            self.db['twuser_'+self.username] = {'loading':''}
+        except couchdb.ResourceConflict:
             return
-        self.db[self.username] = {'loading':''};
         
         try:
-            self.store_user(self.api.get_user(screen_name=self.username),self.db[self.username]['_rev']);
+            self.store_user(self.api.get_user(screen_name=self.username),self.db['twuser_'+self.username]['_rev'])
         except couchdb.ResourceConflict:
-            del self.db[self.username];
+            del self.db['twuser_'+self.username]
     
     def store_user(self,user_info,rev):
         user_info['doc_type'] = 'user'
+        user_info['provider_namespace'] = 'twitter'
         user_info['hash'] = None
+        user_info['coords'] = None
         user_info['_rev'] = rev
-        self.db[self.username] = user_info;
+        self.db['twuser_'+self.username] = user_info
 

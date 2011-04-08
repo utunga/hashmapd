@@ -35,7 +35,7 @@ class RBM_Poisson(object):
         :param n_hidden: number of hidden units
 
         :param W: None for standalone RBMs or symbolic variable pointing to a
-        shared weight matrix in case RBM is part of a DBN network; in a DBN,
+        shared weight matrix in case RBM is part of a DBN network in a DBN,
         the weights are shared between RBMs and layers of a MLP
 
         :param hbias: None for standalone RBMs or symbolic variable pointing 
@@ -91,7 +91,7 @@ class RBM_Poisson(object):
             self.input = T.matrix('input')
             self.input_sums = T.matrix('input_sums')
 
-        self.binomial_approx_val = theano.shared(value = float(100000), name = 'binomial_approx_val');
+        self.binomial_approx_val = theano.shared(value = float(100000), name = 'binomial_approx_val')
 
         self.W          = W
         self.hbias      = hbias
@@ -124,8 +124,8 @@ class RBM_Poisson(object):
         wx_b = T.dot(v_sample, self.W) + self.hbias
         vbias_term = T.dot(v_sample, self.vbias)
         hidden_term = T.sum(T.log(1+T.exp(wx_b)),axis = 1)
-        # extra_vbias_term1 = T.dot(v_sample,T.log(T.sum(T.dot(T.exp(self.vbias),PRODUCT_j(1+T.exp(self.W))),axis = ?))-T.log(v_sums));
-        # extra_vbias_term2 = T.log(FACTORIAL(v_sample));
+        # extra_vbias_term1 = T.dot(v_sample,T.log(T.sum(T.dot(T.exp(self.vbias),PRODUCT_j(1+T.exp(self.W))),axis = ?))-T.log(v_sums))
+        # extra_vbias_term2 = T.log(FACTORIAL(v_sample))
         return -hidden_term-vbias_term
 
     def propup(self, vis):
@@ -140,10 +140,10 @@ class RBM_Poisson(object):
         pre_sigmoid_activation = T.dot(vis, self.W) + self.hbias
         return [pre_sigmoid_activation, T.nnet.sigmoid(pre_sigmoid_activation)]
 
-    def sample_h_given_v(self, v0_sample, v_sums):
+    def sample_h_given_v(self, v0_sample):
         ''' This function infers state of hidden units given visible units '''
         # compute the activation of the hidden units given a sample of the visibles
-        pre_sigmoid_h1, h1_mean = self.propup(v0_sample/v_sums)
+        pre_sigmoid_h1, h1_mean = self.propup(v0_sample)
         # get a sample of the hiddens given their activation
         # Note that theano_rng.binomial returns a symbolic sample of dtype 
         # int64 by default. If we want to keep our computations in floatX 
@@ -191,13 +191,13 @@ class RBM_Poisson(object):
         ''' This function implements one step of Gibbs sampling, 
             starting from the hidden state'''
         pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h0_sample,v_sums)
-        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v1_sample,v_sums)
+        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v1_sample)
         return [pre_sigmoid_v1, v1_mean, v1_sample, pre_sigmoid_h1, h1_mean, h1_sample]
  
     def gibbs_vhv(self, v0_sample, v_sums):
         ''' This function implements one step of Gibbs sampling, 
             starting from the visible state'''
-        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v0_sample,v_sums)
+        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v0_sample)
         pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h1_sample,v_sums)
         return [pre_sigmoid_h1, h1_mean, h1_sample, pre_sigmoid_v1, v1_mean, v1_sample]
  
@@ -280,29 +280,30 @@ class RBM_Poisson(object):
 
     def get_pseudo_likelihood_cost(self, updates):
         """Stochastic approximation to the pseudo-likelihood"""
-
+        """  (this probably doesn't work properly for the values used in poisson layer) """
+        
         # index of bit i in expression p(x_i | x_{\i})
         bit_i_idx = theano.shared(value=0, name = 'bit_i_idx')
-
+        
         # binarize the input image by rounding to nearest integer
         xi = T.round(self.input)
-
+        
         # calculate free energy for the given bit configuration
         fe_xi = self.free_energy(xi)
-
+        
         # flip bit x_i of matrix xi and preserve all other bits x_{\i}
         # Equivalent to xi[:,bit_i_idx] = 1-xi[:, bit_i_idx]
         xi_flip = T.set_subtensor(xi[:,bit_i_idx], 1-xi[:, bit_i_idx])
-
+        
         # calculate free energy with bit flipped
         fe_xi_flip = self.free_energy(xi_flip)
-
+        
         # equivalent to e^(-FE(x_i)) / (e^(-FE(x_i)) + e^(-FE(x_{\i}))) 
         cost = T.mean(self.n_visible * T.log(T.nnet.sigmoid(fe_xi_flip - fe_xi)))
-
+        
         # increment bit_i_idx % number as part of updates
         updates[bit_i_idx] = (bit_i_idx + 1) % self.n_visible
-
+        
         return cost
 
     def get_reconstruction_cost(self, updates, pre_sigmoid_nv):
@@ -340,19 +341,19 @@ def test_rbm(argv = sys.argv):
     
     cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
     
-    info = load_data_info(cfg.input.train_data_info);
-    training_prefix = info[0];
-    n_training_files = info[1];
-    n_training_batches = 10;#info[2];
-    # batches_per_file = info[9];
-    dataset_postfix = '.pkl.gz';
-    batch_size = cfg.train.train_batch_size;
+    info = load_data_info(cfg.input.train_data_info)
+    training_prefix = info[0]
+    n_training_files = info[1]
+    n_training_batches = 10
+    dataset_postfix = '.pkl.gz'
+    batch_size = cfg.train.train_batch_size
+    mean_doc_size = info[10]
     
     training_data = load_poisson_data(training_prefix+'0'+dataset_postfix)
     
     train_data = training_data[0]
     train_data_sums = training_data[1]
-    max_doc_size = training_data[2]
+    mean_doc_size = training_data[2]
     
     numpy_rng = numpy.random.RandomState(123)
     theano_rng = RandomStreams(numpy_rng.randint(2**30))
@@ -363,7 +364,7 @@ def test_rbm(argv = sys.argv):
     
     p_rbm = RBM_Poisson(numpy_rng = numpy_rng,
             theano_rng = theano_rng, 
-            mean_doc_size = max_doc_size,
+            mean_doc_size = mean_doc_size,
             input = x,
             input_sums = x_sums,
             n_visible = cfg.shape.input_vector_length, 
@@ -384,7 +385,7 @@ def test_rbm(argv = sys.argv):
         outputs = cost,
         updates = updates,
         givens  = {x:train_data[index*batch_size:(index+1)*batch_size,:],
-                   x_sums:train_data_sums[index*batch_size:(index+1)*batch_size,:]});
+                   x_sums:train_data_sums[index*batch_size:(index+1)*batch_size,:]})
     
     print 'pretraining'
     
@@ -396,11 +397,11 @@ def test_rbm(argv = sys.argv):
         # go through the training set
         mean_cost = []
         for batch_index in xrange(n_training_batches):
-            print 'batch %d, cost is '%batch_index, numpy.mean(mean_cost)
             print 'batch '+str(batch_index)+', mean weight is '+str(numpy.mean(p_rbm.W.value))+', max weight is '+str(numpy.amax(p_rbm.W.value))
             print 'batch '+str(batch_index)+', mean vbias is '+str(numpy.mean(p_rbm.vbias.value))+', max vbias is '+str(numpy.amax(p_rbm.vbias.value))
             print 'batch '+str(batch_index)+', mean hbias is '+str(numpy.mean(p_rbm.hbias.value))+', max hbias is '+str(numpy.amax(p_rbm.hbias.value))
             mean_cost += [train_rbm(batch_index)]
+            print 'batch %d, cost is '%batch_index, numpy.mean(mean_cost)
     
         print 'Training epoch %d, cost is '%epoch, numpy.mean(mean_cost)
     
@@ -505,7 +506,7 @@ def test_rbm(argv = sys.argv):
     train_rbm = theano.function(inputs = [index],
         outputs = cost,
         updates = updates,
-        givens  = {x:train_data[index*batch_size:(index+1)*batch_size,:]});
+        givens  = {x:train_data[index*batch_size:(index+1)*batch_size,:]})
     
     print 'pretraining'
     
@@ -517,11 +518,11 @@ def test_rbm(argv = sys.argv):
         # go through the training set
         mean_cost = []
         for batch_index in xrange(n_training_batches):
-            print 'batch %d, cost is '%batch_index, numpy.mean(mean_cost)
             print 'batch '+str(batch_index)+', mean weight is '+str(numpy.mean(b_rbm.W.value))+', max weight is '+str(numpy.amax(b_rbm.W.value))
             print 'batch '+str(batch_index)+', mean vbias is '+str(numpy.mean(b_rbm.vbias.value))+', max vbias is '+str(numpy.amax(b_rbm.vbias.value))
             print 'batch '+str(batch_index)+', mean hbias is '+str(numpy.mean(b_rbm.hbias.value))+', max hbias is '+str(numpy.amax(b_rbm.hbias.value))
             mean_cost += [train_rbm(batch_index)]
+            print 'batch %d, cost is '%batch_index, numpy.mean(mean_cost)
     
         print 'Training epoch %d, cost is '%epoch, numpy.mean(mean_cost)
     
@@ -634,15 +635,15 @@ def load_poisson_data(dataset_file):
     x = x.round()
     x_sums = x.sum(axis=1)
 
-    max_doc_size = int(round(numpy.max(x_sums)))
+    mean_doc_size = int(round(numpy.mean(x_sums)))
 
     # shared_dataset
     shared_x = theano.shared(numpy.asarray(x,dtype=theano.config.floatX))
-
-    # build a replcated 2d array of sums so operations can be performed efficiently
+    
+    # build a replicated 2d array of sums so operations can be performed efficiently
     shared_x_sums = theano.shared(numpy.asarray(numpy.array([x_sums]*(x.shape[1])).transpose(),dtype=theano.config.floatX))
     
-    rval = [shared_x,shared_x_sums,max_doc_size]
+    rval = [shared_x,shared_x_sums,mean_doc_size]
     return rval
 
 def load_data(dataset_file):
@@ -664,8 +665,8 @@ def load_data(dataset_file):
 
     # shared_dataset
     shared_x = theano.shared(numpy.asarray(x,dtype=theano.config.floatX))
-
-    # build a replcated 2d array of sums so operations can be performed efficiently
+    
+    # build a replicated 2d array of sums so operations can be performed efficiently
     shared_x_sums = theano.shared(numpy.asarray(numpy.array([x_sums]*(x.shape[1])).transpose(),dtype=theano.config.floatX))
     
     rval = [shared_x,shared_x_sums]

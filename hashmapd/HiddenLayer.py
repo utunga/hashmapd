@@ -49,7 +49,7 @@ class HiddenLayer(object):
             if activation == theano.tensor.nnet.sigmoid:
                 W_values *= 4
             if poisson_layer == True:
-                W_values *= 1/mean_doc_size;
+               W_values *= 1/mean_doc_size;
     
             #print 'using shared weights, randomized' #init case
             self.W = theano.shared(value = W_values, name ='W')

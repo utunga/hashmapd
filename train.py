@@ -45,7 +45,7 @@ def load_data(dataset_file):
     f = gzip.open(dataset_file,'rb')
     x, x_sums, y = cPickle.load(f)
     f.close()
-
+    
     # shared_dataset
     shared_x = numpy.asarray(x, dtype=theano.config.floatX)
     # build a replcated 2d array of sums so operations can be performed efficiently

@@ -11,9 +11,9 @@ class StoreResults(object):
     def store_hash(self, username, hash, db):
         # store the hash in the db under this user
         try:
-            row = db[username];
-            row['hash'] = str(hash);
-            db[username] = row;
+            row = db[username]
+            row['hash'] = str(hash)
+            db[username] = row
             
         except couchdb.ResourceConflict:
             return
@@ -21,9 +21,9 @@ class StoreResults(object):
     def store_coords(self, username, coords, db):
         # store the hash in the db under this user
         try:
-            row = db[username];
-            row['coords'] = str(coords);
-            db[username] = row;
+            row = db[username]
+            row['coords'] = str(coords)
+            db[username] = row
             
         except couchdb.ResourceConflict:
             return

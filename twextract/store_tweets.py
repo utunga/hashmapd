@@ -19,10 +19,13 @@ class StoreTweets(object):
             tweet['provider_namespace'] = 'twitter'
             
             # store the tweet in the db (if this tweet was already stored in 
-            # the db, ignore it - this could happen if a download is carried 
-            # out twice for whatever reason)
+            # the db, replace it with the new version - this could happen if a 
+            # download is carried out twice for whatever reason)
             try:
-                db[tweet['id_str']] = tweet
+                db['tweet_'+tweet['id_str']] = tweet
             except couchdb.ResourceConflict:
+                old_tweet = db['tweet_'+tweet['id_str']]
+                tweet['_rev'] = old_tweet['_rev']
+                db['tweet_'+tweet['id_str']] = tweet
                 return
 

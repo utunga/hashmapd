@@ -1,145 +1,80 @@
 
-*Due to an appalling structural design, or rather, lack thereof, here are some instructions that should give you a rough idea of what the various python script files are for and how to get started*
+** Tweet Data Flow **
+=================
 
-*Generally, one would expect to run the python file at each step by simply typing the name of the 'main python file' without any command line parameters eg*
-> python prepareUserInput.py
+> **Add download request(s) to database** *(twextract/request_queue.py)*
+The main method in "twextract/request_queue.py" adds download requests (username+page) for a single username to the queue. If no page is specified, a request will be added for each of the latest cfg.n_pages.
+(this could easily be extended to add requests for a list of usernames)
 
-*You should be able to get started at any point in the below process as I have, with luck, checked the relevant intermediate files into git. For instance.*
+*Download Request Format: uuid -> {username,request_time,doc_type="download_request"}*
+("attempts" field added and incremented for each failed download attempt)
+("started" field added when download begins)
+("completed" field added when download successfully completed)
 
-*A good quick start would be to jump to the presentation (variations) step and have a look at the map for the 5000_user_labels.csv/user_coords_perplexity_50.csv variation.* 
+> **Download and store tweets** *(twextract/download_tweets.py)*
+*(NB: This grabs the consumer_token, consumer_secret, session_key, and session_secret from the secrets.cfg file, and authenticates with twitter using oAuth)*
+A manager will be initiated which takes the oldest download requests off the queue, and spawns worker threads to: download the relevant tweets and store them in the database, as well as storing the user's info (if it's not already stored). Once all download requests for a given user are completed, a hash request will be created. NB: The program remains open until the user types "exit".
+
+*Tweet Format: "tweet_"+tweetid -> {all_tweet_data,provider_namespace="twitter",doc_type="raw_tweet"}*
+*User Format: "twuser_"+username -> {all_username_data,request_time,hash=null,coords=null,provider_namespace="twitter",doc_type="user"}*
+*Hash Request Format: uuid -> {username,request_time,provider_namespace="twitter",doc_type="user"}*
+("attempts" field added and incremented for each failed download attempt)
+("started" field added when download begins)
+("completed" field added when download successfully completed)
+
+> **Tokenize and Computer Hashes* *(twextract/compute_hashes.py)*
+A manager will be initiated which takes the oldest hash requests off the queue, and spawns worker threads that: tokenize the user's tweet data (done in a view), compute word histograms by combining this information with the words list used by the SMH, then feed the histograms through the SMH to get a hash code (the tSNE algorithm is also run to produce co-ordinates, but this doesn't work at the moment). The hash is then stored in the database. NB: The program remains open until the user types "exit".
 
 
-* Quick review of basic data flow *
-=======
+> The **tweepy** library which is used to download information from twitter is currently stored inside the twextract folder.
+> There are several tests in the test folder that should complete successfully.
 
-**DATA PARSE STEP** [see xtract repository, C#]  
-{twitter stream} -> raw tweets  
 
-**DATA PARSE STEP** [see xtract repository, C#]  
-raw tweets -> user+word counts (in db), plus some stats  
+** SMH Data Flow **
+===============
 
-**DATA PREPREP STEP** [xtract repository, SQL]  
-user+word counts (in db) -> user/word vectors (csv)  
-user+word counts (in db) -> user labels (csv)  
+The .cfg files specify the parameters used when preparing, training, and running the data. The parameters in the specified cfg file are loaded, and any missing paramters are obtained from the base.cfg file.
 
-**DATA PREP STEP**   
-user/word vectors (csv) -> training data (pkl.gz)  
-user/word vectors (csv) -> presentation data (pkl.gz)  
+> **Prepare Data** *(prepare#.py)*
+Prepares the relevant dataset for training. The data will be stored in the following files (pickled):
 
-**TRAIN STEP**  
-training data (pkl.gz) -> trained weights (pkl.gz)  
+1) cfg.input.train_data_info:
+training_file_name (not including index or file extension), number_training_files, total_no_training_batches,
+validation_file_name (not including index or file extension), number_validation_files, total_no_validation_batches,
+testing_file_name (not including index or file extension), number_testing_files, total_no_testing_batches,
+batches_per_file (may be less in last file), mean_doc_size
 
-**RUN STEP**
-trained weights (pkl.gz) 
-+ presentation data (pkl.gz) -> coords (csv)  
+2) data_files:
+normalized_document_word_counts (or raw_counts if using poisson layer), document_sums (all one, unless using poisson layer), labels (may be blank)
 
-**PRESENTATION STEP**  
-coords (csv) + user labels (csv) -> visual (java applet)  
+> **Train** *(train.py)*
+Loads in the specified config file, which loads the relevant data files (all into memory at once if there is only one training file, or one file at a time per epoch if the data is split over several files) and performs pre-training (RBMs/deep belief net) and (after unrolling the network into a stacked auto-encoder) fine-tuning (gradient descent) on the data, before saving the weights (cfg.train.weights_file).
 
-* Details of data flow *  
-====
+Note the new config options:
+- train.method = 'cd' or 'pcd'
+- train.k = number of iterations of cd/pcd
+- first_layer_type = 'bernoulli' or 'poisson' (the poisson layer is still not working properly :/)
+- noise_std_dev = how much gaussian noise to add to codes during fine tuning - 0.0 for none (untested)
+- cost = 'squared_diff' or 'cross_entropy' (cross entropy is untested)
 
-DATA PREP STEP  
----
-**user/word vectors (csv) -> training data (pkl.gz)**  
-**user/word vectors (csv) -> presentation data (pkl.gz)**  
-  
-main python file:  
-**prepare.py**    
-- reads data/user_word_vectors.csv   
-- writes data/word_vectors.pkl.gz  
-- writes data/word_vectors_display.pkl.gz  
+*(i have found that low perplexity results in a single big blob but high perplexity results in slightly more islands and variation to the chart #MKT)*
 
-data/user_word_vectors.csv  
- input file, contains rows of all ints:  
- [user_id, word_id, count]  
+> **Run** *(run.py)*
+Loads in the specified config file, which loads the relevant weights to reproduce the SMH, as well as the **first** file of training data. This data is then fed forward through the SMH to produce hashes which are saved (cfg.output.codes_file), before calling the tSNE.py file (a slowish python implementation of tSNE) to produce co-ordinates which are also saved (cfg.output.coords_file). The prepared labels are also saved in a format that is readable by the VOSViewer (cfg.output.labels_file). NB: The standard tSNE algorithm is very memory intensive and can't handle more than around 5,000 elements of data at once.
 
-data/word_vectors.pkl.gz is an array of numpy arrays, divded into   unsupervised, train, validation and testing data sets   
-[train_set, valid_set, test_set]  
+> **View** *(out/vosviewer)*
+You can run the VOSviewer.jar/jnlp app and select the coords.csv and (optionally) the labels.csv files to view the final output (2d co-ordinates).
 
-data/word_vectors_display.pkl.gz includes all (at this stage 5000 rows of) user data in one array  
 
-each row of above contains word counts, normalized so that the total count per row == 1 (except for some empty case exceptions where total count=0)  
 
-**VARIATIONS FOR DATA PREP STEP**  
 
-**prepareFakeImageInputData.py**  
-**prepareFakeInputData.py**  
-**prepareInputData.py**  
-**prepareTruncatedMnistData.py**   
 
-**all respectively, reading from**  
-- **data/mnist.pkl.gz** - the original full mnist data set  
-- **data/user_word_vectors_small.csv** - smaller number of users (768 I think)  
-- **data/fake_img_data.csv** - a very small set of data representing crosses (in same shape as mnist data)  
+** Datasets **
+==========
 
-**and writing to:**  
-- **data/truncated_mnist.pkl.gz**  
-in same format as mnist.pkl and same format as  tutorial expects  
-[[train_set_x,train_set_y],[valid_set_x, valid_set_y],[test_set_x, test_set_y]]  
-*where the xxx_set_x consists of rows of floats not necessarily adding to 1, (28*28 pixels per row)* and the xxx_set_y consist of a series of ints, from 0,9 representing the correct 'class' for the digit
-- **data/truncated_unsupervised_mnist.pkl.gz**  
-same as above, except we drop the y values... thus
-[train_set_x,valid_set_x, test_set_y]
-- **data/fake_img_data.pkl.gz**  
-same format as above, but much smaller set consisting of variations on crosses
+**prepareReutersData.py** > see reuters.cfg
+**prepareTruncatedMnistData.py** > see unsupervised_mnist.cfg
+**prepare.py** > see base.cfg
 
-TRAIN STEP  
----
-**training data (pkl.gz) -> trained weights (pkl.gz)**  
+(the other prepare files probably aren't updated to match the expected new multi-file format)
 
-*main python file:*  
-**train_SMH.py**  
-- reads data/word_vectors.pkl.gz  
-- writes data/word_vectors_weights.pkl.gz  
-
-this is the main algorithm file, network configuration (ie 3000,2000,50,20,50,2000,3000 is hard coded in here)  
-consists of pre-training step followed by classic neural net gradient descent on training data as an auto-encoder. doesn't use the test_data at all, but uses valid_data to avoid over fitting. lots of parameters in here need to (manually) be made to match the parameters in run_SMH.py  
-
-**VARIATIONS ON TRAIN STEP**  
-
-**read data/truncated_unsupervised_mnist.pkl.gz  
-write data/unsuperivsed_mnist_weights.pkl.gz**  
-
-when run in this mode also generates png files in the trace directory that give some idea of whether digits after reconstruction actually look like digits (also the first layer weights are interesting to look at)
-
-RUN STEP  
----  
-**trained weights (pkl.gz)   
-+ presentation data (pkl.gz) -> coords (csv)**  
-
-main python file:  
-**run_SMH.py**  
-- reads data/word_vectors_weights.pkl.gz  
-- reads data/word_vectors_display.pkl.gz  
-- writes out/coords.csv  
-
-this step does two main things  
-- run the SMH 'forward' on display data generating 'output codes' for each input vector   
-- give the 'output codes' to the tsne binary which then 'refines' the tsne alg then output to coords.csv   
-
-one of the crucial parameters of the tsne algorithm is the 'perplexity' which is described as 'optimal number of neighbours'. i have found that low perplexity results in a single big blob but high perplexity results in slightly more islands and variation to the chart  
-
-PRESENTATION STEP  
----
-**coords (csv) + labels (csv) -> visual (java applet)**  
-
-**out/VOSviewer.jar**  
-- loads out/coords.csv  
-- loads out/5000_user_labels.csv  
-- generates visual display  
-
-Click on VOSViewer.jar and it launches a java app. click 'open map..' then choose the above csv files. set the type to 'coordinates'. Bob is your proverbial.   
-
-if there is no coords.csv yet (because you haven't run the above, see variations below)  
-
-**PRESENTATION STEP - VARIATIONS**
-
-layout of *unsupervised* network on the mnist digit recognition problem  
-**out/mnist_coords.csv  
-out/mnist_labels.csv**  
-mnist_labels.csv is created directly from the supervised dataset in the relevant mnist data set (in prepareMnistData.py)  
-
-A couple of examples of running on the 5000 user/word vectors with different values for perplexity  
-**out/coords_perplexity_50.csv**  
-**out/user_coords_perplexity_5.csv**  

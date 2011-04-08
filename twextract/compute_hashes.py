@@ -28,34 +28,10 @@ from twextract.request_queue import RequestQueue
 from twextract.store_results import StoreResults
 
 
-request_queue = RequestQueue();
-store_results = StoreResults();
+request_queue = RequestQueue()
+store_results = StoreResults()
 
 
-#==============================================================================
-# Factory to produce ComputeHash worker threads
-#==============================================================================
-class ComputeHashFactory(object):
-    
-    def __init__(self,use_mock_data=False,save_mock_data=False):
-        self.use_mock_data = use_mock_data;
-     
-    def get_worker_thread(self,manager,screen_name,raw_word_counts,db,request_id):
-        thread = ComputeHash(manager,screen_name,raw_word_counts,db,request_id)
-        
-        if (self.use_mock_data):
-            thread.compute_hash = Mock()
-            thread.compute_hash.side_effect = self.compute_fake_hash
-            thread.compute_tsne = Mock()
-            thread.compute_tsne.side_effect = self.compute_fake_coords
-        
-        return thread
-    
-    def compute_fake_hash(thread,raw_word_counts):
-        return numpy.random((1,cfg.shape.inner_code_length),dtype=theano.config.floatX);
-    
-    def compute_fake_coords(thread,raw_word_counts):
-        return numpy.random((1,2),dtype=theano.config.floatX);
 
 
 #==============================================================================
@@ -75,11 +51,11 @@ class ComputeHash(threading.Thread):
     def run(self):
         try:
             # obtain hash
-            hash = self.compute_hash(self.raw_word_counts);
+            hash = self.compute_hash(self.raw_word_counts)
             # store the tweets in specified db
             store_results.store_hash(self.screen_name,hash[0],self.db)
             # TODO: also do TSNE and compute co-ordinates here
-            coords = self.calc_tsne(hash,cfg.tsne.desired_dims,cfg.tsne.perplexity,cfg.tsne.pca_dims);
+            coords = self.calc_tsne(hash,cfg.tsne.desired_dims,cfg.tsne.perplexity,cfg.tsne.pca_dims)
             # store the co-ordinates in specified db
             store_results.store_coords(self.screen_name,coords[0],self.db)
             
@@ -92,10 +68,10 @@ class ComputeHash(threading.Thread):
         self.manager.notify_completed(self)
     
     def compute_hash(self,raw_word_counts):
-        return run.get_output_codes(self.manager.smh,raw_word_counts);
+        return run.get_output_codes(self.manager.smh,raw_word_counts)
     
     def calc_tsne(self,hash,desired_dims,perplexity,pca_dims):
-        return run.calc_tsne(hash,desired_dims,perplexity,pca_dims);
+        return run.calc_tsne(hash,desired_dims,perplexity,pca_dims)
 
 import time
 
@@ -109,10 +85,9 @@ import time
 class Manager(threading.Thread):
     
     def __init__(self, server_url='http://127.0.0.1:5984', db_name='hashmapd',\
-            retrieval_factory=ComputeHashFactory(), max_simultaneous_requests=5):
+                    max_simultaneous_requests=5):
         threading.Thread.__init__(self)
         self.db = couchdb.Server(server_url)[db_name]
-        self.retrieval_factory = retrieval_factory
         self.worker_threads = []
         self.semaphore = semaphore = threading.Semaphore(max_simultaneous_requests)
         self.terminate = False
@@ -128,7 +103,7 @@ class Manager(threading.Thread):
         
         # write finished time
         row = self.db[thread.request_id]
-        request_queue.completed_request(row,thread.request_id);
+        request_queue.completed_request(row,thread.request_id)
         # print notification of completion
         print 'Computed hash ('+str(thread.screen_name)+')'
     
@@ -138,7 +113,7 @@ class Manager(threading.Thread):
         # clear started time, so that the job will be restarted
         # TODO: (is this a good idea? what if the job keeps failing over and over for some reason?)  
         row = self.db[thread.request_id]
-        request_queue.failed_request(row,thread.request_id);
+        request_queue.failed_request(row,thread.request_id)
         # print error message
         print >> sys.stderr, 'Error computing hash/coords ('+str(thread.screen_name)+'):\n'+str(err)
     
@@ -151,8 +126,8 @@ class Manager(threading.Thread):
             # if the queue is empty, check for new data (every 2 seconds for now)
             # (might want to just terminate here)
             if next_request == None:
-                time.sleep(2)
-                continue;
+                time.sleep(0.05)
+                continue
             
             screen_name = next_request['username']
             request_id = next_request.id
@@ -160,14 +135,12 @@ class Manager(threading.Thread):
             # construct histogram based on the user's tweets
             visible_data = self.construct_histogram(screen_name)
             # convert from sums to percentages
-            visible_data = visible_data/visible_data.sum();
-            
-            print visible_data.sum();
+            visible_data = visible_data/visible_data.sum()
             
             # acquire a lock before creating new thread
             self.semaphore.acquire()
             # spawn a worker thread to compute a hash for the specified user 
-            thread = self.retrieval_factory.get_worker_thread(self,screen_name,visible_data,self.db,request_id)
+            thread = ComputeHash(self,screen_name,visible_data,self.db,request_id)
             self.worker_threads.append(thread)
             thread.start()
         
@@ -181,16 +154,13 @@ class Manager(threading.Thread):
         print 'exited compute_hashes.py'
     
     def construct_histogram(self,screen_name):        
-        # obtain results from view 
-        tokenized_view = self.db['_design/tweets']['views']['tokenize'];
-        map_view = tokenized_view['map'];
-        reduce_view = tokenized_view['reduce'];
-        results = self.db.query(map_view,reduce_fun=reduce_view,group=True)
+        # obtain results from view
+        results = self.db.view('tweets/tokenize', reduce=True, group=True) 
         # obtain results from this user only
         results = results[[screen_name]:[screen_name,'Z']]
         
         # build the histogram of relevant word counts for this user
-        visible_data = numpy.zeros((1,cfg.shape.input_vector_length),dtype=theano.config.floatX);
+        visible_data = numpy.zeros((1,cfg.shape.input_vector_length),dtype=theano.config.floatX)
         # TODO: this a moderately expensive operation. consider trying to make
         #       it more efficient at some point
         for result in results:
@@ -202,18 +172,18 @@ class Manager(threading.Thread):
         return visible_data
     
     def exit(self):
-        self.terminate = True;
+        self.terminate = True
 
 def load_words_dict():
     # load in the list of words used in trained SMH (throw away header line)
-    csvReader = csv.reader(open(cfg.input.input_words,"rb"),delimiter=',',quotechar='\"');
-    csvReader.next();
+    csvReader = csv.reader(open(cfg.input.input_words,"rb"),delimiter=',',quotechar='\"')
+    csvReader.next()
     
     # load data into dictionary for fast access 
     words_dict = {}
     for line in csvReader:
-        words_dict[line[1].lower()] = int(line[0]);
-    return words_dict;
+        words_dict[line[1].lower()] = int(line[0])
+    return words_dict
 
 #==============================================================================
 # Main method to intialize and run the Manager indefinitely
@@ -247,18 +217,17 @@ if __name__ == '__main__':
     if cfg is None:
         cfg = hashmapd.DefaultConfig()
     
-    # run the manager
-    factory = ComputeHashFactory(use_mock_data=False);
-    thread = Manager(cfg.raw.couch_server_url,cfg.raw.couch_db,factory,cfg.raw.max_simultaneous_requests);
-    thread.start()
+    # run the man))
+    manager = Manager(cfg.raw.couch_server_url,cfg.raw.couch_db,cfg.raw.max_simultaneous_requests)
+    manager.start()
     
     # keep running until user types 'exit', then terminate nicely
     # (ie: allow all currently running jobs to complete before closing)
     print ''
     while True:
-        input = raw_input("type \'exit\' to terminate:\n\n");
+        input = raw_input("type \'exit\' to terminate:\n\n")
         if input == 'exit':
-            thread.exit();
+            manager.exit()
             print 'terminating ...'
             break
 
