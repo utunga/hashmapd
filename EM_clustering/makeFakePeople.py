@@ -65,11 +65,9 @@ if __name__ == '__main__':
         N = int(sys.argv[2])
         out_file = str(sys.argv[3])
         out_stem = out_file.split('.')[0]
-        print out_file, out_stem
         print 'numClasses %d, numSamples %d' % (K,N)
     else:
-        sys.exit('usage: python makePeople.py num_classes num_samples datafilename')
-        
+        sys.exit('usage: python makeFakePeople.py num_classes num_samples outfile_name')
 
     D = 2 # data will be 2 dimensional
     mean = 3 * rng.normal(0.0,1.0,(D,K))   # the centers
@@ -95,9 +93,9 @@ if __name__ == '__main__':
         # choose a component
         j = np.sum(rng.random() > np.cumsum(mix_coeff))
         # Now choose a data point using that component of the mixture
-        x,y = rng.multivariate_normal(centers[j],covarianceMats[j],1).T
+        x,y = rng.multivariate_normal(centers[j],covarianceMats[j],).T
         point = np.array([x,y])
-        point.shape = (2,)
+        #point.shape = (2,)
 
         # now make up a histogram to be associated with this (x,y) point.
         # First, calc the responsibilities.
