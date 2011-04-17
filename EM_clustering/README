@@ -1,0 +1,4 @@
+for example:
+
+> python makeFakePeople.py 5 1000 testpeople
+> python labelFakePeople.py  testpeople.slices.pickle 10
