@@ -19,7 +19,7 @@ Oh and make some pictures as a reality check.
 Marcus
 """
 
-import sys, pickle
+import sys, pickle, math
 import pylab as pl
 import numpy as np
 import numpy.random as rng
@@ -47,7 +47,7 @@ def GaussDensity(d,mu,v):
     """
     if (np.linalg.det(v) < 0.0):
         sys.exit('determinant is negative! ')
-    normalisation = 2*np.pi * np.sqrt(np.linalg.det(v))
+    normalisation = 2*math.pi * np.sqrt(np.linalg.det(v))
     xx = d-mu
     yy = np.dot(np.linalg.inv(v), xx.transpose()).transpose()
     s1 = xx[0] * yy[0]
@@ -157,6 +157,7 @@ if __name__ == '__main__':
             mycolours.append(np.array([1,1,1]) * (1-p.histo[ind]/max_intensity))
         pl.scatter(data[:,0], data[:,1], c=mycolours, marker='o',s=3,linewidths=None,edgecolors=mycolours,alpha=1.0)
         pl.axis('equal')
+        pl.title('density of %s' % (word))
         pl.draw()
         out_imagename = out_stem+'_' + word + '.png'
         pl.savefig(out_imagename)

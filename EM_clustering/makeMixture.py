@@ -7,7 +7,7 @@ training item. Ground truth is lost in this file: the class is not
 written, just the vector.
 """
 
-import sys
+import sys, math
 import pylab as pl
 import numpy as np
 import numpy.random as rng
@@ -18,8 +18,8 @@ def makeRandom2DCovMatrix():
     # first make some Gaussian data in D dimensions
     dumData = rng.normal(0.0,0.5+2.0*rng.random(2),(200,2))
     # rotate it a bit (easy enough when it's just 2D)
-    angle = np.pi * rng.random()
-    rotMatrix = np.array([[np.cos(angle), np.sin(angle)],[-np.sin(angle), np.cos(angle)]])
+    angle = math.pi * rng.random()
+    rotMatrix = np.array([[math.cos(angle), math.sin(angle)],[-math.sin(angle), math.cos(angle)]])
     dumData = np.dot(dumData,rotMatrix)
     # find the covariance matrix!
     v00 = np.mean(dumData[:,0]*dumData[:,0])
@@ -34,6 +34,8 @@ if __name__ == '__main__':
 
     if len(sys.argv) == 5:
         D = int(sys.argv[1])
+        if (D != 2):
+            sys.exit('only sure this works for 2D at present - sorry!')
         K = int(sys.argv[2])
         N = int(sys.argv[3])
         out_file = str(sys.argv[4])
