@@ -42,39 +42,11 @@ def plotEllipse(pos,P,edge,face,transparency):
     return ellipsePlot
 
 
-#-----------------------------------------------------------------------------
-
-if __name__ == '__main__':
-
-    # Set the random number generator's seed if you want reproducability.
-    # (nb. this would be better as a command line arg...)
-    # rng.seed(1112)  
-
-    if len(sys.argv) == 3:
-        K = int(sys.argv[1])
-        infile = str(sys.argv[2])
-        print 'We are assuming %d classes' % (K)
-    else:
-        sys.exit('usage: python EMmix.py numClasses infile')
-
-    data = genfromtxt(infile, float) #, unpack=True)
-    print data
+def learnMOGmodel(data, model):
+    (means, variances, mix_coeff) = model
     (N,D) = data.shape
-    print 'N is ',N, ' and D is ',D
-
-    # Set initial guestimates for means, variances, and mixture coefficients
-    means = zeros((D,K),float)   # centers start off
-    for k in range(K):           # on randomly chosen data points
-        n = rng.randint(N)
-        means[:,k] = data[n,:]
-
-    variances = 10*ones((D,D,K),float)     # initial variances
-    for k in range(K):                     # start off spherical
-        variances[:,:,k] = eye(2)          
-    mix_coeff = ones((K),float)/K          # mixing coefficients
+    (D,K) = means.shape
     r = 1.0* ones((N,K))                   # start off all the same
-
-
     for iteration in range(50):
         # E step___________________________________________________
         # Evaluate the responsibilities using the current parameter
@@ -106,8 +78,58 @@ if __name__ == '__main__':
             variances[:,:,k] = [[v00,v01],[v10,v11]] / gamma_sums[k]
 
         logL = log(r_sum).sum() # that was easy!
-        print 'iteration %3d logL %12.6f' % (iteration,logL)
+        #print 'iteration %3d logL %12.6f' % (iteration,logL)
     # END OF THE EM LOOP____________________________________________
+    model = (means, variances, mix_coeff)
+    return model, logL
+
+
+def randomStartPoint(N,D,K,data):
+    # Set initial guestimates for means, variances, and mixture coefficients
+    means = zeros((D,K),float)   # centers start off
+    for k in range(K):           # on randomly chosen data points
+        n = rng.randint(N)
+        means[:,k] = data[n,:]
+    variances = 10*ones((D,D,K),float)     # initial variances
+    for k in range(K):                     # start off spherical
+        variances[:,:,k] = eye(2)          
+    mix_coeff = ones((K),float)/K          # mixing coefficients
+    model = (means, variances, mix_coeff)
+    return model 
+
+def findBestMOGmodel(N,D,K,data):
+    best_logL = -10000000.0
+    for trial in range(20):
+        model = randomStartPoint(N,D,K,data)
+        m, logL = learnMOGmodel(data, model)
+        print 'logL is ',logL
+        if logL > best_logL:
+            best_logL = logL
+            model = m
+    print 'best logL is ',best_logL
+    return model
+
+#-----------------------------------------------------------------------------
+
+if __name__ == '__main__':
+
+    # Set the random number generator's seed if you want reproducability.
+    # (nb. this would be better as a command line arg...)
+    # rng.seed(1112)  
+
+    if len(sys.argv) == 3:
+        K = int(sys.argv[1])
+        infile = str(sys.argv[2])
+        print 'We are assuming %d classes' % (K)
+    else:
+        sys.exit('usage: python EMmix.py numClasses infile')
+
+    data = genfromtxt(infile, float) #, unpack=True)
+    (N,D) = data.shape
+    print 'N is ',N, ' and D is ',D
+
+
+    (means, variances, mix_coeff) = findBestMOGmodel(N,D,K,data)
 
 
     f1 = figure()
@@ -116,18 +138,11 @@ if __name__ == '__main__':
     for k in range(K):
         randColor = rng.random((3))
         randColor /= randColor.sum()
-
         ellipsePlot=plotEllipse(means[:,k],variances[:,:,k],'blue',
                                 randColor,mix_coeff[k]/mix_coeff.max())
-        """
-        print '\n Mixture component ',k
-        print 'Mean: ', means[:,k]
-        print 'Covariance matrix: \n',variances[:,:,k]
-        print 'Mixture coefficient: ',mix_coeff[k]
-        """
 
     scatter(data[:,0], data[:,1], marker='o',s=.5,linewidths=None,alpha=0.5)
-    #axis('equal')  # uncomment to give the 2 axes the same scale
+    axis('equal')  # uncomment to give the 2 axes the same scale
     draw()
 
     out_stem = infile.split('.')[0]
@@ -144,7 +159,7 @@ if __name__ == '__main__':
         j = sum(rng.random() > cumsum(mix_coeff))
         X[i,:] = array([rng.multivariate_normal(means[:,j],variances[:,:,j],1)])
     scatter(X[:,0], X[:,1], marker='o',s=.5,linewidths=None,alpha=0.5)
-    #axis('equal')
+    axis('equal')
     draw()
     out_imagename = out_stem+'_faked.png'
     savefig(out_imagename)
