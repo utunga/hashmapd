@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     covarianceMats = []
     centers = []
-    vocabulary = ['cleansing','waterboard','heaven','xbox']
+    vocabulary = ['cleansing','waterboard','heaven','xbox','bieber','yomama']
     histograms = []
     for k in range(K):
         centers.append(5.0* rng.normal(0.0,1.0,(D)))
@@ -125,6 +125,7 @@ if __name__ == '__main__':
         data[i,0] = p.x
         data[i,1] = p.y
     pl.scatter(data[:,0], data[:,1], marker='o',s=3,linewidths=None,alpha=1.0)
+    #pl.axis([np.min(data[:,0]),np.max(data[:,0]),np.min(data[:,1]),np.max(data[:,1])]) # fits the data 'tightly'
     pl.axis('equal')
     pl.draw()
     out_imagename = out_stem+'.png'
@@ -150,13 +151,15 @@ if __name__ == '__main__':
             data[i,0] = p.x
             data[i,1] = p.y
             intensity[i] = p.histo[ind]
-            if (intensity[i] > max_intensity): max_intensity = intensity[i]
+        intensity = intensity / np.max(intensity)
         mycolours = []
         for i,p in enumerate(people):
-            # colour fades to white as intensity decreases to zero.
-            mycolours.append(np.array([1,1,1]) * (1-p.histo[ind]/max_intensity))
-        pl.scatter(data[:,0], data[:,1], c=mycolours, marker='o',s=3,linewidths=None,edgecolors=mycolours,alpha=1.0)
+            # colour goes black to red as intensity increases to 1.
+            mycolours.append(intensity[i] * np.array([1,0,0]))
+        pl.scatter(data[:,0],data[:,1], c=mycolours, marker='o', s=3, linewidths=None,edgecolors='none',alpha=1.0)
+        #pl.axis([data[:,0].min(),data[:,0].max(),data[:,1].min(),data[:,1].max()]) # fits the data 'tightly'
         pl.axis('equal')
+        pl.axis('off')
         pl.title('density of %s' % (word))
         pl.draw()
         out_imagename = out_stem+'_' + word + '.png'

@@ -67,7 +67,7 @@ if __name__ == '__main__':
         out_stem = in_file.split('.')[0]
         K = int(sys.argv[2])  # the number of clusters EM will use
     else:
-        sys.exit('usage: python   labelFakePeople.py   filename  num_clusters')
+        sys.exit('usage:  python  labelFakePeople.py  filename  num_clusters')
         
 
     f = open(in_file,'r')
@@ -83,18 +83,56 @@ if __name__ == '__main__':
         data[i,:] = [p.x,p.y]
     
 
-    # learn a decent mixture of Gaussians model for the overall density.
-    (means, variances, mix_coeff) = findBestMOGmodel(len(people),2,K,data)
 
     # make a plot
     f1 = pl.figure()
     pl.title('%d Gaussians fit to %s using EM' % (K, out_stem))
-    ellipseColor = np.array([.2,.75, 1])
-    for k in range(K):
-        ellipsePlot=plotEllipse(means[:,k],variances[:,:,k],'blue',
-                                ellipseColor,mix_coeff[k]/mix_coeff.max())
-    pl.scatter(data[:,0], data[:,1], marker='o',s=3,linewidths=None,alpha=0.5)
-    pl.axis('equal')  # uncomment to give the 2 axes the same scale
+    pl.scatter(data[:,0], data[:,1], marker='o',s=2,linewidths=None,alpha=0.1)
+    pl.axis('equal')
+    #pl.axis([data[:,0].min(),data[:,0].max(),data[:,1].min(),data[:,1].max()]) # fits 'tightly'
+    # NOTE: if you want to use the above and have axes fit the data sensibly, you have to compensate the angle at which either text or ellipse is displayed. I'm not sure which!! But they go out of alignment if you do nothing.
+    pl.axis('off')
+
+    # learn a decent mixture of Gaussians model for the overall density.
+    #weightings = np.ones(len(people))
+    #(means, variances, mix_coeff) = findBestMOGmodel(len(people),2,K,data,weightings)
+
+
+
+    for wd in vocabulary:
+        i = vocabulary.index(wd)
+        w = []
+        for pers in people:
+            w.append(pers.histo[i])
+        weightings = np.array(w)
+        weightings = weightings / weightings.max()
+        print 'person weightings for ' + wd + ' are ',
+        print weightings[0:5]
+        (means, variances, mix_coeff) = findBestMOGmodel(len(people),2,K,data,weightings)
+
+        ellipseColor = 0.5*rng.random(3)
+        for k in range(K):
+            mu = means[:,k]
+            cov = variances[:,:,k]
+            ellipsePlot=plotEllipse(mu,cov,ellipseColor,'none',transparency=mix_coeff[k]/mix_coeff.max())
+
+            # stuff to put words on the clusters
+            u,s,vh = linalg.svd(cov)
+            princ_comp = u[0]
+            print 'principal_component is ',princ_comp
+            angle = 180/math.pi * math.atan2(princ_comp[1],princ_comp[0])
+            if (angle>90):  angle = angle-180 # we don't like upside-down text
+            if (angle<-90): angle = angle+180
+            # overrule text orientation if there's not that much diff?
+            # s ratio tells us relative dominance of 1st vs 2nd principal component:
+            if (s[0]/s[1] < 2.0): angle = 0.0
+            labelText = vocabulary[i]
+            labelSize = 25*mix_coeff[k]/max(mix_coeff)
+            if labelSize >= 1:
+                pl.text(mu[0],mu[1],labelText,size=labelSize,rotation=angle,ha='center',va='center',alpha=1.0,color=ellipseColor)
+
+
+
     pl.draw()
     out_image = out_stem + '_EM.png'
     pl.savefig(out_image)
