@@ -28,8 +28,30 @@ def load_data_without_labels(dataset):
     #x_shared  = theano.shared(numpy.asarray(x, dtype=theano.config.floatX))
     
     #return x_shared
-
+    
 def load_data_with_labels(dataset):
+
+    # unlike the train_SMH case we expect both unsupervised data and appropriate labels for that data, in pairs,
+    print '... loading render data, expecting input and labels in pairs'
+
+    f = gzip.open(dataset,'rb')
+    train_set, valid_set, test_set = cPickle.load(f)
+    f.close()
+    
+    train_set_x, train_set_labels = train_set
+
+    print "render data has shape:"
+    print train_set_x.shape
+    
+    return [train_set_x, train_set_labels]
+    
+    #not sure if making these things 'shared' helps the GPU out but just in case we may as well do that
+    #train_set_x_shared  = theano.shared(numpy.asarray(train_set_x[0:500], dtype=theano.config.floatX))
+    #train_set_labels_shared  = theano.shared(numpy.asarray(train_set_labels[0:500], dtype=theano.config.floatX))
+    
+    #return [train_set_x_shared, train_set_labels_shared]
+    
+def load_data_with_multi_labels(dataset):
 
     # unlike the train_SMH case we expect both unsupervised data and appropriate labels for that data, in pairs,
     print '... loading render data, expecting input and labels in pairs'
@@ -162,6 +184,7 @@ def main(argv = sys.argv):
     data_info_file = cfg.input.train_data_info
     render_file = cfg.input.render_data #NB includes labels or sometimes not?
     render_file_has_labels = cfg.input.render_data_has_labels
+    render_file_has_multi_labels = cfg.input.render_data_has_multi_labels
     weights_file = cfg.train.weights_file
     n_ins = cfg.shape.input_vector_length
     skip_trace_images = cfg.train.skip_trace_images
@@ -187,8 +210,10 @@ def main(argv = sys.argv):
         batches_per_file,mean_doc_size = cPickle.load(f)
     f.close()
     # load weights file and initialize smh
-    if (render_file_has_labels):
+    if (render_file_has_multi_labels):
         dataset_x, dataset_labels = load_data_with_labels(training_prefix+'0.pkl.gz')
+    elif (render_file_has_labels):
+        dataset_x, dataset_labels = load_data_with_labels(render_file)
     else:
         dataset_x = load_data_without_labels(training_prefix+'0.pkl.gz')
     
