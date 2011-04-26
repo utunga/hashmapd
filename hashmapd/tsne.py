@@ -11,6 +11,7 @@ try:
 except:
     print >> sys.stderr, "No psyco"
 
+
 class TSNE(object):
         
     def __init__(self, default_iterations = 1000, perplexity = 15):
@@ -42,17 +43,15 @@ class TSNE(object):
         """Performs a binary search to get P-values in such a way that each conditional Gaussian has the target perplexity."""
 
         X = self.codes
-        perplexity = self.perplexity
-        tol = self.tol
         
         # Initialize some variables
         print "Computing pairwise distances..."
-        (n, d) = X.shape;
-        sum_X = numpy.sum(numpy.square(X), 1);
-        D = numpy.add(numpy.add(-2 * numpy.dot(X, X.T), sum_X).T, sum_X);
-        P = numpy.zeros((n, n));
-        beta = numpy.ones((n, 1));
-        logU = numpy.log(perplexity);
+        (n, d) = X.shape
+        sum_X = numpy.sum(numpy.square(X), 1)
+        D = numpy.add(numpy.add(-2 * numpy.dot(X, X.T), sum_X).T, sum_X)
+        P = numpy.zeros((n, n))
+        beta = numpy.ones((n, 1))
+        log_perplexity = numpy.log(self.perplexity) 
         
         # Loop over all datapoints
         for i in range(n):
@@ -61,7 +60,8 @@ class TSNE(object):
             if i % 500 == 0:
                 print "Computing P-values for point ", i, " of ", n, "..."
                 
-            thisP = self.compute_hbeta_for_i(i)
+            Di = D[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))];
+            thisP = self.compute_hbeta_for_i(Di,beta[i],log_perplexity)
                 
             # Set the row of P we just worked out
             P[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))] = thisP;
@@ -70,37 +70,39 @@ class TSNE(object):
         print "Mean value of sigma: ", numpy.mean(numpy.sqrt(1 / beta))
         return P;
     
-    def compute_hbeta_for_i(i):
-            # Compute the Gaussian kernel and entropy for the current precision
-            betamin = -numpy.inf; 
-            betamax =  numpy.inf;
-            Di = D[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))];
-            (H, thisP) = self.Hbeta(Di, beta[i]);
+    def compute_hbeta_for_i(self, Di, beta,log_perplexity):
+        # Binary search for a value of beta that achieves the required
+        # perplexity. Then returns the corresponding P-vector.
+        betamin = -numpy.inf; 
+        betamax =  numpy.inf;
+        # Compute the Gaussian kernel and entropy for the current beta
+        (H, thisP) = self.Hbeta(Di, beta);
                 
-            # Evaluate whether the perplexity is within tolerance
-            Hdiff = H - logU;
-            tries = 0;
-            while numpy.abs(Hdiff) > tol and tries < 50:
+        # Evaluate whether the perplexity is within tolerance
+        Hdiff = H - log_perplexity
+        tries = 0
+        while numpy.abs(Hdiff) > self.tol and tries < 50:
                     
-                # If not, increase or decrease precision
-                if Hdiff > 0:
-                    betamin = beta[i];
-                    if betamax == numpy.inf or betamax == -numpy.inf:
-                        beta[i] = beta[i] * 2;
-                    else:
-                        beta[i] = (beta[i] + betamax) / 2;
+            # If not, increase or decrease precision
+            if Hdiff > 0:
+                betamin = beta
+                if betamax == numpy.inf or betamax == -numpy.inf:
+                    beta = beta * 2
                 else:
-                    betamax = beta[i];
-                    if betamin == numpy.inf or betamin == -numpy.inf:
-                        beta[i] = beta[i] / 2;
-                    else:
-                        beta[i] = (beta[i] + betamin) / 2;
+                    beta = (beta + betamax) / 2
+            else:
+                betamax = beta
+                if betamin == numpy.inf or betamin == -numpy.inf:
+                    beta = beta / 2
+                else:
+                    beta = (beta + betamin) / 2
                 
-                # not yet within tolerance - recompute the values
-                (H, thisP) = self.Hbeta(Di, beta[i]);
-                Hdiff = H - logU;
-                tries = tries + 1;
-            
+            # not yet within tolerance - recompute the values
+            (H, thisP) = self.Hbeta(Di, beta)
+            Hdiff = H - log_perplexity
+            tries = tries + 1
+        return thisP
+
     
     def initialize_with_codes(self, codes):
         self.codes = numpy.array(codes)
@@ -109,6 +111,7 @@ class TSNE(object):
         #random initialize the coords
         print '!randomly initializing the coordinates!'
         self.coords = numpy.random.randn(n, self.out_dims)
+
         
     def load_from_file(self, coords_file, codes_file):
         codes = numpy.genfromtxt(codes_file, dtype=numpy.float32, delimiter=',')
@@ -126,10 +129,12 @@ class TSNE(object):
         self.coords = coords
         print 'loaded coords and codes from %s, %s respectively' %(coords_file, codes_file)
         
+
     def save_coords_to_file(self, coords_file):
         print 'saving coords to %s' %(coords_file)
         numpy.savetxt(coords_file, self.coords, delimiter=',')
     
+
     def get_coord_for_code(self, code, iterations = None):
         if (iterations==None):
             iterations = self.default_iterations
@@ -195,6 +200,7 @@ class TSNE(object):
         # update solution
         self.coords = Y;
         
+
     def fit(self, iterations = None): 
         """Descends along tsne gradient path for specified number of iterations"""
 
