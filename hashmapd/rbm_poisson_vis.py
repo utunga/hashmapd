@@ -14,7 +14,7 @@ import os, sys, getopt
 
 from utils import tile_raster_images
 from theano.tensor.shared_randomstreams import RandomStreams
-from ConfigLoader import *
+from load_config import LoadConfig, DefaultConfig
 import rbm
 
 class RBM_Poisson(object):

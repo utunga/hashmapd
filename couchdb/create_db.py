@@ -12,12 +12,12 @@ db = server.create('hashmapd')
 
 # use couchapp to push the views
 time.sleep(1);
-os.chdir(sys.path[0]+os.sep+'queue')
+os.chdir(os.path.join(sys.path[0], 'queue'))
 os.system('couchapp init')
 time.sleep(1);
 os.system('couchapp push http://localhost:5984/hashmapd')
 time.sleep(1);
-os.chdir(sys.path[0]+os.sep+'tweets')
+os.chdir(os.path.join(sys.path[0], 'tweets'))
 os.system('couchapp init')
 time.sleep(1);
 os.system('couchapp push http://localhost:5984/hashmapd')
