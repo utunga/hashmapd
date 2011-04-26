@@ -1,6 +1,8 @@
+*~
 *.pyc
 *.swp
 trace/*
+EM_clustering/*.png
 configurator/build/*
 out/*
 trace/*
