@@ -172,10 +172,15 @@ def normalize_data_x(data_x,sums_x,name):
     
     return (data_x.transpose()/sums_x).transpose()
 
-def main(argv = sys.argv):
-    opts, args = getopt.getopt(argv[1:], "h", ["help"])
+if __name__ == '__main__':
+    from optparse import OptionParser
 
-    cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
+    parser = OptionParser()
+    parser.add_option("-f", "--file", dest="config", default="config",
+        help="Path of the config file to use")
+    (options, args) = parser.parse_args()
+
+    cfg = LoadConfig(options.config)
     validate_config(cfg)
     
     if (cfg.input.csv_contains_counts):
@@ -192,7 +197,4 @@ def main(argv = sys.argv):
     
     #output into pickled data files
     normalize_and_output_pickled_data(cfg,raw_counts)
-
-if __name__ == '__main__':
-    sys.exit(main())    
     

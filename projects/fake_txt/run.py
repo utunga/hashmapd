@@ -16,7 +16,7 @@ sys.path.append(HOME)
 
 from hashmapd.load_config import LoadConfig, DefaultConfig
 from hashmapd.SMH import SMH
-import tSNE
+from hashmapd.tsne import TSNE
 
 #################################
 ## stuff relating to running the SMH step
@@ -140,10 +140,8 @@ def calc_tsne(data_matrix,NO_DIMS=2,PERPLEX=30,INITIAL_DIMS=30,LANDMARKS=1):
     """
     This is the main tSNE function:
     (uses code from http://homepage.tudelft.nl/19j49/t-SNE.html)
-    """
-    
-    y = tSNE.tsne(data_matrix,NO_DIMS,INITIAL_DIMS,PERPLEX,True)
-    print y
+    """ 
+    y = TSNE(data_matrix,NO_DIMS,INITIAL_DIMS,PERPLEX,True)
     return y
 
 def scale_to_interval(arr,max=1.0, eps=1e-8):
@@ -185,11 +183,14 @@ def write_csv_codes(codes, output_file = "out/codes.csv"):
         csv_writer.writerow(row) 
 
 
-def main(argv = sys.argv):
-    opts, args = getopt.getopt(argv[1:], "h", ["help"])
+if __name__ == '__main__':
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-f", "--file", dest="config", default="config",
+        help="Path of the config file to use")
+    (options, args) = parser.parse_args()
+    cfg = LoadConfig(options.config)
 
-    cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
-    #validate_config(cfg)
     render_file = cfg.input.render_data #NB includes labels or sometimes not?
     render_file_has_labels = cfg.input.render_data_has_labels
     render_file_has_multi_labels = cfg.input.render_data_has_multi_labels
@@ -244,7 +245,3 @@ def main(argv = sys.argv):
     if (render_file_has_labels):
         write_csv_labels(dataset_labels, labels_file)
         
-if __name__ == '__main__':
-    sys.exit(main())
-    
-    

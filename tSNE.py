@@ -1,7 +1,7 @@
 import os, sys, getopt
 import csv
 import numpy
-from hashmapd.ConfigLoader import DefaultConfig, LoadConfig
+from hashmapd.load_config import DefaultConfig, LoadConfig
 from hashmapd.tsne import TSNE
 
 def main(argv = sys.argv):

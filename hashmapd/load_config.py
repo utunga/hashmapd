@@ -1,6 +1,5 @@
 from config import Config, ConfigMerger
 
-
 class ConfigLoader(object):
     """Loads configs in a clever way"""
 
@@ -30,7 +29,6 @@ def DefaultConfig():
     
 def LoadConfig(config_name):
     return ConfigLoader().load(config_name);
-
 
 def dict_to_cfg(dictionary, section, filename):
     f = open(filename, 'w')

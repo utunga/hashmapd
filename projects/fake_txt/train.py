@@ -345,13 +345,14 @@ def load_model(cost_method, first_layer_type = 'bernoulli', n_ins=784,  mid_laye
     smh.load_model(smh_params)
     return smh
 
-def main(argv = sys.argv):
-    opts, args = getopt.getopt(argv[1:], "h", ["help"])
+if __name__ == '__main__':
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-f", "--file", dest="config", default="config",
+        help="Path of the config file to use")
+    (options, args) = parser.parse_args()
+    cfg = LoadConfig(options.config)
 
-    cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
-    #validate_config(cfg)
-    
-    data_info_file = cfg.input.train_data_info
     n_ins = cfg.shape.input_vector_length
    
     weights_file = cfg.train.weights_file
@@ -396,8 +397,6 @@ def main(argv = sys.argv):
                     inner_code_length = inner_code_length, weights_file=weights_file)
     output_trace_info(smh2, testing_data[0][:3], 'test_weights_restore', skip_trace_images)
     
-if __name__ == '__main__':
-    sys.exit(main())
     
 
     
