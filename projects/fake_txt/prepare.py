@@ -1,6 +1,3 @@
-
-from struct import *
-from numpy import *
 import sys
 import getopt
 import os
@@ -9,13 +6,29 @@ import cPickle
 import gzip
 import theano
 import time, PIL.Image
+import numpy as np
 
-from hashmapd import *
+def get_git_home():
+    testpath = '.'
+    while not '.git' in os.listdir(testpath) and not os.path.abspath(testpath) == '/':
+        testpath = os.path.sep.join(('..', testpath))
+    if not os.path.abspath(testpath) == '/':
+        return os.path.abspath(testpath)
+    else:
+        raise ValueError, "Not in git repository"
 
-PICKLED_WORD_VECTORS_TRAINING_FILE_POSTFIX = "training_data"
-PICKLED_WORD_VECTORS_VALIDATION_FILE_POSTFIX = "validation_data"
-PICKLED_WORD_VECTORS_TESTING_FILE_POSTFIX = "testing_data"
-PICKLED_FILE_TYPE = ".pkl.gz"
+HOME = get_git_home()
+sys.path.append(HOME)
+
+
+from hashmapd.load_config import LoadConfig, DefaultConfig, dict_to_cfg
+
+TRAINING_FILE = "training_data"
+VALIDATION_FILE = "validation_data"
+TESTING_FILE = "testing_data"
+PICKLED_TYPE = ".pkl.gz"
+
+
 
 def read_user_word_pixels(cfg):
     """
@@ -23,7 +36,7 @@ def read_user_word_pixels(cfg):
     """
     print "attempting to read " + cfg.input.csv_data
     
-    raw_pixels = zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX) #store as float so that normalized_counts uses float math
+    raw_pixels = np.zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX) #store as float so that normalized_counts uses float math
     
     vectorReader = csv.DictReader(open(cfg.input.csv_data, 'rb'), delimiter=',')
     iter=0
@@ -49,7 +62,7 @@ def read_user_word_counts(cfg):
     """
     print "attempting to read " + cfg.input.csv_data
     
-    raw_counts = zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX) #store as float so that normalized_counts uses float math
+    raw_counts = np.zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX) #store as float so that normalized_counts uses float math
     vectorReader = csv.DictReader(open(cfg.input.csv_data, 'rb'), delimiter=',')
     iter=0
     for row in vectorReader:
@@ -80,7 +93,9 @@ def validate_config(cfg):
     assert validate_cutoff<=test_cutoff, \
         "config fail, number_for_testing should be >= 0"
     
-    
+def get_filename(name, number, filetype=PICKLED_TYPE, extsep='.'):
+    return os.path.join("data", "%s_%s%s"%(name, number, filetype))
+
 def normalize_and_output_pickled_data(cfg, raw_counts):
    
     print "outputting full data set"
@@ -109,31 +124,39 @@ def normalize_and_output_pickled_data(cfg, raw_counts):
         test_set_x = raw_counts[validate_cutoff:test_cutoff]
     test_sums = test_set_x.sum(axis=1)
    
-    print '...  pickling and zipping train/validate/test data to '+ cfg.input.train_data
+    print '...  pickling and zipping train/validate/test data to data directory'
     
-    train_file = gzip.open(cfg.input.train_data+PICKLED_WORD_VECTORS_TRAINING_FILE_POSTFIX+'0'+PICKLED_FILE_TYPE,'wb')
-    valid_file = gzip.open(cfg.input.train_data+PICKLED_WORD_VECTORS_VALIDATION_FILE_POSTFIX+'0'+PICKLED_FILE_TYPE,'wb')
-    test_file = gzip.open(cfg.input.train_data+PICKLED_WORD_VECTORS_TESTING_FILE_POSTFIX+'0'+PICKLED_FILE_TYPE,'wb')
+    train_file = gzip.open(get_filename(TRAINING_FILE, 0),'wb')
+    valid_file = gzip.open(get_filename(VALIDATION_FILE, 0),'wb')
+    test_file = gzip.open(get_filename(TESTING_FILE, 0), 'wb')
     
     if (cfg.train.first_layer_type=='poisson'):
-        cPickle.dump((train_set_x,train_sums,zeros(train_sums.shape,dtype=theano.config.floatX)), train_file, cPickle.HIGHEST_PROTOCOL)
-        cPickle.dump((valid_set_x,valid_sums,zeros(valid_sums.shape,dtype=theano.config.floatX)), valid_file, cPickle.HIGHEST_PROTOCOL)
-        cPickle.dump((test_set_x,test_sums,zeros(test_sums.shape,dtype=theano.config.floatX)), test_file, cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump((train_set_x,train_sums,np.zeros(train_sums.shape,dtype=theano.config.floatX)), train_file, cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump((valid_set_x,valid_sums,np.zeros(valid_sums.shape,dtype=theano.config.floatX)), valid_file, cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump((test_set_x,test_sums,np.zeros(test_sums.shape,dtype=theano.config.floatX)), test_file, cPickle.HIGHEST_PROTOCOL)
     else:
-        cPickle.dump((normalize_data_x(train_set_x,train_sums,'training'),train_sums,zeros(train_sums.shape,dtype=theano.config.floatX)), train_file, cPickle.HIGHEST_PROTOCOL)
-        cPickle.dump((normalize_data_x(valid_set_x,valid_sums,'validation'),valid_sums,zeros(valid_sums.shape,dtype=theano.config.floatX)), valid_file, cPickle.HIGHEST_PROTOCOL)
-        cPickle.dump((normalize_data_x(test_set_x,test_sums,'testing'),test_sums,zeros(test_sums.shape,dtype=theano.config.floatX)), test_file, cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump((normalize_data_x(train_set_x,train_sums,'training'),train_sums,np.zeros(train_sums.shape,dtype=theano.config.floatX)), train_file, cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump((normalize_data_x(valid_set_x,valid_sums,'validation'),valid_sums,np.zeros(valid_sums.shape,dtype=theano.config.floatX)), valid_file, cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump((normalize_data_x(test_set_x,test_sums,'testing'),test_sums,np.zeros(test_sums.shape,dtype=theano.config.floatX)), test_file, cPickle.HIGHEST_PROTOCOL)
     
     train_file.close()
     valid_file.close()
     test_file.close() 
         
-    f = gzip.open('data/word_vectors_info.pkl.gz','wb')
-    cPickle.dump(("data/word_vectors_"+PICKLED_WORD_VECTORS_TRAINING_FILE_POSTFIX,1,train_cutoff/batch_size,
-                    "data/word_vectors_"+PICKLED_WORD_VECTORS_VALIDATION_FILE_POSTFIX,1,validate_cutoff/batch_size,
-                    "data/word_vectors_"+PICKLED_WORD_VECTORS_TESTING_FILE_POSTFIX,1,test_cutoff/batch_size,
-                    (train_cutoff+validate_cutoff+test_cutoff)/batch_size,mean_doc_size), f, cPickle.HIGHEST_PROTOCOL)
-    f.close()
+    data_info = {'training_prefix': os.path.join('data', TRAINING_FILE),
+        'n_training_files': 1,
+        'n_training_batches':train_cutoff/batch_size,
+        'validation_prefix':  os.path.join('data', VALIDATION_FILE),
+        'n_validation_files': 1,
+        'n_validation_batches': validate_cutoff/batch_size,
+        'testing_prefix':  os.path.join('data', TESTING_FILE),
+        'n_testing_files': 1,
+        'n_testing_batches': test_cutoff/batch_size,
+        'batches_per_file': (train_cutoff+validate_cutoff+test_cutoff)/batch_size,
+        'mean_doc_size': mean_doc_size,
+    }
+
+    dict_to_cfg(data_info, 'info', 'data.cfg')
 
     print '...  pickling and zipping render_data to '+ cfg.input.render_data
     render_data = normalize_data_x(train_set_x,train_sums,'training')[0:num_examples]

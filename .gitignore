@@ -11,3 +11,6 @@ other/*
 **.DS_Store
 **.couchapprc
 **.couchappignore
+*.png
+*.pkl.gz
+projects/fake_txt/out/*

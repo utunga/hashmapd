@@ -1,11 +1,21 @@
 import os, sys, getopt
 import numpy, time, cPickle, gzip, PIL.Image
 import csv
-import theano
-import theano.tensor as T
-from theano.tensor.shared_randomstreams import RandomStreams
-from struct import *
-from hashmapd import *
+
+def get_git_home():
+    testpath = '.'
+    while not '.git' in os.listdir(testpath) and not os.path.abspath(testpath) == '/':
+        testpath = os.path.sep.join(('..', testpath))
+    if not os.path.abspath(testpath) == '/':
+        return os.path.abspath(testpath)
+    else:
+        raise ValueError, "Not in git repository"
+
+HOME = get_git_home()
+sys.path.append(HOME)
+
+from hashmapd.load_config import LoadConfig, DefaultConfig
+from hashmapd.SMH import SMH
 import tSNE
 
 #################################
@@ -19,7 +29,7 @@ def load_data_without_labels(dataset):
     x = cPickle.load(f)
     f.close()
 
-    print "render data has shape:"
+    #print "render data has shape:"
     print x.shape
 
     return x
@@ -118,7 +128,7 @@ def output_trace(smh, data_x, prefix="run", skip_trace_images=True):
 
 def get_output_codes(smh, data_x):
     print 'running input data forward through smh..'
-    
+    print data_x 
     output_codes = smh.output_codes_given_x(data_x);
     return output_codes; #a 2d array consisting of 'smh' representation of each input row as a row of floats
 
@@ -180,8 +190,6 @@ def main(argv = sys.argv):
 
     cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
     #validate_config(cfg)
-
-    data_info_file = cfg.input.train_data_info
     render_file = cfg.input.render_data #NB includes labels or sometimes not?
     render_file_has_labels = cfg.input.render_data_has_labels
     render_file_has_multi_labels = cfg.input.render_data_has_multi_labels
@@ -202,20 +210,15 @@ def main(argv = sys.argv):
     perplexity = cfg.tsne.perplexity; #roughly 'the optimal number of neighbours'
     
     cost_method = cfg.train.cost;
-    
-    f = gzip.open(data_info_file,'rb')
-    training_prefix,n_training_files,n_training_batches,\
-        validation_prefix,n_validation_files,n_validation_batches,\
-        testing_prefix,n_testing_files,n_testing_batches,\
-        batches_per_file,mean_doc_size = cPickle.load(f)
-    f.close()
+   
+    info = LoadConfig('data')['info']
     # load weights file and initialize smh
     if (render_file_has_multi_labels):
-        dataset_x, dataset_labels = load_data_with_labels(training_prefix+'0.pkl.gz')
+        dataset_x, dataset_labels = load_data_with_multi_labels(info['training_prefix']+'_0.pkl.gz')
     elif (render_file_has_labels):
         dataset_x, dataset_labels = load_data_with_labels(render_file)
     else:
-        dataset_x = load_data_without_labels(training_prefix+'0.pkl.gz')
+        dataset_x = load_data_without_labels(render_file)
     
     if (render_file_has_labels):
         write_csv_labels(dataset_labels, labels_file)
