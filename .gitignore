@@ -9,3 +9,5 @@ other/*
 **.DS_Store
 **.couchapprc
 **.couchappignore
+*.png
+*.pkl.gz

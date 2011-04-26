@@ -271,7 +271,7 @@ class SMH(object):
         return output_fn();
 
     def output_codes_given_x(self, data_x):
-        
+        #print theano.pprint(self.x), len(data_x), data_x[0].shape, data_x[1].shape, data_x[2].shape 
         output_fn = theano.function( [],
                outputs =  self.hash_code_layer.output, 
                givens  = {self.x : data_x})
