@@ -122,19 +122,6 @@ def get_output_codes(smh, data_x):
     output_codes = smh.output_codes_given_x(data_x);
     return output_codes; #a 2d array consisting of 'smh' representation of each input row as a row of floats
 
-#################################
-## stuff relating to running the t-sne step
-#################################
-
-def calc_tsne(data_matrix,NO_DIMS=2,PERPLEX=30,INITIAL_DIMS=30,LANDMARKS=1):
-    """
-    This is the main tSNE function:
-    (uses code from http://homepage.tudelft.nl/19j49/t-SNE.html)
-    """
-    
-    y = tSNE.tsne(data_matrix,NO_DIMS,INITIAL_DIMS,PERPLEX,True)
-    print y
-    return y
 
 def scale_to_interval(arr,max=1.0, eps=1e-8):
     """ Scales all values in the numpy array to be between 0 and max """
@@ -146,15 +133,6 @@ def scale_to_interval(arr,max=1.0, eps=1e-8):
     flatt *= max/ (flatt.max()+eps)
     return flatt.reshape(orig_shape)
     
-def write_csv_coords(coords, output_file="out/coords.csv"):
-    #coords = scale_to_interval(coords, max=100)
-    
-    print 'writing coordinates to csv'
-    csv_writer = csv.writer(open(output_file, 'wb'), delimiter=',')
-    for r in xrange(len(coords)):
-        csv_writer.writerow(coords[r].astype('|S12')) # format with 10dp accuracy (but no '-e' format stuff)
-
-
 def write_csv_labels(labels, output_file="out/labels.csv"):
     
     print 'writing labels to csv'
@@ -229,15 +207,10 @@ def main(argv = sys.argv):
     # run the input data forward through the smh
     codes = get_output_codes(smh, dataset_x)
     
-    #output codes
+    # write output codes (aka semantic hash)
     write_csv_codes(codes, codes_file)
     
-    # run the middle layer 'semantic hashes' or 'codes' through Stochastic Neighbour Embedding library
-    coords = calc_tsne(codes, desired_dims, perplexity, pca_dims);
-    
-    # write results and labels
-    write_csv_coords(coords, coords_file)
-    
+    # write labels
     if (render_file_has_labels):
         write_csv_labels(dataset_labels, labels_file)
         
