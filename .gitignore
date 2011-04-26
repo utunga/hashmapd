@@ -11,3 +11,4 @@ other/*
 **.couchappignore
 *.png
 *.pkl.gz
+projects/fake_txt/out/*
