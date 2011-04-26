@@ -5,7 +5,7 @@ import getopt
 if (not sys.path[0].endswith(os.sep+'..')):
     sys.path[0] = sys.path[0]+os.sep+'..'
 
-from mock import Mock
+#from mock import Mock
 
 from Queue import Queue
 import threading
