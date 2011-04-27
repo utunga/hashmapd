@@ -1,21 +1,25 @@
-
-import sys
-import getopt
-import os
+import os, sys, getopt
+import numpy, time, cPickle, gzip, PIL.Image
 import csv
-import cPickle
-import gzip
-import theano
-import time, PIL.Image
 import couchdb
 import json
-
-from hashmapd import *
-from hashmapd.csv_unicode_helpers import UnicodeWriter
 
 from couchdb.mapping import Document, LongField, DateField, FloatField, TextField, IntegerField, BooleanField
 from couchdb import Server
 
+def get_git_home():
+    testpath = '.'
+    while not '.git' in os.listdir(testpath) and not os.path.abspath(testpath) == '/':
+        testpath = os.path.sep.join(('..', testpath))
+    if not os.path.abspath(testpath) == '/':
+        return os.path.abspath(testpath)
+    else:
+        raise ValueError, "Not in git repository"
+
+HOME = get_git_home()
+sys.path.append(HOME)
+
+from hashmapd.load_config import LoadConfig, DefaultConfig
 
 class TextDoc(Document):
     screen_name = TextField()
@@ -24,8 +28,8 @@ class TextDoc(Document):
 
 def upload_raw(cfg):
     # setup couchdb
-    couch = Server(cfg.couchdb.server_url)
-    db = couch[cfg.couchdb.database]
+    couch = Server(cfg.raw.couch_server_url)
+    db = couch[cfg.raw.couch_db]
   
     #read json file
     dict = json.load(file(cfg.raw.raw_data_file))
@@ -92,19 +96,17 @@ def write_user_counts(cfg):
     for row in sorted(users.items(), key=lambda x: x[1]): 
         csv_user_labels.writerow(([row[0]]))
     
-       
     print "User Count (put this into config, input.number_of_examples field) :",user_count
     print "Word Count (put this into config, shape.input_vector_length field):",word_count
 
-def main(argv = sys.argv):
-    opts, args = getopt.getopt(argv[1:], "h", ["help"])
-
-    cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
-
-    if (args[1]=='upload'):
-        upload_raw(cfg)
-    if (args[1]=='write_counts'):
-        write_user_counts(cfg)
- 
 if __name__ == '__main__':
-    sys.exit(main())    
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-f", "--file", dest="config", default="config",
+        help="Path of the config file to use")
+    (options, args) = parser.parse_args()
+    cfg = LoadConfig(options.config)
+
+    upload_raw(cfg)
+    write_user_counts(cfg)
+ 

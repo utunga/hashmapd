@@ -1,21 +1,27 @@
-
-import sys
-import getopt
-import os
+import os, sys, getopt
+import numpy, time, cPickle, gzip, PIL.Image
 import csv
-import cPickle
-import gzip
-import theano
-import time, PIL.Image
 import couchdb
-
-from hashmapd import *
-from hashmapd.csv_unicode_helpers import UnicodeReader
-
-from struct import *
-from numpy import *
 from couchdb.mapping import Document, LongField, DateField, FloatField, TextField, IntegerField, BooleanField
 from couchdb import Server
+
+#from struct import *
+#from numpy import *
+
+def get_git_home():
+    testpath = '.'
+    while not '.git' in os.listdir(testpath) and not os.path.abspath(testpath) == '/':
+        testpath = os.path.sep.join(('..', testpath))
+    if not os.path.abspath(testpath) == '/':
+        return os.path.abspath(testpath)
+    else:
+        raise ValueError, "Not in git repository"
+
+HOME = get_git_home()
+sys.path.append(HOME)
+
+from hashmapd.load_config import LoadConfig, DefaultConfig
+from hashmapd.csv_unicode_helpers import UnicodeReade
 
 class WordDoc(Document):
       token = TextField()
@@ -72,11 +78,14 @@ def read_word_data_into_couch(cfg):
       print 'copied up to row '+ str(i) + '..';
             
 
-def main(argv = sys.argv):
-    opts, args = getopt.getopt(argv[1:], "h", ["help"])
+if __name__ == '__main__':
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-f", "--file", dest="config", default="config",
+        help="Path of the config file to use")
+    (options, args) = parser.parse_args()
+    cfg = LoadConfig(options.config)
 
-    cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
-    #validate_config(cfg)
     
     #read in csv and post data to couchdb
     read_word_data_into_couch(cfg);

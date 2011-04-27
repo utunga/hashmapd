@@ -14,17 +14,17 @@ except:
 
 class TSNE(object):
         
-    def __init__(self, default_iterations = 1000, perplexity = 15):
+    def __init__(self, default_iterations = 1000, perplexity = 15, desired_dims=2):
         
         self.default_iterations = default_iterations
         self.perplexity=perplexity
-                
+        self.out_dims=desired_dims
+        
         self.initial_momentum = 0.5
         self.final_momentum = 0.8
         self.eta = 500
-        self.sigma_iterations = 50 # number of iterations to try when fitting sigma *for each row* 
+        self.sigma_iterations = 50 # number of iterations to try when finding sigma that matches perplexity *for each row of P, for every iteration* 
         self.min_gain = 0.01
-        self.out_dims=2
         self.tol = 1e-5
         
     def Hbeta(self, D = numpy.array([]), beta = 1.0):

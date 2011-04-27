@@ -16,7 +16,6 @@ sys.path.append(HOME)
 
 from hashmapd.load_config import LoadConfig, DefaultConfig
 from hashmapd.SMH import SMH
-from hashmapd.tsne import TSNE
 
 #################################
 ## stuff relating to running the SMH step
@@ -29,7 +28,7 @@ def load_data_without_labels(dataset):
     x = cPickle.load(f)
     f.close()
 
-    #print "render data has shape:"
+    print "render data has shape:"
     print x.shape
 
     return x
@@ -128,21 +127,10 @@ def output_trace(smh, data_x, prefix="run", skip_trace_images=True):
 
 def get_output_codes(smh, data_x):
     print 'running input data forward through smh..'
-    print data_x 
+    
     output_codes = smh.output_codes_given_x(data_x);
     return output_codes; #a 2d array consisting of 'smh' representation of each input row as a row of floats
 
-#################################
-## stuff relating to running the t-sne step
-#################################
-
-def calc_tsne(data_matrix,NO_DIMS=2,PERPLEX=30,INITIAL_DIMS=30,LANDMARKS=1):
-    """
-    This is the main tSNE function:
-    (uses code from http://homepage.tudelft.nl/19j49/t-SNE.html)
-    """ 
-    y = TSNE(data_matrix,NO_DIMS,INITIAL_DIMS,PERPLEX,True)
-    return y
 
 def scale_to_interval(arr,max=1.0, eps=1e-8):
     """ Scales all values in the numpy array to be between 0 and max """
@@ -154,15 +142,6 @@ def scale_to_interval(arr,max=1.0, eps=1e-8):
     flatt *= max/ (flatt.max()+eps)
     return flatt.reshape(orig_shape)
     
-def write_csv_coords(coords, output_file="out/coords.csv"):
-    #coords = scale_to_interval(coords, max=100)
-    
-    print 'writing coordinates to csv'
-    csv_writer = csv.writer(open(output_file, 'wb'), delimiter=',')
-    for r in xrange(len(coords)):
-        csv_writer.writerow(coords[r].astype('|S12')) # format with 10dp accuracy (but no '-e' format stuff)
-
-
 def write_csv_labels(labels, output_file="out/labels.csv"):
     
     print 'writing labels to csv'
@@ -202,18 +181,14 @@ if __name__ == '__main__':
     mid_layer_sizes = list(cfg.shape.mid_layer_sizes)
     inner_code_length = cfg.shape.inner_code_length
     
-    coords_file = cfg.output.coords_file
     labels_file = cfg.output.labels_file
     codes_file = cfg.output.codes_file
     
-    desired_dims = cfg.tsne.desired_dims; # almost always 2
-    pca_dims = cfg.tsne.pca_dims; #set this to inner_code_length to effectively skip the PCA step
-    perplexity = cfg.tsne.perplexity; #roughly 'the optimal number of neighbours'
-    
     cost_method = cfg.train.cost;
-   
+    
     info = LoadConfig('data')['info']
-    # load weights file and initialize smh
+
+    #load data to generate codes for
     if (render_file_has_multi_labels):
         dataset_x, dataset_labels = load_data_with_multi_labels(info['training_prefix']+'_0.pkl.gz')
     elif (render_file_has_labels):
@@ -221,14 +196,17 @@ if __name__ == '__main__':
     else:
         dataset_x = load_data_without_labels(render_file)
     
+    # write labels
+    # FIXME this should probably be done by the prepare.py step, no?
     if (render_file_has_labels):
         write_csv_labels(dataset_labels, labels_file)
     
+    # load weights file and initialize smh
     smh = load_model(cost_method, n_ins=input_vector_length,  mid_layer_sizes = mid_layer_sizes,
                     inner_code_length = inner_code_length, weights_file=weights_file)
     
     # check it is setup right by reconstructing the input
-    output_trace(smh, dataset_x, skip_trace_images)
+    #output_trace(smh, dataset_x, skip_trace_images)
     
     # run the input data forward through the smh
     codes = get_output_codes(smh, dataset_x)
@@ -236,12 +214,5 @@ if __name__ == '__main__':
     #output codes
     write_csv_codes(codes, codes_file)
     
-    # run the middle layer 'semantic hashes' or 'codes' through Stochastic Neighbour Embedding library
-    coords = calc_tsne(codes, desired_dims, perplexity, pca_dims);
     
-    # write results and labels
-    write_csv_coords(coords, coords_file)
     
-    if (render_file_has_labels):
-        write_csv_labels(dataset_labels, labels_file)
-        
