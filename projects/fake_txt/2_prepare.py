@@ -27,43 +27,41 @@ TRAINING_FILE = "training_data"
 VALIDATION_FILE = "validation_data"
 TESTING_FILE = "testing_data"
 PICKLED_TYPE = ".pkl.gz"
-
-
-
-def read_user_word_pixels(cfg):
-    """
-    Reads in data from user_word_vectors.csv
-    """
-    print "attempting to read " + cfg.input.csv_data
-    
-    raw_pixels = np.zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX) #store as float so that normalized_counts uses float math
-    
-    vectorReader = csv.DictReader(open(cfg.input.csv_data, 'rb'), delimiter=',')
-    iter=0
-    for row in vectorReader:
-        if iter % 100==0:
-            print 'reading row '+ str(iter) + '..' #MKT: presumably a nicer way to do this
-        iter += 1
-        user_id = int(row['user_id'])
-        word_id = int(row['word_id'])
-        pixel = float(row['pixel'])
-        raw_pixels[user_id,word_id] = pixel
-    
-    #total_user_pixels = raw_pixels.sum(axis=1)
-    #normalized_pixels = (raw_pixels.transpose()/total_user_pixels).transpose()
-    
-    print 'done reading input'
-    print raw_pixels
-    return raw_pixels
-    
+#
+#def read_user_word_pixels(cfg):
+#    """
+#    Reads in data from user_word_vectors.csv
+#    """
+#    print "attempting to read " + cfg.input.csv_data
+#    
+#    raw_pixels = np.zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX) #store as float so that normalized_counts uses float math
+#    
+#    vectorReader = csv.DictReader(open(cfg.input.csv_data, 'rb'), delimiter=',')
+#    iter=0
+#    for row in vectorReader:
+#        if iter % 100==0:
+#            print 'reading row '+ str(iter) + '..' #MKT: presumably a nicer way to do this
+#        iter += 1
+#        user_id = int(row['user_id'])
+#        word_id = int(row['word_id'])
+#        pixel = float(row['pixel'])
+#        raw_pixels[user_id,word_id] = pixel
+#    
+#    #total_user_pixels = raw_pixels.sum(axis=1)
+#    #normalized_pixels = (raw_pixels.transpose()/total_user_pixels).transpose()
+#    
+#    print 'done reading input'
+#    print raw_pixels
+#    return raw_pixels
+#    
 def read_user_word_counts(cfg):
     """
     Reads in data from user_word_vectors.csv
     """
-    print "attempting to read " + cfg.input.csv_data
+    print "attempting to read " + cfg.raw.csv_data
     
     raw_counts = np.zeros((cfg.input.number_of_examples, cfg.shape.input_vector_length), dtype=theano.config.floatX) #store as float so that normalized_counts uses float math
-    vectorReader = csv.DictReader(open(cfg.input.csv_data, 'rb'), delimiter=',')
+    vectorReader = csv.DictReader(open(cfg.raw.csv_data, 'rb'), delimiter=',')
     iter=0
     for row in vectorReader:
         if iter % 10000==0:  #MKT: presumably a nicer way to do this ?
