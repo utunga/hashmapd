@@ -58,8 +58,9 @@ class TSNE(object):
                 print "Computing P-values for point ", i, " of ", n, "..."
                 
             distances_to_i = D[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))];
+            #print distances_to_i
             thisP, sigma = self.get_row_of_P(distances_to_i,self.perplexity)
-                
+            #print thisP, sigma
             # Set the row of P we just worked out
             P[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))] = thisP;
             sigmas.append(sigma)
@@ -209,6 +210,8 @@ class TSNE(object):
             
             # Compute current value of cost function
             if (iter + 1) % 10 == 0:
+                print "P ,", P
+                print "Q " , Q
                 C = numpy.sum(P * numpy.log(P / Q));
                 print "Iteration ", (iter + 1), ": error is ", C
                 

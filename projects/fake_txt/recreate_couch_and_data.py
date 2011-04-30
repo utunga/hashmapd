@@ -52,7 +52,7 @@ def reinit_db(cfg):
     # delete old db and create new one
     if db_name in server:
         server.delete(db_name)
-        time.sleep(.1);
+        time.sleep(1);
     db = server.create(db_name)
 
     print 'recreated database %s/%s' % (cfg.raw.couch_server_url, db_name)

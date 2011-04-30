@@ -75,6 +75,26 @@ def read_user_word_counts(cfg):
     print 'done reading input'
     return raw_counts
 
+def read_user_labels(cfg):
+    """
+    Reads in data from fake_txt_users.csv
+    """
+    print "attempting to read " + cfg.raw.users_file
+    
+    users = []
+    vectorReader = csv.DictReader(open(cfg.raw.users_file, 'rb'), delimiter=',')
+    iter=0
+    for row in vectorReader:
+        if iter % 10000==0:  #MKT: presumably a nicer way to do this ?
+            print 'reading row '+ str(iter) + '..'
+        iter += 1
+        user_id = int(row['user_id'])
+        user_name = row['screen']
+        users.append((user_id, user_name))
+    
+    print 'done reading input'
+    return dict(users)
+
 def validate_config(cfg):
     
     num_examples = cfg.input.number_of_examples
@@ -94,7 +114,7 @@ def validate_config(cfg):
 def get_filename(name, number, filetype=PICKLED_TYPE, extsep='.'):
     return os.path.join("data", "%s_%s%s"%(name, number, filetype))
 
-def normalize_and_output_pickled_data(cfg, raw_counts):
+def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
    
     print "outputting full data set"
     
@@ -104,9 +124,12 @@ def normalize_and_output_pickled_data(cfg, raw_counts):
     test_cutoff = validate_cutoff+cfg.input.number_for_testing
     batch_size = cfg.train.train_batch_size
     
+    print raw_counts
     train_set_x = raw_counts[0:train_cutoff]
     train_sums = train_set_x.sum(axis=1)
     mean_doc_size = train_sums.mean()
+    print train_set_x
+    print train_sums
     
     if (cfg.input.number_for_validation ==0):
         print 'WARNING: no examples set aside for validation, copying train set data for validation (as a quick hack only)'
@@ -159,7 +182,18 @@ def normalize_and_output_pickled_data(cfg, raw_counts):
     print '...  pickling and zipping render_data to '+ cfg.input.render_data
     render_data = normalize_data_x(train_set_x,train_sums,'training')[0:num_examples]
     f = gzip.open(cfg.input.render_data,'wb')
-    cPickle.dump(render_data,f, cPickle.HIGHEST_PROTOCOL)
+    
+    render_file_has_labels = cfg.input.render_data_has_labels
+    data = render_data
+    if (render_file_has_labels):
+        labels = user_labels.items()
+        labels.sort()
+        labels = labels[0:num_examples] #FIXME makes dangerous assumption that user_labels has same ordering as render_data
+        data = (render_data, labels)
+        
+    cPickle.dump(data,f, cPickle.HIGHEST_PROTOCOL)
+    
+    print data
     f.close()
     
 def normalize_data_x(data_x,sums_x,name):
@@ -189,10 +223,15 @@ if __name__ == '__main__':
         #read in pixel values between 0 and 1
         raw_counts = read_user_word_pixels(cfg)
     
-    
     if (raw_counts == None):
         print "You need to set either cfg.input.csv_contains_pixels or cfg.input.csv_contains_counts to True otherwise not sure how to process data"
     
+    render_file_has_labels = cfg.input.render_data_has_labels
+    
+    user_labels = None
+    if (render_file_has_labels):
+        user_labels = read_user_labels(cfg)
+        
     #output into pickled data files
-    normalize_and_output_pickled_data(cfg,raw_counts)
+    normalize_and_output_pickled_data(cfg,raw_counts, user_labels)
     

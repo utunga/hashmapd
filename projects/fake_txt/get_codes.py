@@ -44,7 +44,7 @@ def load_data_with_labels(dataset):
     print '... loading render data, expecting input and labels in pairs'
 
     f = gzip.open(dataset,'rb')
-    train_set, valid_set, test_set = cPickle.load(f)
+    train_set = cPickle.load(f)
     f.close()
     
     train_set_x, train_set_labels = train_set
@@ -198,8 +198,8 @@ if __name__ == '__main__':
     
     # write labels
     # FIXME this should probably be done by the prepare.py step, no?
-    if (render_file_has_labels):
-        write_csv_labels(dataset_labels, labels_file)
+    #if (render_file_has_labels):
+    #    write_csv_labels(dataset_labels, labels_file)
     
     # load weights file and initialize smh
     smh = load_model(cost_method, n_ins=input_vector_length,  mid_layer_sizes = mid_layer_sizes,
