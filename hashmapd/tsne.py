@@ -30,6 +30,7 @@ class TSNE(object):
     def Hbeta(self, D = numpy.array([]), beta = 1.0):
         """Compute the perplexity and the P-row for a specific value of the precision of a Gaussian distribution."""
         
+        print 'HBeta for D, beta ', D, beta
         # Compute P-row and corresponding perplexity
         P = numpy.exp(-D.copy() * beta);
         sumP = sum(P);
@@ -79,9 +80,13 @@ class TSNE(object):
         betamax =  numpy.inf;
         beta = 1 #star guess
         
+        print 'computing gaussian kernal'
         # Compute the Gaussian kernel and entropy for the current beta
         (H, thisP) = self.Hbeta(distances, beta) #first guess, probably wrong
-                
+    
+        print 'H', H
+        print 'P', thisP
+        
         # Evaluate whether the perplexity is within tolerance
         Hdiff = H - log_perplexity
         tries = 0
@@ -210,8 +215,8 @@ class TSNE(object):
             
             # Compute current value of cost function
             if (iter + 1) % 10 == 0:
-                print "P ,", P
-                print "Q " , Q
+                #print "P ,", P
+                #print "Q " , Q
                 C = numpy.sum(P * numpy.log(P / Q));
                 print "Iteration ", (iter + 1), ": error is ", C
                 

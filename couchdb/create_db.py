@@ -5,10 +5,10 @@ import couchdb
 server = couchdb.Server('http://localhost:5984')
 
 # delete old db and create new one
-if 'hashmapd' in server:
-    server.delete('hashmapd')
+if 'fake_txt' in server:
+    server.delete('fake_txt')
     time.sleep(2.5);
-db = server.create('hashmapd')
+db = server.create('fake_txt')
 
 # use couchapp to push the views
 time.sleep(1);

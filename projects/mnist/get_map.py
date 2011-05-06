@@ -25,10 +25,7 @@ if __name__ == '__main__':
     
     coords_file = cfg.output.coords_file
     density_plot_file = cfg.output.density_plot_file
-    if cfg.input.render_data_has_labels: 
-        labels_file = cfg.output.labels_file
-    else:
-        labels_file = None
+    labels_file = cfg.output.labels_file
 
     render = Render(coords_file, labels_file)
     render.plot_density(density_plot_file)
