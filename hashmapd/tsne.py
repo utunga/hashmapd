@@ -135,10 +135,6 @@ class TSNE(object):
         # Loop over all datapoints
         for i in range(n):
         
-            # Print progress
-            if i % 50 == 0:
-                print "Computing P-values for point ", i, " of ", n, "..."
-                
             distances_to_i = D[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))];
             #print distances_to_i
             thisP, sigma = self.get_row_of_P(distances_to_i,self.perplexity)
@@ -146,6 +142,11 @@ class TSNE(object):
             # Set the row of P we just worked out
             P[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))] = thisP;
             sigmas.append(sigma)
+
+            # Print progress
+            if i % 50 == 0:
+                print "Computed P-values for point ", i, " of ", n,"  sigma: ",sigma
+            
             
         # Return final P-matrix
         print "Mean value of sigma: ", numpy.mean(sigmas)
