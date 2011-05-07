@@ -3,8 +3,6 @@ Tests the queue tasks in the twextract module
 """
 import sys, os, time
 from mock import Mock
-# move the working dir up two levels so we can import hashmapd stuff
-sys.path[0] = sys.path[0]+os.sep+'..'+os.sep+'..'
 
 import cPickle
 import gzip
@@ -13,10 +11,11 @@ import couchdb
 
 import hashmapd
 
-import twextract.lib.tweepy as tweepy
+import tweepy
 from twextract.request_queue import RequestQueue
 from twextract.store_tweets import StoreTweets
 import twextract.download_tweets as download_tweets
+
 
 views = couchdb.Server('http://127.0.0.1:5984')['hashmapd']['_design/queue']
 

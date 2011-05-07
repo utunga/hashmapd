@@ -1,17 +1,10 @@
 import os
 import sys
 import getopt
-# move the working dir up one level so we can import hashmapd stuff
-if (not sys.path[0].endswith(os.sep+'..')):
-    sys.path[0] = sys.path[0]+os.sep+'..'
-
 import couchdb
 from uuid import uuid4
-
 import datetime
-
-from hashmapd import LoadConfig,DefaultConfig
-
+from hashmapd.load_config import LoadConfig, DefaultConfig
 import inspect
 
 #==============================================================================
