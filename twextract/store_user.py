@@ -1,14 +1,9 @@
 import os
 import sys
-# move the working dir up one level so we can import hashmapd stuff
-if (not sys.path[0].endswith(os.sep+'..')):
-    sys.path[0] = sys.path[0]+os.sep+'..'
-
 import threading
 
 import couchdb
-
-import twextract.lib.tweepy as tweepy
+import tweepy
 
 #==============================================================================
 # Store a new entry for the user

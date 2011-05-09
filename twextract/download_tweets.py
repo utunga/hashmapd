@@ -1,11 +1,6 @@
 import os
 import sys
 import getopt
-# move the working dir up one level so we can import hashmapd stuff
-if (not sys.path[0].endswith(os.sep+'..')):
-    sys.path[0] = sys.path[0]+os.sep+'..'
-
-#from mock import Mock
 
 from Queue import Queue
 import threading
@@ -18,11 +13,11 @@ import datetime
 
 import couchdb
 
-from hashmapd import LoadConfig, DefaultConfig
+from hashmapd.load_config import LoadConfig, DefaultConfig
 from twextract.store_user import StoreUser
 from twextract.store_tweets import StoreTweets
 from twextract.request_queue import RequestQueue
-import twextract.lib.tweepy as tweepy
+import tweepy
 
 
 min_hits = 5
