@@ -4,6 +4,7 @@ Tests the queue tasks in the twextract module
 import sys, os, time
 from mock import Mock
 
+
 import cPickle
 import gzip
 
@@ -16,8 +17,19 @@ from twextract.request_queue import RequestQueue
 from twextract.store_tweets import StoreTweets
 import twextract.download_tweets as download_tweets
 
+def get_git_home():
+    testpath = '.'
+    while not '.git' in os.listdir(testpath) and not os.path.abspath(testpath) == '/':
+        testpath = os.path.sep.join(('..', testpath))
+    if not os.path.abspath(testpath) == '/':
+        return os.path.abspath(testpath)
+    else:
+        raise ValueError, "Not in git repository"
+
+BASEPATH = get_git_home()
 
 views = couchdb.Server('http://127.0.0.1:5984')['hashmapd']['_design/queue']
+
 
 # TODO: split this into a few test cases, and also make a failure test case
 def test_downloads_and_stores_tweets_and_user_and_requests_hash():
@@ -90,14 +102,14 @@ def test_downloads_and_stores_tweets_and_user_and_requests_hash():
 
 
 def retrieve_pickled_data(screen_name,page):
-    f = open(sys.path[0]+os.sep+'twextract'+os.sep+'stored_tweets'+os.sep+str(screen_name)+str(page),'rb')
+    f = open(os.path.join(BASEPATH, 'twextract', 'stored_tweets', str(screen_name)+str(page)),'rb')
     tweet_data = cPickle.load(f)
     f.close()
     return tweet_data
 
 def pickle_data(screen_name,page):
     tweet_data = api.user_timeline(screen_name=screen_name,page=page,count=count,include_entities=True,trim_user=True,include_rts=False)
-    f = open(sys.path[0]+os.sep+'twextract'+os.sep+'stored_tweets'+os.sep+str(screen_name)+str(page),'wb')
+    f = open(os.path.join(BASEPATH, 'twextract', 'stored_tweets', str(screen_name)+str(page)),'wb')
     cPickle.dump(tweet_data,f,cPickle.HIGHEST_PROTOCOL)
     f.close()
     return tweet_data

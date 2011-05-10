@@ -1,10 +1,9 @@
 import couchdb
 
-#==============================================================================
-# Store the calculated hash or coords in the specified db
-#==============================================================================
 class StoreResults(object):
-    
+    """
+    Store the calculated hash or coords in the specified db
+    """
     def __init__(self):
         pass
     

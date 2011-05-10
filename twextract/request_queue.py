@@ -4,16 +4,17 @@ import getopt
 import couchdb
 from uuid import uuid4
 import datetime
-from hashmapd.load_config import LoadConfig, DefaultConfig
 import inspect
 
-#==============================================================================
-# Manages the Tweet Request database.
-#
-# Contains methods to add request(s), or to get the next request off the db
-# "Queue".
-#==============================================================================
+from hashmapd.load_config import LoadConfig, DefaultConfig
+
 class RequestQueue(object):
+    """
+    Manages the Tweet Request database.
+
+    Contains methods to add request(s), or to get the next request off the db
+    "Queue".
+    """
     
     n_pages = 3
     
@@ -94,12 +95,12 @@ class RequestQueue(object):
         self.db[request_id] = row
     
 
-#==============================================================================
-# Main method to add a tweet request (or a series of tweet requests) to the 
-# db queue
-#==============================================================================
 
 class NoScreenNameError(Exception):
+    """
+    Main method to add a tweet request (or a series of tweet requests) to the 
+    db queue
+    """
     def __init__(self, value):
         self.value = value
     def __str__(self):

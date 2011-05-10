@@ -1,23 +1,20 @@
 import os
 import sys
 import getopt
-
 from Queue import Queue
 import threading
 import time
-
 import cPickle
 import gzip
-
 import datetime
 
 import couchdb
+import tweepy
 
-from hashmapd.load_config import LoadConfig, DefaultConfig
+from hashmapd.load_config import LoadConfig, DefaultConfig, BASEPATH
 from twextract.store_user import StoreUser
 from twextract.store_tweets import StoreTweets
 from twextract.request_queue import RequestQueue
-import tweepy
 
 
 min_hits = 5
@@ -25,13 +22,12 @@ count = 100
 store_tweets = StoreTweets()
 request_queue = RequestQueue()
 
-#==============================================================================
-# Get the specified page of tweets for the specified user, and store them in
-# the specified db
-#==============================================================================
 class RetrieveTweets(threading.Thread):
-    
-    def __init__(self,manager,screen_name,page,db,request_id):
+    """
+    Get the specified page of tweets for the specified user, and store them in
+    the specified db
+   """ 
+    def __init__(self, manager, screen_name, page, db, request_id):
         threading.Thread.__init__(self)
         self.manager = manager
         self.screen_name = screen_name
@@ -66,22 +62,22 @@ class RetrieveTweets(threading.Thread):
             #       (for now just raise the error)
             raise
 
-#==============================================================================
-# Loop until user terminates program. Obtain tweet requests from the queue and
-# spawn worker threads to retrieve the data.
-# 
-# Blocks when the maximum number of simultanous requests are underway.
-# Currently busy-waits (0.1s) when there are no requests on the queue.
-# Also busy-waits (20s) when the twitter rate limit is reached.
-#==============================================================================
 class Manager(threading.Thread):
+    """
+    Loop until user terminates program. Obtain tweet requests from the queue and
+    spawn worker threads to retrieve the data.
+ 
+    Blocks when the maximum number of simultanous requests are underway.
+    Currently busy-waits (0.1s) when there are no requests on the queue.
+    Also busy-waits (20s) when the twitter rate limit is reached.
+    """
     
     def __init__(self,server_url='http://127.0.0.1:5984',db_name='hashmapd',\
             max_simultaneous_requests=5):
         threading.Thread.__init__(self)
         self.db = couchdb.Server(server_url)[db_name]
         self.worker_threads = []
-        self.semaphore = semaphore = threading.Semaphore(max_simultaneous_requests)
+        self.semaphore = threading.Semaphore(max_simultaneous_requests)
         self.terminate = False
     
     def notify_completed(self,thread):
@@ -120,7 +116,6 @@ class Manager(threading.Thread):
         
         if len(results[thread.screen_name]) == 0:
             request_queue.add_hash_request(thread.screen_name)
-            pass
     
     def run(self):
         # obtain a twitter screen name from db that needs data downloaded
@@ -175,17 +170,17 @@ class Manager(threading.Thread):
         self.terminate = True
 
 
-#==============================================================================
-# Main method to intialize and run the Manager indefinitely
-#==============================================================================
 
 def usage():
     return 'usage: get_tweets                                                   \n'+\
            '   [-c config]        specifies config file to load                 '
 
 if __name__ == '__main__':
+    """
+    Main method to intialize and run the Manager indefinitely
+    """
     # authenticate with oauth
-    secrets_cfg = LoadConfig("secrets")
+    secrets_cfg = LoadConfig(os.path.join(BASEPATH, "secrets"))
     auth = tweepy.OAuthHandler(secrets_cfg.auth.consumer_token,secrets_cfg.auth.consumer_secret)
     auth.set_access_token(secrets_cfg.auth.session_key,secrets_cfg.auth.session_secret)
     
@@ -204,8 +199,6 @@ if __name__ == '__main__':
         print >> sys.stderr, usage()
         sys.exit(1)
     
-    use_test_data = False
-    save_test_data = False
     cfg = None
     for o,a in opts:
         if o in ("-c", "--config"):
@@ -228,6 +221,5 @@ if __name__ == '__main__':
             manager.exit()
             print 'terminating ...'
             break
-
 
 

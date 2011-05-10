@@ -5,11 +5,10 @@ import threading
 import couchdb
 import tweepy
 
-#==============================================================================
-# Store a new entry for the user
-#==============================================================================
 class StoreUser(threading.Thread):
-    
+    """
+    Store a new entry for the user
+    """
     def __init__(self,username,db,tweepy_api):
         threading.Thread.__init__(self)
         self.username = username
