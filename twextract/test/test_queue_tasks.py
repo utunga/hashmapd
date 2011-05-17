@@ -92,7 +92,7 @@ def test_download_requests_dequeued_in_order():
     
     # returns a list of values taken from the dumnmy values dictionary, that are 
     # formatted and ordered in the same way as the relevant view would be
-    def get_view_results(view,reduce):
+    def get_view_results(view,reduce,descending):
         if (view == 'queue/queued_download_requests'):
             return generate_view('queued','download')
         elif (view == 'queue/underway_download_requests'):

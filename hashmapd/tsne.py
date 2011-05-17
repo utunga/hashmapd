@@ -26,20 +26,111 @@ class TSNE(object):
         self.sigma_iterations = 50 # number of iterations to try when finding sigma that matches perplexity *for each row of P, for every iteration* 
         self.min_gain = 0.01
         self.tol = 1e-5
+
         
-    def Hbeta(self, D = numpy.array([]), beta = 1.0):
-        """Compute the perplexity and the P-row for a specific value of the precision of a Gaussian distribution."""
+
+    def initialize_with_codes(self, codes):
+        self.codes = numpy.array(codes)
+        (n, d) = self.codes.shape # n rows, d columns
+        self.code_dims = d
+        #randomly initialize the coords
+        print '!randomly initializing the coordinates!'
+        self.coords = numpy.random.randn(n, self.out_dims)
+        # Note there are smarter ways to initialise, eg. use the
+        # projections onto the first 2 principal components for
+        # example, that would make tsne's job easier by starting
+        # coords in the right ball-park. Something to keep in mind if
+        # we think local minima are a problem.
+
+
+
+    def fit(self, iterations = None): 
+        """Descends along tsne gradient path for the specified number of iterations"""
+
+        if (iterations==None):
+            iterations = self.default_iterations
         
-        #print 'HBeta for D, beta ', D, beta
-        # Compute P-row and corresponding perplexity
-        P = numpy.exp(-D.copy() * beta);
-        sumP = sum(P);
-        H = numpy.log(sumP) + beta * numpy.sum(D * P) / sumP;
-        P = P / sumP;
-        return H, P;
+#<<<<<<< HEAD:hashmapd/tsne.py
+        if self.codes.dtype != "float32":
+            print "Error: array of codes should have type float32.";
+            return -1;
         
+        # Initialize variables
+        X = self.codes
+        Y = self.coords
+        initial_momentum = 0.5;
+        final_momentum = 0.8;
+        eta = 500;
+        min_gain = 0.01;
+        (n, d) = X.shape;
+        assert(d==self.code_dims) #these should be the same, right?
+        
+        dY = numpy.zeros((n, self.out_dims));
+        iY = numpy.zeros((n, self.out_dims));
+        gains = numpy.ones((n, self.out_dims));
+        
+        # Compute P-values
+        print "Computing the P-values first"
+        P = self.x2p();
+        P = P + numpy.transpose(P);
+        P = P / numpy.sum(P);
+        P = P * 4;                                    # early exaggeration
+        P = numpy.maximum(P, 1e-12);
+#=======
+#        #print 'HBeta for D, beta ', D, beta
+#        # Compute P-row and corresponding perplexity
+#        P = numpy.exp(-D.copy() * beta);
+#        sumP = sum(P);
+#        H = numpy.log(sumP) + beta * numpy.sum(D * P) / sumP;
+#        P = P / sumP;
+#        return H, P;
+#>>>>>>> d749adedfcc2bfea5d666e92cdd171597a4c49d3:hashmapd/tsne.py
+        
+        # Run iterations
+        print "Doing the tsne minimization"
+        for iter in range(iterations):
+            
+            # Compute pairwise affinities
+            sum_Y = numpy.sum(numpy.square(Y), 1);        
+            num = 1 / (1 + numpy.add(numpy.add(-2 * numpy.dot(Y, Y.T), sum_Y).T, sum_Y));
+            num[range(n), range(n)] = 0;
+            Q = num / numpy.sum(num);
+            Q = numpy.maximum(Q, 1e-12);
+            
+            # Compute gradient
+            PQ = P - Q;
+            for i in range(n):
+                dY[i,:] = numpy.sum(numpy.tile(PQ[:,i] * num[:,i], (self.out_dims, 1)).T * (Y[i,:] - Y), 0);
+                
+            # Perform the update
+            if iter < 20:
+                momentum = initial_momentum
+            else:
+                momentum = final_momentum
+            gains = (gains + 0.2) * ((dY > 0) != (iY > 0)) + (gains * 0.8) * ((dY > 0) == (iY > 0));
+            gains[gains < min_gain] = min_gain;
+            iY = momentum * iY - eta * (gains * dY);
+            Y = Y + iY;
+            Y = Y - numpy.tile(numpy.mean(Y, 0), (n, 1));
+            
+            # Compute current value of cost function
+            if (iter + 1) % 10 == 0:
+                C = numpy.sum(P * numpy.log(P / Q));
+                print "Iteration ", (iter + 1), ": error is ", C
+                
+            # Stop lying about P-values
+            if iter == 100:
+                P = P / 4;
+                
+        # update solution
+        self.coords = Y;
+                   
+
+
+
     def x2p(self):
-        """Performs a binary search to get P-values in such a way that each conditional Gaussian has the target perplexity."""
+        """Performs a binary search to get P-values in such a way that
+        each conditional Gaussian has the target perplexity."""
 
         X = self.codes
         
@@ -54,22 +145,35 @@ class TSNE(object):
         # Loop over all datapoints
         for i in range(n):
         
-            # Print progress
-            if i % 500 == 0:
-                print "Computing P-values for point ", i, " of ", n, "..."
-                
             distances_to_i = D[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))];
             #print distances_to_i
             thisP, sigma = self.get_row_of_P(distances_to_i,self.perplexity)
-            #print thisP, sigma
+            
             # Set the row of P we just worked out
             P[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))] = thisP;
             sigmas.append(sigma)
+
+            # Print progress
+            if i % 50 == 0:
+                print "Computed P-values for point ", i, " of ", n,"  sigma: ",sigma
+            
             
         # Return final P-matrix
         print "Mean value of sigma: ", numpy.mean(sigmas)
         return P;
+
     
+    def Hbeta(self, D = numpy.array([]), beta = 1.0):
+        """Compute the perplexity and the P-row for a specific value of the precision of a Gaussian distribution."""
+        
+        # Compute P-row and corresponding perplexity
+        P = numpy.exp(-D.copy() * beta);
+        sumP = sum(P);
+        H = numpy.log(sumP) + beta * numpy.sum(D * P) / sumP;
+        P = P / sumP;
+        return H, P;
+        
+
     def get_row_of_P(self, distances, perplexity):
         
         log_perplexity = numpy.log(perplexity)
@@ -78,7 +182,7 @@ class TSNE(object):
         # perplexity. Then returns the corresponding P-vector.
         betamin = -numpy.inf; 
         betamax =  numpy.inf;
-        beta = 1 #star guess
+        beta = 1.0 #star guess
         
         #print 'computing gaussian kernal'
         # Compute the Gaussian kernel and entropy for the current beta
@@ -110,17 +214,10 @@ class TSNE(object):
             (H, thisP) = self.Hbeta(distances, beta)
             Hdiff = H - log_perplexity
             tries = tries + 1
-            
-        sigma = numpy.sqrt(1 / beta)
+
+        sigma = numpy.sqrt(1.0 / beta)
         return thisP, sigma
     
-    def initialize_with_codes(self, codes):
-        self.codes = numpy.array(codes)
-        (n, d) = self.codes.shape
-        self.code_dims = d
-        #random initialize the coords
-        print '!randomly initializing the coordinates!'
-        self.coords = numpy.random.randn(n, self.out_dims)
 
     def load_from_file(self, coords_file, codes_file):
         codes = numpy.genfromtxt(codes_file, dtype=numpy.float32, delimiter=',')
@@ -138,9 +235,6 @@ class TSNE(object):
         self.coords = coords
         print 'loaded coords and codes from %s, %s respectively' %(coords_file, codes_file)
         
-    def save_coords_to_file(self, coords_file):
-        print 'saving coords to %s' %(coords_file)
-        numpy.savetxt(coords_file, self.coords, delimiter=',')
 
     def get_coord_for_code(self, code, iterations = None):
         if (iterations==None):
@@ -220,81 +314,19 @@ class TSNE(object):
                 C = numpy.sum(P * numpy.log(P / Q));
                 print "Iteration ", (iter + 1), ": error is ", C
                 
-                
         # update solution
         self.coords = Y;
         
 
-    def fit(self, iterations = None): 
-        """Descends along tsne gradient path for specified number of iterations"""
 
-        if (iterations==None):
-            iterations = self.default_iterations
-        
-        if self.codes.dtype != "float32":
-            print "Error: array of codes should have type float32.";
-            return -1;
-        
-        # Initialize variables
-        X = self.codes
-        Y = self.coords
-        initial_momentum = 0.5;
-        final_momentum = 0.8;
-        eta = 500;
-        min_gain = 0.01;
-        (n, d) = X.shape;
-        assert(d==self.code_dims) #these should be the same, right?
-        
-        dY = numpy.zeros((n, self.out_dims));
-        iY = numpy.zeros((n, self.out_dims));
-        gains = numpy.ones((n, self.out_dims));
-        
-        # Compute P-values
-        P = self.x2p();
-        P = P + numpy.transpose(P);
-        P = P / numpy.sum(P);
-        P = P * 4;                                    # early exaggeration
-        P = numpy.maximum(P, 1e-12);
-        
-        # Run iterations
-        for iter in range(iterations):
-            
-            # Compute pairwise affinities
-            sum_Y = numpy.sum(numpy.square(Y), 1);        
-            num = 1 / (1 + numpy.add(numpy.add(-2 * numpy.dot(Y, Y.T), sum_Y).T, sum_Y));
-            num[range(n), range(n)] = 0;
-            Q = num / numpy.sum(num);
-            Q = numpy.maximum(Q, 1e-12);
-            
-            # Compute gradient
-            PQ = P - Q;
-            for i in range(n):
-                dY[i,:] = numpy.sum(numpy.tile(PQ[:,i] * num[:,i], (self.out_dims, 1)).T * (Y[i,:] - Y), 0);
-                
-            # Perform the update
-            if iter < 20:
-                momentum = initial_momentum
-            else:
-                momentum = final_momentum
-            gains = (gains + 0.2) * ((dY > 0) != (iY > 0)) + (gains * 0.8) * ((dY > 0) == (iY > 0));
-            gains[gains < min_gain] = min_gain;
-            iY = momentum * iY - eta * (gains * dY);
-            Y = Y + iY;
-            Y = Y - numpy.tile(numpy.mean(Y, 0), (n, 1));
-            
-            # Compute current value of cost function
-            if (iter + 1) % 10 == 0:
-                C = numpy.sum(P * numpy.log(P / Q));
-                print "Iteration ", (iter + 1), ": error is ", C
-                
-            # Stop lying about P-values
-            if iter == 100:
-                P = P / 4;
-                
-        # update solution
-        self.coords = Y;
-                   
-#f __name__ == "__main__":
+
+    def save_coords_to_file(self, coords_file):
+        print 'saving coords to %s' %(coords_file)
+        numpy.savetxt(coords_file, self.coords, delimiter=',')
+
+
+
+#if __name__ == "__main__":
     #print "Run Y = tsne.tsne(X, self.out_dims, perplexity) to perform t-SNE on your dataset."
     #print "Running example on 2,500 MNIST digits..."
     #X = numpy.loadtxt("mnist2500_X.txt");

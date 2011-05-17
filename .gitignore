@@ -16,4 +16,5 @@ other/*
 projects/fake_txt/out/*
 hashmapd.egg-info/*
 build/*
+config/secrets.cfg
 

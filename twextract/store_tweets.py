@@ -1,10 +1,9 @@
 import couchdb
 
-#==============================================================================
-# Store a list of tweets in the specified db
-#==============================================================================
 class StoreTweets(object):
-    
+    """
+    Store a list of tweets in the specified db
+    """
     def __init__(self):
         pass
     

@@ -1,25 +1,17 @@
 import os
 import sys
 import getopt
-# move the working dir up one level so we can import hashmapd stuff
-if (not sys.path[0].endswith(os.sep+'..')):
-    sys.path[0] = sys.path[0]+os.sep+'..'
-
-from mock import Mock
-
+import time
 from Queue import Queue
 import threading
-import time
-
 import csv
 import cPickle
 import gzip
-
 import datetime
+
 import numpy
-
+from mock import Mock
 import couchdb
-
 import theano
 
 import hashmapd
@@ -32,14 +24,11 @@ request_queue = RequestQueue()
 store_results = StoreResults()
 
 
-
-
-#==============================================================================
-# Computes a hash given the specified raw word counts, and stores the result in
-# under the users information in the specified db
-#==============================================================================
 class ComputeHash(threading.Thread):
-    
+    """
+    Computes a hash given the specified raw word counts, and stores the result in
+    under the users information in the specified db
+    """
     def __init__(self,manager,screen_name,raw_word_counts,db,request_id):
         threading.Thread.__init__(self)
         self.manager = manager
@@ -73,16 +62,15 @@ class ComputeHash(threading.Thread):
     def calc_tsne(self,hash,desired_dims,perplexity,pca_dims):
         return run.calc_tsne(hash,desired_dims,perplexity,pca_dims)
 
-import time
 
-#==============================================================================
-# Loop until user terminates program. Obtain hash requests from the queue and
-# spawn worker threads to compute hash codes.
-# 
-# Blocks when the maximum number of simultanous requests are underway.
-# Currently busy-waits when there are no requests on the queue.
-#==============================================================================
 class Manager(threading.Thread):
+    """
+    Loop until user terminates program. Obtain hash requests from the queue and
+    spawn worker threads to compute hash codes.
+ 
+    Blocks when the maximum number of simultanous requests are underway.
+    Currently busy-waits when there are no requests on the queue.
+    """
     
     def __init__(self, server_url='http://127.0.0.1:5984', db_name='hashmapd',\
                     max_simultaneous_requests=5):
@@ -185,15 +173,15 @@ def load_words_dict():
         words_dict[line[1].lower()] = int(line[0])
     return words_dict
 
-#==============================================================================
-# Main method to intialize and run the Manager indefinitely
-#==============================================================================
 
 def usage():
     return 'usage: get_tweets                                                   \n'+\
            '   [-c config]        specifies config file to load                 '
 
 if __name__ == '__main__':
+    """
+    Main method to intialize and run the Manager indefinitely
+    """
     print 'starting compute_hashes.py'
     print ''
     
