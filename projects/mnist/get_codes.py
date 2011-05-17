@@ -33,6 +33,8 @@ def load_data_with_labels(dataset):
     print "render data has shape:"
     print data_x.shape
     
+    print "render labels has shape"
+    print labels_y.shape
     return [data_x, labels_y]
     
 def load_model(cost_method, n_ins=784,  mid_layer_sizes = [200],
@@ -54,7 +56,7 @@ def get_output_codes(smh, data_x):
     return output_codes; #a 2d array consisting of 'smh' representation of each input row as a row of floats
     
 def write_csv_labels(labels, output_file="out/labels.csv"):
-    print 'writing labels to csv'
+    print 'writing labels to csv', output_file
     
     csv_writer = csv.writer(open(output_file, 'wb'), delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
     for label in labels:
@@ -83,7 +85,7 @@ if __name__ == '__main__':
     #load data (and labels) to generate codes for
     render_file = cfg.input.render_file 
     dataset_x, dataset_labels = load_data_with_labels(render_file)
-    
+ 
     # write labels
     labels_file = cfg.output.labels_file
     write_csv_labels(dataset_labels, labels_file)

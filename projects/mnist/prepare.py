@@ -28,18 +28,24 @@ def load_and_truncate_mnist(batch_size, raw_dataset_file=None, data_folder=None,
     train_set, valid_set, test_set = cPickle.load(f)
     f.close()
     
-    train_set_x = train_set[0]
-    valid_set_x = valid_set[0]
-    test_set_x = test_set[0]
-
-    # supervised data aka labels (not used in training)
-    train_set_y = train_set[1]
-    valid_set_y = valid_set[1]
-    test_set_y = test_set[1]
+    train_set_x = numpy.array(train_set[0])
+    valid_set_x = numpy.array(valid_set[0])
+    test_set_x = numpy.array(test_set[0])
     
+    # supervised data aka labels (not used in training)
+    train_set_y = numpy.array(train_set[1])
+    valid_set_y = numpy.array(valid_set[1])
+    test_set_y = numpy.array(test_set[1])
+
+    print "train set x has shape", train_set_x.shape
+    print "valid set x has shape", valid_set_x.shape
+    print "test set x has shape", test_set_x.shape
+    print "train set y has shape", train_set_y.shape
+    print "valid set y has shape", valid_set_y.shape
+    print "test set y has shape", test_set_y.shape
+
     #set up config file
 
-    
     train_cutoff = cfg.input.number_for_training
     validate_cutoff = cfg.input.number_for_validation #train_cutoff+cfg.input.number_for_validation
     test_cutoff = cfg.input.number_for_testing #validate_cutoff+cfg.input.number_for_testing
@@ -49,6 +55,15 @@ def load_and_truncate_mnist(batch_size, raw_dataset_file=None, data_folder=None,
     train_set_x = test_set_x[0:train_cutoff]
     valid_set_x = valid_set_x[0:validate_cutoff]
     test_set_x = train_set_x[0:test_cutoff]
+    train_set_y = test_set_y[0:train_cutoff]
+    valid_set_y = valid_set_y[0:validate_cutoff]
+    test_set_y = train_set_y[0:test_cutoff]
+    print "train set x has shape", train_set_x.shape
+    print "valid set x has shape", valid_set_x.shape
+    print "test set x has shape", test_set_x.shape
+    print "train set y has shape", train_set_y.shape
+    print "valid set y has shape", valid_set_y.shape
+    print "test set y has shape", test_set_y.shape
     
     mean_doc_size = train_set_x.sum(axis=1).mean()
 
@@ -64,23 +79,6 @@ def load_and_truncate_mnist(batch_size, raw_dataset_file=None, data_folder=None,
         'batches_per_file': (train_cutoff+validate_cutoff+test_cutoff)/batch_size,
         'mean_doc_size': mean_doc_size,
     }
-    
-    #dict_to_cfg(data_info, 'info', 'data.cfg')
-
-        
-    #print '...  pickling and zipping truncated, unsupervised data to '+ data_folder
-    #
-    #f = gzip.open(os.path.join(data_folder,TRAINING_FILE+'_0.pkl.gz'),'wb')
-    #cPickle.dump((train_set_x,train_set_x.sum(axis=1),[]),f, cPickle.HIGHEST_PROTOCOL) # no sums/labels
-    #f.close()
-    #
-    #f = gzip.open(os.path.join(data_folder,VALIDATION_FILE+'_0.pkl.gz'),'wb')
-    #cPickle.dump((valid_set_x,valid_set_x.sum(axis=1),[]),f, cPickle.HIGHEST_PROTOCOL) # no sums/labels
-    #f.close()
-    #
-    #f = gzip.open(os.path.join(data_folder,TESTING_FILE+'_0.pkl.gz'),'wb')
-    #cPickle.dump((test_set_x,test_set_x.sum(axis=1),[]),f, cPickle.HIGHEST_PROTOCOL) # no sums/labels
-    #f.close()
     
     print '...  pickling and zipping truncated, render data (with labels) to '+ render_file
 

@@ -28,5 +28,6 @@ if __name__ == '__main__':
     labels_file = cfg.output.labels_file
 
     render = Render(coords_file, labels_file)
+    render.max_labels = 1000
     render.plot_density(density_plot_file)
     
