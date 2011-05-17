@@ -15,6 +15,7 @@ class Render(object):
             self.labels_filename = labels_filename
         self.fig_width  = 8
         self.fig_height = 8
+        self.max_labels = sys.maxint
 
 
     def plot_density(self, plot_filename='out/density.png'):
@@ -36,9 +37,10 @@ class Render(object):
         imshow(rot90(Z), cmap=cm.gist_earth_r, extent=[xmin, xmax, ymin, ymax])
 
 
-        # Plot the twits
+        # Plot the labels
+        num_labels_to_plot = min(len(labels), self.max_labels)
         if self.has_labels:
-            for i in range(len(labels)):
+            for i in range(num_labels_to_plot):
                 text(x[i],y[i],labels[i]) # assumes m size and order matches labels
         else:
             plot(x, y, 'k.', markersize=1)

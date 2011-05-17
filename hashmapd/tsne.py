@@ -50,7 +50,7 @@ class TSNE(object):
         if (iterations==None):
             iterations = self.default_iterations
         
-<<<<<<< HEAD:hashmapd/tsne.py
+#<<<<<<< HEAD:hashmapd/tsne.py
         if self.codes.dtype != "float32":
             print "Error: array of codes should have type float32.";
             return -1;
@@ -76,15 +76,15 @@ class TSNE(object):
         P = P / numpy.sum(P);
         P = P * 4;                                    # early exaggeration
         P = numpy.maximum(P, 1e-12);
-=======
-        #print 'HBeta for D, beta ', D, beta
-        # Compute P-row and corresponding perplexity
-        P = numpy.exp(-D.copy() * beta);
-        sumP = sum(P);
-        H = numpy.log(sumP) + beta * numpy.sum(D * P) / sumP;
-        P = P / sumP;
-        return H, P;
->>>>>>> d749adedfcc2bfea5d666e92cdd171597a4c49d3:hashmapd/tsne.py
+#=======
+#        #print 'HBeta for D, beta ', D, beta
+#        # Compute P-row and corresponding perplexity
+#        P = numpy.exp(-D.copy() * beta);
+#        sumP = sum(P);
+#        H = numpy.log(sumP) + beta * numpy.sum(D * P) / sumP;
+#        P = P / sumP;
+#        return H, P;
+#>>>>>>> d749adedfcc2bfea5d666e92cdd171597a4c49d3:hashmapd/tsne.py
         
         # Run iterations
         print "Doing the tsne minimization"
