@@ -10,8 +10,6 @@ EC2_SSH="ssh ubuntu@${EC2_ADDR} -i ${EC2_DEFAULT_PEM}"
 ec2-associate-address ${EC2_ADDR} -i ${EC2_INSTANCE}
 ec2-attach-volume ${EC2_VOLUME} -i ${EC2_INSTANCE} -d /dev/sdh
 
-
-
 #Set up block storage
 ${EC2_SSH} "sudo mkdir /ebs"
 ${EC2_SSH} "sudo mount -t ext3 /dev/sdh /ebs"
@@ -34,7 +32,10 @@ ${EC2_SSH} "sudo chmod a+r /ebs/var/lib/couchdb/0.10.0 /mnt/var/lib/couchdb/0.10
 ${EC2_SSH} "sudo /etc/init.d/couchdb stop"
 ${EC2_SSH} "sudo /etc/init.d/couchdb start"
 
-#Set up an ssh tunnel, you can now see couch on 
-ssh -f -L 5994:localhost:5984 ubuntu@${EC2_ADDR} -i ${EC2_DEFAULT_PEM}
+#Now load the views
+${EC2_SSH} "cd ~/hashmapd/couchdb; python create_db.py"
+
+#Set up an ssh tunnel, so that you can access couch
+ssh -f -N -L 5994:localhost:5984 ubuntu@${EC2_ADDR} -i ${EC2_DEFAULT_PEM}
 
 
