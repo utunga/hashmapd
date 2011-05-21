@@ -6,7 +6,7 @@
 EC2_VOLUME=`ec2-describe-volumes|awk '{print $2}'|head -1`
 EC2_INSTANCE=`ec2-describe-instances|grep running|awk '{print $2}'|head -1`
 EC2_ADDR=`ec2-describe-addresses|awk '{print $2}'|head -1`
-EC2_SSH="ssh ubuntu@${EC2_ADDR} -i ${EC2_DEFAULT_PEM}"
+EC2_SSH="ssh ubuntu@${EC2_ADDR} -A -i ${EC2_DEFAULT_PEM}"
 ec2-associate-address ${EC2_ADDR} -i ${EC2_INSTANCE}
 ec2-attach-volume ${EC2_VOLUME} -i ${EC2_INSTANCE} -d /dev/sdh
 
@@ -20,7 +20,7 @@ ${EC2_SSH} "sudo aptitude update -y"
 ${EC2_SSH} "sudo aptitude install couchdb git-core python-setuptools python-dev gcc -y"
 ${EC2_SSH} "sudo easy_install pip"
 ${EC2_SSH} "sudo pip install couchapp couchdb tweepy config"
-${EC2_SSH} -A "git clone git@github.com:utunga/hashmapd.git"
+${EC2_SSH} "git clone git@github.com:utunga/hashmapd.git"
 
 #Set the couch config so that the database files go to /ebs and the index files go to /mnt
 scp -i ${EC2_DEFAULT_PEM} local.ini  ubuntu@${EC2_ADDR}:~
