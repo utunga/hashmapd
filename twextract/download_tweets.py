@@ -7,6 +7,7 @@ import time
 import cPickle
 import gzip
 import datetime
+import logging
 
 import couchdb
 import tweepy
@@ -21,6 +22,9 @@ min_hits = 5
 count = 100
 store_tweets = StoreTweets()
 request_queue = RequestQueue()
+
+logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
+logger = logging.getLogger('download_tweets')
 
 class RetrieveTweets(threading.Thread):
     """
@@ -60,6 +64,7 @@ class RetrieveTweets(threading.Thread):
         except Exception, err:
             # TODO: depending on the err type, should handle this in different ways
             #       (for now just raise the error)
+            logger.exception(str(err))
             raise
 
 class Manager(threading.Thread):
@@ -89,7 +94,7 @@ class Manager(threading.Thread):
         # create hash request if completed downloading user requests
         self.create_hash_request_if_finished(thread)
         # print notification of completion
-        print 'Retrieved tweets ('+str(thread.screen_name)+','+str(thread.page)+')'
+        logger.info('Retrieved tweets ('+str(thread.screen_name)+','+str(thread.page)+')')
     
     def notify_failed(self,thread,err):
         self.worker_threads.remove(thread)
@@ -100,7 +105,7 @@ class Manager(threading.Thread):
         # create hash request if completed downloading user requests
         self.create_hash_request_if_finished(thread)
         # print error message
-        print >> sys.stderr, 'Error retrieving tweets ('+str(thread.screen_name)+','+str(thread.page)+'):\n'+str(err)
+        logger.error('Error retrieving tweets ('+str(thread.screen_name)+','+str(thread.page)+'):\n'+str(err))
     
     def create_hash_request_if_finished(self,thread):
         # if there are no more pending download requests for this user,
@@ -145,7 +150,7 @@ class Manager(threading.Thread):
             #       a running total
             rate_limit = api.rate_limit_status()
             while rate_limit['remaining_hits'] < min_hits:
-                print >> sys.stderr, 'only '+str(rate_limit['remaining_hits'])+' hits allowed until '+str(rate_limit['reset_time'])
+                logger.info('Only '+str(rate_limit['remaining_hits'])+' hits allowed until '+str(rate_limit['reset_time']))
                 time.sleep(20)
             
             # acquire a lock before creating new thread
@@ -162,14 +167,10 @@ class Manager(threading.Thread):
         
         # determine no hits left after completion
         limit = api.rate_limit_status()
-        print ''
-        print 'exited download_tweets.py, hits left: '+str(limit['remaining_hits'])
-        print '(reset time: '+str(limit['reset_time']+')')
+        logger.info('Exited download_tweets.py, hits left: '+str(limit['remaining_hits']) + ' (reset time: '+str(limit['reset_time']+')'))
     
     def exit(self):
         self.terminate = True
-
-
 
 def usage():
     return 'usage: get_tweets                                                   \n'+\
@@ -188,15 +189,13 @@ if __name__ == '__main__':
     
     # determine no hits left before starting
     limit = api.rate_limit_status()
-    print 'starting download_tweets.py, hits left: '+str(limit['remaining_hits'])
-    print ''
+    logger.info('Starting download_tweets.py, hits left: '+str(limit['remaining_hits']))
     
     # parse command line arguments
     try:
         opts,args = getopt.getopt(sys.argv[1:], "c:", ["config="])
     except getopt.GetoptError, err:
-        print >> sys.stderr, 'error: ' + str(err)
-        print >> sys.stderr, usage()
+        logger.exception(str(err))
         sys.exit(1)
     
     cfg = None
@@ -209,6 +208,7 @@ if __name__ == '__main__':
     if cfg is None:
         cfg = DefaultConfig()
     
+    logger.addHandler(logging.FileHandler('download_tweets.log'))
     # run the manager
     manager = Manager(cfg.raw.couch_server_url,cfg.raw.couch_db,cfg.raw.max_simultaneous_requests)
     manager.start()
@@ -219,7 +219,7 @@ if __name__ == '__main__':
         input = raw_input("type \'exit\' to terminate:\n")
         if input == 'exit':
             manager.exit()
-            print 'terminating ...'
+            logger.info('Terminated')
             break
 
 
