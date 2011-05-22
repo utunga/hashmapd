@@ -89,7 +89,9 @@ QT.encode = function(x, y, z){
     if ((y&pow) != 0) cell+=2;
     arr.push(cell);
   }
-  return arr.join("");
+  return arr;
+  //MKT changed from this
+  //return arr.join("");
 }
 
 
