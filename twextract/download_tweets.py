@@ -75,6 +75,9 @@ class RetrieveTweets(threading.Thread):
 		logger.info('Page not found (%s, %s)'%(self.screen_name, self.page))
                 self.manager.delete_request_doc(self)
                 return 
+            if err.__class__.__name__ == 'TweepError' and str(err).startswith('Rate limit exceeded'):
+                logger.info('Rate limit exceeded')
+            	self.manager.notify_failed(self, err)
             logger.exception(str(err))
             backoff_time = min(backoff_time*2, MAX_BACKOFF_TIME)
             if backoff_time == MAX_BACKOFF_TIME:
@@ -192,16 +195,18 @@ class Manager(threading.Thread):
                 if rate_limit['remaining_hits'] == 0:
                     wait_until = max(rate_limit['reset_time_in_seconds'], wait_until)
                     logger.info('No more hits, wait for %s seconds'%(wait_until - time.time()))
-                if wait_until > int(time.time()):
-                    logger.debug('Sleep for %s seconds'%(wait_until - int(time.time())))
-                    time.sleep(wait_until - int(time.time()))
+		while time.time() < wait_until:
+                    time.sleep(SMALL_PAUSE)
+		    if self.terminate:
+                        break
             
                 # spawn a worker thread to retreive the specified tweet data
-                time.sleep(SMALL_PAUSE)
-                thread = RetrieveTweets(self, screen_name, page, self.db, request_id)
-                self.worker_threads.append(thread)
-                logger.debug('Start thread downloading tweets for %s, page %s'%(screen_name, page))
-                thread.start()
+                if not self.terminate:
+                    time.sleep(SMALL_PAUSE)
+                    thread = RetrieveTweets(self, screen_name, page, self.db, request_id)
+                    self.worker_threads.append(thread)
+                    logger.debug('Start thread downloading tweets for %s, page %s'%(screen_name, page))
+                    thread.start()
             finally:
                 rate_semaphore.release()
         
