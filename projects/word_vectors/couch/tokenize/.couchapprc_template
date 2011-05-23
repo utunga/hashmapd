@@ -1,0 +1,13 @@
+{
+  "env": {
+    "production" : {
+      "db" : "http://hashmapd:<the_password>@hashmapd.couch.io/hashmapd"
+    },
+    "default" : {
+      "db" : "http://<user>:<password>@localhost:5984/hashmapd"
+    },
+    "dev" : {
+      "db" : "http://<user>:<password>@localhost:5984/hashmapd"
+    },
+  }
+}
