@@ -117,7 +117,7 @@ class Manager(threading.Thread):
         # create hash request if completed downloading user requests
         self.create_hash_request_if_finished(thread)
         # print notification of completion
-        logger.info('Retrieved tweets (' + str(thread.screen_name)+',' + str(thread.page) + ')')
+        logger.info('Manager: retrieved tweets (%s, %s, %s)'%(thread.screen_name, thread.page, rate_limit['remaining_hits']))
     
     def notify_failed(self, thread, err):
         self.worker_threads.remove(thread)
@@ -127,7 +127,7 @@ class Manager(threading.Thread):
         # create hash request if completed downloading user requests
         self.create_hash_request_if_finished(thread)
         # print error message
-        logger.error('Error retrieving tweets (' + str(thread.screen_name) + ',' + str(thread.page) + '):\n' + str(err))
+        logger.error('Manager: error retrieving tweets (%s, %s, %s): %s'%(thread.screen_name, thread.page, rate_limit['remaining_hits'], err))
     
     def delete_request_doc(self, thread):
         doc = self.db[thread.request_id]
@@ -152,7 +152,7 @@ class Manager(threading.Thread):
     def run(self):
         # obtain a twitter screen name from db that needs data downloaded
         # spawn a thread for each page of downloads
-        global logged_empty_queue, wait_until
+        global logged_empty_queue, wait_until, rate_limit
         while self.terminate == False:
             # get the next request
             logger.debug('Manager: get the next request')
