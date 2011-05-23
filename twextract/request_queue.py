@@ -18,7 +18,7 @@ class RequestQueue(object):
     
     n_pages = 3
     
-    def __init__(self,server_url='http://127.0.0.1:5984',db_name='hashmapd'):
+    def __init__(self, server_url='http://127.0.0.1:5984',db_name='hashmapd'):
         self.db = couchdb.Server(server_url)[db_name]
     
     # dequeue the front item (request) in the queue (queue_name = 'download' or 'hash')
