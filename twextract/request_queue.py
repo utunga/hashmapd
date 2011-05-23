@@ -17,38 +17,38 @@ class RequestQueue(object):
     """
     
     n_pages = 3
+    n_cache = 350
     
     def __init__(self, server_url='http://127.0.0.1:5984',db_name='hashmapd'):
         self.db = couchdb.Server(server_url)[db_name]
+        self.download_queue = []
     
     # dequeue the front item (request) in the queue (queue_name = 'download' or 'hash')
     def next(self,queue_name):
         # 1) produce view of underway requests
-        results = self.db.view('queue/underway_'+queue_name+'_requests', reduce=False, descending=False)
+        #results = self.db.view('queue/underway_'+queue_name+'_requests', reduce=False, descending=False, limit=n_cache)
         
         # 2) if the oldest request has been underway for too long (30s for now - may want to reduce this),
         #    return that (as it has probably failed)
-        for result in results:
-            row = self.db[result.id]
-            try:
-                if (datetime.datetime.strptime(row['started_time'],"%Y-%m-%dT%H:%M:%S.%f") > datetime.datetime.now()-datetime.timedelta(seconds=30)):
-                    break
-                self.started_request(row,result.id)
-                return row
-            except KeyError:
-                break
+        #for row in results.rows:
+        #    try:
+        #        if (datetime.datetime.strptime(row['started_time'],"%Y-%m-%dT%H:%M:%S.%f") > datetime.datetime.now()-datetime.timedelta(seconds=30)):
+        #            break
+        #        self.started_request(row,result.id)
+        #        return row
+        #    except KeyError:
+        #        break
         
         # produce view of requests
-        results = self.db.view('queue/queued_'+queue_name+'_requests', reduce=False, descending=False)
-        
-        # get the first result (first request in the queue), update the start time field, and begin work
-        for result in results:
-            row = self.db[result.id]
-            self.started_request(row,result.id)
-            return row
+        if not self.download_queue:
+            results = self.db.view('queue/queued_'+queue_name+'_requests', reduce=False, descending=False, limit=self.n_cache)
+            for row in results.rows:
+                record = self.db[row.id]
+                self.download_queue.append(record)
+        return self.download_queue.pop()
     
     # enqueue an item (hash request) to the back of the queue 
-    def add_hash_request(self,username,priority=0):
+    def add_hash_request(self, username, priority=0):
         # note that we create a new hash request regardless of whether or not 
         # another one already exists (completed or otherwise)
         self.db[uuid4().hex] = {'username':username,'priority':priority,\
@@ -57,24 +57,24 @@ class RequestQueue(object):
     # lower priority requests will be processed first (can be negative)
     
     # enqueue an item (download request) to the back of the queue 
-    def add_download_request(self,username,page,priority=0):
+    def add_download_request(self, username, page, priority=0):
         # note that we create a new download request regardless of whether or not 
         # another one already exists (completed or otherwise)  
         self.db[uuid4().hex] = {'username':username,'page':page,'priority':priority,\
           'request_time':datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),'doc_type':'download_request'}
     
     # enqueue a series of download requests (several pages) for a user to the back of the queue 
-    def add_download_requests_for_username(self,username,priority=0):
-        for page in xrange(1,self.n_pages+1):
+    def add_download_requests_for_username(self, username, priority=0):
+        for page in xrange(1, self.n_pages+1):
             self.add_download_request(username,page,priority)
     
     # mark a request as started (work is underway) 
-    def started_request(self,row,request_id):
+    def started_request(self, row, request_id):
         row['started_time'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
         self.db[request_id] = row
     
     # mark a request as completed
-    def completed_request(self,row,request_id):
+    def completed_request(self, row, request_id):
         row['completed_time'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
         self.db[request_id] = row
         # TODO: store/update a value indicating the most recently downloaded tweet here
@@ -82,15 +82,11 @@ class RequestQueue(object):
     
     # work on a request has failed - so clear the started field, and increment
     # the number of attempts field
-    def failed_request(self,row,request_id):
+    def failed_request(self, row, request_id):
         # clear started field
         del row['started_time']
         # increment number of attempts field
-        try:
-            fails = row['attempts']
-        except KeyError:
-            fails = 0
-        row['attempts'] = (fails+1)
+        row['attempts'] = row.setdefault('attempts', 0) + 1
         # store the update row in the db
         self.db[request_id] = row
     
