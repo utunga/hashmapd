@@ -10,6 +10,7 @@ class StoreTweets(object):
     # - saves each tweet as a document into couchdb with the a few modifications
     def store(self, username, tweet_data, db):
         for tweet in tweet_data:
+            key = 'tweet_%s_%s'%(username, tweet['id_str'])
             # - adds a 'doc_type' field to the json and sets it to 'raw_tweet'
             # - add a provider_namespace field (set it to 'twitter')
             # - add a provider_id field (set it to their twitter screenname)
@@ -21,10 +22,10 @@ class StoreTweets(object):
             # the db, replace it with the new version - this could happen if a 
             # download is carried out twice for whatever reason)
             try:
-                db['tweet_'+tweet['id_str']] = tweet
+                db[key] = tweet
             except couchdb.ResourceConflict:
-                old_tweet = db['tweet_'+tweet['id_str']]
+                old_tweet = db[key]
                 tweet['_rev'] = old_tweet['_rev']
-                db['tweet_'+tweet['id_str']] = tweet
+                db[key] = tweet
                 return
 

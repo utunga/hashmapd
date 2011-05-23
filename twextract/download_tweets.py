@@ -1,13 +1,13 @@
-import os
-import sys
+import cPickle
+import datetime
+import gzip
+import logging
 from optparse import OptionParser
+import os
 from Queue import Queue
+import sys
 import threading
 import time
-import cPickle
-import gzip
-import datetime
-import logging
 
 import couchdb
 import tweepy
@@ -22,14 +22,16 @@ min_hits = 5
 count = 100
 store_tweets = StoreTweets()
 logger = logging.getLogger('download_tweets')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logged_empty_queue = False
 
 #Default limit
 rate_limit = {'hourly_limit': 350, 'remaining_hits': 350, 'reset_time_in_seconds': int(time.time()) + 360}
 
-#Rate semaphore
+#Semaphores
+max_simultaneous_requests = 5
 rate_semaphore = threading.BoundedSemaphore()
+semaphore = threading.BoundedSemaphore(max_simultaneous_requests)
 
 MIN_BACKOFF_TIME = 0.5
 MAX_BACKOFF_TIME = 600
@@ -48,22 +50,38 @@ class RetrieveTweets(threading.Thread):
         self.screen_name = screen_name
         self.page = page
         self.db = db
+        self.daemon = True
         self.request_id = request_id
+        # acquire a lock before creating new thread
+        semaphore.acquire()
         logger.debug('RetrieveTweets: Downloading tweets of %s, page %s, from database %s'%(self.screen_name, self.page, self.db))
     
     def run(self):
+        global wait_until, backoff_time
         try:
             # obtain tweet data
             tweet_data = self.retrieve_data_from_twitter(self.screen_name, self.page)
             # store the tweets in specified db
             store_tweets.store(self.screen_name, tweet_data, self.db)
-        except Exception, err:
-            # notify manager of error
+            # set next wait time
+            backoff_time = MIN_BACKOFF_TIME
+            wait_until = time.time() + backoff_time
+            # notify manager that data has been retrieved
+            self.manager.notify_completed(self)
+            semaphore.release()
+        except Exception as err:
+            semaphore.release()
+            if err.__class__.__name__ == 'TweepError' and str(err) in ('Not found', 'Not authorized'):
+		logger.info('Page not found (%s, %s)'%(self.screen_name, self.page))
+                self.manager.delete_request_doc(self)
+                return 
+            logger.exception(str(err))
+            backoff_time = min(backoff_time*2, MAX_BACKOFF_TIME)
+            if backoff_time == MAX_BACKOFF_TIME:
+                logger.error('Maximum backoff time (%s) reached'%MAX_BACKOFF_TIME)
+            wait_until = time.time() + backoff_time
             self.manager.notify_failed(self, err)
-            return
-        
-        # notify manager that data has been retrieved
-        self.manager.notify_completed(self)
+            raise 
     
     def retrieve_data_from_twitter(self, screen_name, page):
         # TODO: we do not actually get back "count" tweets. we get back all the
@@ -71,20 +89,7 @@ class RetrieveTweets(threading.Thread):
         #       is this a big problem? (if so, there is a separate call to get
         #       retweets, but there doesn't appear to be a single call that gets
         #       both "statuses" and "retweets")
-        global wait_until, backoff_time
-        try:
-            return api.user_timeline(screen_name=screen_name, page=page, count=count, include_entities=True, trim_user=True, include_rts=False)
-            backoff_time = MIN_BACKOFF_TIME
-            wait_until = time.time() + backoff_time
-        except Exception, err:
-            # TODO: depending on the err type, should handle this in different ways
-            #       (for now just raise the error)
-            logger.exception(str(err))
-            backoff_time = min(backoff_time*2, MAX_BACKOFF_TIME)
-            if backoff_time == MAX_BACKOFF_TIME:
-                logger.error('Maximum backoff time (%s) reached'%MAX_BACKOFF_TIME)
-            wait_until = time.time() + backoff_time
-            raise
+        return api.user_timeline(screen_name=screen_name, page=page, count=count, include_entities=True, trim_user=True, include_rts=False)
 
 class Manager(threading.Thread):
     """
@@ -96,19 +101,16 @@ class Manager(threading.Thread):
     Also busy-waits when the twitter rate limit is reached.
     """
     
-    def __init__(self, server_url='http://127.0.0.1:5984', db_name='hashmapd',\
-            max_simultaneous_requests=5):
+    def __init__(self, server_url='http://127.0.0.1:5984', db_name='hashmapd'):
         threading.Thread.__init__(self)
         self.db = couchdb.Server(server_url)[db_name]
         self.request_queue = RequestQueue(server_url=server_url, db_name=db_name)
         self.worker_threads = []
-        self.semaphore = threading.Semaphore(max_simultaneous_requests)
         self.terminate = False
         logger.debug('Manager: downloading tweets from %s, database %s'%(server_url, db_name))
     
     def notify_completed(self,thread):
         self.worker_threads.remove(thread)
-        self.semaphore.release()
         # report to the queue that the job finished successfully
         row = self.db[thread.request_id]
         self.request_queue.completed_request(row, thread.request_id)
@@ -117,9 +119,8 @@ class Manager(threading.Thread):
         # print notification of completion
         logger.info('Retrieved tweets (' + str(thread.screen_name)+',' + str(thread.page) + ')')
     
-    def notify_failed(self,thread,err):
+    def notify_failed(self, thread, err):
         self.worker_threads.remove(thread)
-        self.semaphore.release()
         # report to the queue that the job failed
         row = self.db[thread.request_id]
         self.request_queue.failed_request(row, thread.request_id)
@@ -128,6 +129,11 @@ class Manager(threading.Thread):
         # print error message
         logger.error('Error retrieving tweets (' + str(thread.screen_name) + ',' + str(thread.page) + '):\n' + str(err))
     
+    def delete_request_doc(self, thread):
+        doc = self.db[thread.request_id]
+        self.db.delete(doc)
+        logger.debug('Deleted request for missing tweets (' + str(thread.screen_name) + ',' + str(thread.page) + ')')
+
     def create_hash_request_if_finished(self, thread):
         # if there are no more pending download requests for this user,
         # create a new hash request for the user
@@ -190,8 +196,6 @@ class Manager(threading.Thread):
                     logger.debug('Sleep for %s seconds'%(wait_until - int(time.time())))
                     time.sleep(wait_until - int(time.time()))
             
-                # acquire a lock before creating new thread
-                self.semaphore.acquire()
                 # spawn a worker thread to retreive the specified tweet data
                 time.sleep(SMALL_PAUSE)
                 thread = RetrieveTweets(self, screen_name, page, self.db, request_id)
@@ -223,6 +227,7 @@ if __name__ == '__main__':
     parser.add_option("-d", "--database",  help="Couchdb database", default=None)
     parser.add_option("-s", "--secrets", help = "Oauth secrets", default=os.path.join(BASEPATH, "secrets"))
     parser.add_option("-l", "--log", help="Log file", default='download_tweets.log')
+    parser.add_option("-m", "--mode", help="Logging mode (debug, info, or error)", default='info')
 
     options, args = parser.parse_args()
     cfg = LoadConfig(options.cfg)
@@ -230,7 +235,9 @@ if __name__ == '__main__':
         cfg.raw.couch_server_url = options.url
     if options.database is not None:
         cfg.raw.couch_db = options.database
-        
+    mode_lookup = {'debug': logging.DEBUG, 'info':logging.INFO, 'error':logging.ERROR}
+    options.mode = mode_lookup.get(options.mode, logging.DEBUG)
+       
     # authenticate with oauth
     secrets_cfg = LoadConfig(options.secrets)
     auth = tweepy.OAuthHandler(secrets_cfg.auth.consumer_token, secrets_cfg.auth.consumer_secret)
@@ -240,6 +247,9 @@ if __name__ == '__main__':
     
     # determine no hits left before starting
     rate_limit = api.rate_limit_status()
+    
+    # setup logging
+    logger.setLevel(options.mode)
     log_file = logging.FileHandler(options.log)
     log_stream = logging.StreamHandler()
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
@@ -250,9 +260,9 @@ if __name__ == '__main__':
     logger.info('Starting download_tweets.py, hits left: '+str(rate_limit['remaining_hits']))
      
     # run the manager
-    manager = Manager(cfg.raw.couch_server_url, cfg.raw.couch_db, cfg.raw.max_simultaneous_requests)
+    manager = Manager(cfg.raw.couch_server_url, cfg.raw.couch_db) 
     manager.start()
-    
+
     # keep running until user types 'exit', then terminate nicely
     # (ie: allow all currently running jobs to complete before closing) 
     while True:
@@ -261,5 +271,6 @@ if __name__ == '__main__':
             manager.exit()
             logger.info('Terminated')
             break
+        time.sleep(SMALL_PAUSE)
 
 
