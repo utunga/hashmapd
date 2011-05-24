@@ -84,7 +84,10 @@ class RequestQueue(object):
     # the number of attempts field
     def failed_request(self, row, request_id):
         # clear started field
-        del row['started_time']
+        try:
+            del row['started_time']
+        except  KeyError:
+            pass
         # increment number of attempts field
         row['attempts'] = row.setdefault('attempts', 0) + 1
         # store the update row in the db

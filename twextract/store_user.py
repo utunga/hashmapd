@@ -4,6 +4,7 @@ import threading
 
 import couchdb
 import tweepy
+from tweepy.error import TweepError
 
 class StoreUser(threading.Thread):
     """
@@ -27,6 +28,10 @@ class StoreUser(threading.Thread):
             self.store_user(self.api.get_user(screen_name=self.username),self.db['twuser_'+self.username]['_rev'])
         except couchdb.ResourceConflict:
             del self.db['twuser_'+self.username]
+	except TweepError, err:
+            if str(err) == 'Not found':
+                del self.db['twuser_'+self.username]
+                 
     
     def store_user(self,user_info,rev):
         user_info['doc_type'] = 'user'
