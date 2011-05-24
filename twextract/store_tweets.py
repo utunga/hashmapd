@@ -1,4 +1,5 @@
 import couchdb
+import datetime
 
 class StoreTweets(object):
     """
