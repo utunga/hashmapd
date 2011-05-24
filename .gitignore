@@ -13,8 +13,15 @@ other/*
 **.couchappignore
 *.png
 *.pkl.gz
+*.csv
+*.xlsx
 projects/fake_txt/out/*
 hashmapd.egg-info/*
 build/*
 config/secrets.cfg
+demo/*
+Thumbs.db
+dropbox
+amazon/credentials.csv
+amazon/ec2-bashrc
 
