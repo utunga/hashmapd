@@ -13,6 +13,7 @@ from twextract.store_tweets import StoreTweets
 from twextract.request_queue import RequestQueue
 
 
+MIN_HITS = 3
 COUNT = 100
 store_tweets = StoreTweets()
 logger = logging.getLogger('download_tweets')
@@ -81,8 +82,9 @@ class Status(object):
         self.wait()
         self.get_rate_limit()
         remaining_hits = self.rate_limit['remaining_hits']
-        while not remaining_hits and not self.terminate:
-            self.wait_until = max(self.rate_limit['reset_time_in_seconds'], self.wait_until)
+        while remaining_hits < MIN_HITS and not self.terminate:
+            reset_time = min(self.rate_limit['reset_time_in_seconds'] - time.time(), 3600)
+            self.wait_until = max(reset_time + time.time(), self.wait_until)
             logger.info('No more hits, wait for %s seconds'%(self.wait_until - time.time()))
             self.wait()
             if self.terminate:
