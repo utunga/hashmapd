@@ -124,11 +124,11 @@ class TSNE(object):
             Y += iY;
             Y -= numpy.mean(Y, 0)
             
-            # Q doesn't exist if using cython
-            #if (iter + 1) % 10 == 0:
+            if iter < 10 or (iter < 100 and (iter+1) % 10 == 0) or (iter+1) % 100 == 0:
                 # Compute current value of cost function
+                # Q doesn't exist if using cython
                 #C = numpy.sum(P * numpy.log(P / Q));
-                #print "Iteration ", (iter + 1) #, ": error is ", C
+                print "Iteration ", (iter + 1) #, ": error is ", C
                 
             # Stop lying about P-values
             if iter == 100:
