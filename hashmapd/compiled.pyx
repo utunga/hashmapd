@@ -1,42 +1,113 @@
-cimport numpy as np
-
-def calc_dY(
-        np.ndarray[np.float_t, ndim=2] P not None,
-        np.ndarray[np.float_t, ndim=2] Y not None,
-        np.ndarray[np.float_t, ndim=1] num not None,
-        np.ndarray[np.float_t, ndim=1] Y2 not None,
-        np.ndarray[np.float_t, ndim=2] dY not None):
-
-    """For tsne.  Calculates dY[n,d] from P[n,n] and Y[n,d].
-    num[n(n-1)/2] and Y2[d] are just intermediate values but they are passed 
-    in as parameters so their memory can be efficiently re-used."""
+cimport c_numpy
     
-    cdef int d, n    # array dimension sizes
+cdef void *checkArray(c_numpy.ndarray a, char typecode, int itemsize, 
+        int nd, int **dims) except NULL:
+    cdef int length, size
+    cdef char kind
+    if a is None:
+        raise TypeError("Array required, got None")
+    #if a.version != 2:
+    #    raise ValueError(
+    #        "Unexpected array interface version %s" % str(a.version))
+    cdef char typecode2
+    typecode2 = a.descr.kind
+    if typecode2 != typecode:
+        raise TypeError("'%s' type array required, got '%s'" %
+                (chr(typecode), chr(typecode2)))
+    if a.itemsize != itemsize:
+        raise TypeError("'%s%s' type array required, got '%s%s'" %
+                (chr(typecode), itemsize, chr(typecode2), a.itemsize))
+    if a.nd != nd:
+        raise ValueError("%s dimensional array required, got %s" %
+                (nd, a.nd))
+    if not a.flags & c_numpy.NPY_CONTIGUOUS:
+        raise ValueError ('Noncontiguous array')
+        
+    cdef int dimension, val
+    cdef int *var
+    for dimension from 0 <= dimension < nd:
+        val = a.shape[dimension]
+        var = dims[dimension]
+        if var[0] == 0:
+            # Length unspecified, take it from the provided array
+            var[0] = val
+        elif var[0] != val:
+            # Length already specified, but not the same
+            raise ValueError("Dimension %s is %s, expected %s" %
+                    (dimension, val, var[0]))
+        else:
+            # Length matches what was expected
+            pass
+    return a.data
+    
+    
+cdef void *checkArray1D(c_numpy.ndarray a, char typecode, int size, 
+        int *x) except NULL:
+    cdef int *dims[1]
+    dims[0] = x
+    return checkArray(a, typecode, size, 1, dims)
+            
+cdef void *checkArray2D(c_numpy.ndarray a, char typecode, int size, 
+        int *x, int *y) except NULL:
+    cdef int *dims[2]
+    dims[0] = x
+    dims[1] = y
+    return checkArray(a, typecode, size, 2, dims)
+
+cdef void *checkArray3D(c_numpy.ndarray a, char typecode, int size, 
+        int *x, int *y, int *z) except NULL:
+    cdef int *dims[3]
+    dims[0] = x
+    dims[1] = y
+    dims[2] = z
+    return checkArray(a, typecode, size, 3, dims)
+            
+    
+cdef double * checkArrayDouble1D(c_numpy.ndarray a, int *x) except NULL:
+    return <double *> checkArray1D(a, c'f', sizeof(double), x)
+    
+cdef double * checkArrayDouble2D(c_numpy.ndarray a, int *x, int *y) except NULL:
+    return <double *> checkArray2D(a, c'f', sizeof(double), x, y)
+
+
+def calc_dY(  #
+        c_numpy.ndarray P,
+        c_numpy.ndarray Y,
+        c_numpy.ndarray num,
+        c_numpy.ndarray Y2,
+        c_numpy.ndarray dY,
+        ):
+    
+    """Calculate dY[n,d] from P[n,n] and Y[n,d] using num[n(n-1)/2] and Y2[n] as 
+    work space for intermediate values.  P is assumed to be symmetrical."""
+    
+    cdef int d=0, n=0, w=0    # array dimension sizes
     cdef int i, j, k, tri_i   # indicies
     cdef double num_total, num_scale, q, b
+    cdef double *P_data, *num_data, *Y_data, *dY_data
 
-    n = Y.shape[0]
-    d = Y.shape[1]
-    assert P.shape[0] == P.shape[1] == Y.shape[0] == dY.shape[0] == Y2.shape[0] == n
-    assert dY.shape[1] == Y.shape[1] == d
-    assert num.shape[0] >= n*(n-1)//2
+    P_data = checkArrayDouble2D(P, &n, &n)
+    num_data = checkArrayDouble1D(num, &w)
+    Y_data = checkArrayDouble2D(Y, &n, &d)
+    dY_data = checkArrayDouble2D(dY, &n, &d)
+    Y2_data = checkArrayDouble1D(Y2, &n)
+    assert w >= n*(n-1) // 2
     
     for i in range(n):
-        Y2[i] = 0.0
+        Y2_data[i] = 0.0
         for j in range(d):
-            Y2[i] += Y[i,j] ** 2
-            dY[i,j] = 0.0
-    
-    # num is a symmetrical square array, so stored in compact triangular layout
+            Y2_data[i] += Y_data[i*d+j] ** 2
+            dY_data[i*d+j] = 0.0
+            
     num_total = 0.0
     for i in range(n):
         tri_i = i*(i-1)//2
         for k in range(i):
             b = 0.0
             for j in range(d):
-                b += Y[i,j] * Y[k,j]
-            b = 1.0 / (-2.0 * b + Y2[i] + Y2[k] + 1.0)
-            num[tri_i+k] = b
+                b += Y_data[i*d+j] * Y_data[k*d+j]
+            b = 1.0 / (-2.0 * b + Y2_data[i] + Y2_data[k] + 1.0)
+            num_data[tri_i+k] = b
             num_total += b
     num_scale = 1.0 / (num_total * 2.0)
         
@@ -44,14 +115,13 @@ def calc_dY(
         tri_i = i*(i-1)//2        
         for j in range(d):
             for k in range(i):
-                b = num[tri_i+k]
+                b = num_data[tri_i+k]
                 q = b * num_scale
                 if q < 1e-12:
                     q = 1e-12
-                b *= (Y[i,j] - Y[k,j]) * (P[i,k] - q)
-                dY[i,j] += b
-                dY[k,j] -= b 
+                b *= (Y_data[i*d+j] - Y_data[k*d+j])
+                b *= (P_data[i*n+k] - q)
+                dY_data[i*d+j] += b
+                dY_data[k*d+j] -= b
     
     return dY    
-    
-    
