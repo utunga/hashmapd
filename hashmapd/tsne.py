@@ -179,7 +179,7 @@ class TSNE(object):
         
         # Compute P-row and corresponding perplexity
         P = numpy.exp(D * -beta);
-        sumP = sum(P);
+        sumP = P.sum()
         P /= sumP
         H = numpy.log(sumP) + beta * numpy.inner(D, P)
         return H, P;
