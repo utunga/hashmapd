@@ -48,9 +48,9 @@ def calc_dY(
                 q = b * num_scale
                 if q < 1e-12:
                     q = 1e-12
-                b *= (Y[i,j] - Y[k,j])
-                dY[i,j] += (P[i,k] - q) * b
-                dY[k,j] -= (P[k,i] - q) * b
+                b *= (Y[i,j] - Y[k,j]) * (P[i,k] - q)
+                dY[i,j] += b
+                dY[k,j] -= b 
     
     return dY    
     
