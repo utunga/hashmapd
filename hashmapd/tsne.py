@@ -3,6 +3,13 @@
 
 import numpy
 
+try:
+    from .compiled import calc_dY
+except ImportError:
+    print >> sys.stderr, "No Cython"
+    # Use "python setup.py build_ext -i" to compile it
+    calc_dY = None
+
 import sys
 try:
     import psyco
@@ -88,20 +95,23 @@ class TSNE(object):
         
         # Run iterations
         print "Doing the tsne minimization"
+        dY = numpy.zeros_like(Y)
+        Y2 = numpy.zeros_like(Y[:, 0])
+        num = numpy.zeros([n*(n-1)//2], float)
+        
         for iter in range(iterations):
+            if calc_dY is None:
+                sum_Y = numpy.square(Y).sum(axis=1)
+                num = 1 / (1 + numpy.add(numpy.add(-2 * numpy.dot(Y, Y.T), sum_Y).T, sum_Y));
+                #num = 1/((-2 * numpy.dot(Y, Y.T)) + sum_Y + sum_Y[..., numpy.newaxis] + 1)
+                num[range(n), range(n)] = 0;
+                Q = num / numpy.sum(num);
+                Q = numpy.maximum(Q, 1e-12);
+                PQN = (P - Q) * num;
+                dY = ((Y[:,numpy.newaxis] - Y).transpose([2,0,1]) * PQN.T).sum(axis=-1).T
+            else:
+                dY = calc_dY(P, Y, num, Y2, dY)
             
-            # Compute pairwise affinities
-            sum_Y = numpy.sum(numpy.square(Y), 1);        
-            num = 1 / (1 + numpy.add(numpy.add(-2 * numpy.dot(Y, Y.T), sum_Y).T, sum_Y));
-            num[range(n), range(n)] = 0;
-            Q = num / numpy.sum(num);
-            Q = numpy.maximum(Q, 1e-12);
-            
-            # Compute gradient
-            PQ = P - Q;
-            for i in range(n):
-                dY[i,:] = numpy.sum(numpy.tile(PQ[:,i] * num[:,i], (self.out_dims, 1)).T * (Y[i,:] - Y), 0);
-                
             # Perform the update
             if iter < 20:
                 momentum = initial_momentum
@@ -109,19 +119,20 @@ class TSNE(object):
                 momentum = final_momentum
             gains = (gains + 0.2) * ((dY > 0) != (iY > 0)) + (gains * 0.8) * ((dY > 0) == (iY > 0));
             gains[gains < min_gain] = min_gain;
-            iY = momentum * iY - eta * (gains * dY);
-            Y = Y + iY;
-            Y = Y - numpy.tile(numpy.mean(Y, 0), (n, 1));
+            iY *= momentum 
+            iY -= eta * (gains * dY);
+            Y += iY;
+            Y -= numpy.mean(Y, 0)
             
-            # Compute current value of cost function
-            if (iter + 1) % 10 == 0:
-                C = numpy.sum(P * numpy.log(P / Q));
-                print "Iteration ", (iter + 1), ": error is ", C
+            # Q doesn't exist if using cython
+            #if (iter + 1) % 10 == 0:
+                # Compute current value of cost function
+                #C = numpy.sum(P * numpy.log(P / Q));
+                #print "Iteration ", (iter + 1) #, ": error is ", C
                 
             # Stop lying about P-values
             if iter == 100:
-                P = P / 4;
-                
+                P /= 4;
         # update solution
         self.coords = Y;
                    
@@ -163,14 +174,14 @@ class TSNE(object):
         return P;
 
     
-    def Hbeta(self, D = numpy.array([]), beta = 1.0):
+    def Hbeta(self, D, beta = 1.0):
         """Compute the perplexity and the P-row for a specific value of the precision of a Gaussian distribution."""
         
         # Compute P-row and corresponding perplexity
-        P = numpy.exp(-D.copy() * beta);
+        P = numpy.exp(D * -beta);
         sumP = sum(P);
-        H = numpy.log(sumP) + beta * numpy.sum(D * P) / sumP;
-        P = P / sumP;
+        P /= sumP
+        H = numpy.log(sumP) + beta * numpy.inner(D, P)
         return H, P;
         
 
