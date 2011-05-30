@@ -14,11 +14,13 @@ void draw() {
         //hm_debug.push(points);
         loadPoints(hm_points);
         background(#ffffff);
-        for (int i = 0; i < points.length; i++){
-            point(points[i].x, points[i].y);
-        }
         fill(255, 0, 0);
-        stroke(0, 255, 0);
+        stroke(0, 127, 0);
+        for (int i = 0; i < hm_points.length; i++){
+            Point p = points[i];
+            //hm_debug.push(p);
+            point(p.x, p.y);
+        }
         noLoop();
     }
     else {
