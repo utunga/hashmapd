@@ -14,10 +14,10 @@ var PADDING = 16;
 function make_colour_range(){
     var colours = [];
     for (var i = 255; i >= 0; i--){
-        var r = ((i >> 1) + 64).toString(16);
-        var g = i.toString(16);
-        var b = ((i >> 1) + 0).toString(16);
-        colours.push("#" + r + g + b);
+        var r = ((i >> 1) + 16);
+        var g = i;
+        var b = 0;
+        colours.push('rgb(' + r + ',' + g + ',' + b + ')');
     }
     return colours;
 }
@@ -51,7 +51,8 @@ function hm_on_data(canvas, data){
         ctx.globalAlpha = r.value * value_scale;
         ctx.fillStyle = colours[parseInt(r.value * colour_scale)];
         ctx.beginPath();
-        ctx.arc(PADDING + x * scale, PADDING + y * scale, scale * 10 * value_scale * Math.sqrt(r.value), 0, 6.3);
+        ctx.arc(PADDING + x * scale, PADDING + y * scale,
+                scale * 2, 0, 6.3);
         ctx.fill();
     }
 }
