@@ -1,6 +1,7 @@
 var DATA_URL = 'locations.json';
 var HTTP_OK = 200;
 var XML_HTTP_READY = 4;
+var PADDING = 16;
 
 /** hm_on_data is a callback from hm_draw_map.
  *
@@ -24,9 +25,7 @@ function make_colour_range(){
 function hm_on_data(canvas, data){
     var ctx = canvas.getContext("2d");
     var rows = data.rows;
-    var scale = canvas.width / (1 << rows[0].key.length);
-    ctx.fillStyle = '#f00';
-    ctx.strokeStyle = '#0f0';
+    var scale = (canvas.width - 2 * PADDING) / (1 << rows[0].key.length);
     var max_value = 0;
     for (var j = 0; j < rows.length; j++){
         var r = rows[j];
@@ -35,7 +34,8 @@ function hm_on_data(canvas, data){
         }
     }
     var colours = make_colour_range();
-    var value_scale = (colours.length - 0.01) / max_value;
+    var value_scale = 1.0 / max_value;
+    var colour_scale = value_scale * (colours.length - 0.1);
 
     for (var j = 0; j < rows.length; j++){
         var r = rows[j];
@@ -48,8 +48,11 @@ function hm_on_data(canvas, data){
             x += (p & 1) * (1 << i);
             y += (p >> 1) * (1 << i);
         }
-        ctx.fillStyle = colours[parseInt(r.value * value_scale)];
-        ctx.fillRect(x * scale, y * scale, scale, scale);
+        ctx.globalAlpha = r.value * value_scale;
+        ctx.fillStyle = colours[parseInt(r.value * colour_scale)];
+        ctx.beginPath();
+        ctx.arc(PADDING + x * scale, PADDING + y * scale, scale * 10 * value_scale * Math.sqrt(r.value), 0, 6.3);
+        ctx.fill();
     }
 }
 
