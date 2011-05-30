@@ -11,6 +11,7 @@ int wait_b = 0;
 
 void draw() {
     if (hm_points_loaded){
+        //hm_debug.push(points);
         loadPoints(hm_points);
         background(#ffffff);
         for (int i = 0; i < points.length; i++){
@@ -51,4 +52,4 @@ void loadPoints(ArrayList rows){
         }
         points[i] = new Point(x, y, value);
     }
-};
+}

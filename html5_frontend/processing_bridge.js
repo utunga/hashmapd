@@ -3,6 +3,11 @@
 var hm_points = [];
 var hm_points_loaded = false;
 
+/* for debugging processing. Push things on here for Chromium debugger
+ * to see. */
+
+var hm_debug = [];
+
 function hm_on_data(canvas, data){
     /* The natural way to do this would be to call something like this:
 
