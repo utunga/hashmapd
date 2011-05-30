@@ -28,12 +28,9 @@ function hm_on_data(canvas, data){
         var x = 0;
         var y = 0;
         for (j = 0; j < coords.length; j++){
-            /* start from other end */
-            var p = coords[coords.length - j - 1];
-            x <<= 1;
-            y <<= 1;
-            x += (p & 1);
-            y += (p >> 1);
+            var p = coords[j];
+            x = (x << 1) | (p & 1);
+            y = (y << 1) | (p >> 1);
         }
         hm_points.push([x, y, r.value]);
     }
