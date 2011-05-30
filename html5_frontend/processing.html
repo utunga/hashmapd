@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Hashmapd. the cleverest thing in the world.</title>
+    <link rel="stylesheet" href="css.css" />
+      <script src="processing.js"></script>
+      <script src="processing_bridge.js"></script>
+      <script src="common.js"></script>
+  </head>
+  <body>
+    <canvas data-processing-sources="hashmapd.pde" width="512" height="512" id="hm_canvas">
+      oh no. What browser is this?
+    </canvas>
+    <script>
+      var hm_canvas = document.getElementById("hm_canvas");
+      hm_draw_map(hm_canvas);
+    </script>
+  </body>
+</html>

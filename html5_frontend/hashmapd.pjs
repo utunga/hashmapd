@@ -1,0 +1,54 @@
+ArrayList points;
+
+void setup() {
+    size(512, 512);
+    points = new ArrayList;
+}
+
+int wait_r = 255;
+int wait_g = 255;
+int wait_b = 0;
+
+void draw() {
+    if (hm_points_loaded){
+        loadPoints(hm_points);
+        background(#ffffff);
+        for (int i = 0; i < points.length; i++){
+            point(points[i].x, points[i].y);
+        }
+        fill(255, 0, 0);
+        stroke(0, 255, 0);
+        noLoop();
+    }
+    else {
+        background(wait_r, wait_g, wait_b);
+        wait_r *= 0.95;
+        wait_g *= 0.99;
+        wait_b = 255 - (wait_r + wait_g) / 2;
+    }
+}
+
+class Point {
+    int x;
+    int y;
+    int value;
+    Point(int x, int y, int value) {
+        this.x = x;
+        this.y = y;
+        this.value = value;
+    }
+}
+
+void loadPoints(ArrayList rows){
+    int i;
+    int max_value = 0;
+    for (var i = 0; i < rows.length; i++){
+        int x = rows[i][0];
+        int y = rows[i][1];
+        int value = rows[i][2];
+        if (value > max_value){
+            max_value = value;
+        }
+        points[i] = new Point(x, y, value);
+    }
+};
