@@ -24,4 +24,4 @@ Thumbs.db
 dropbox
 amazon/credentials.csv
 amazon/ec2-bashrc
-
+.emacs.*
