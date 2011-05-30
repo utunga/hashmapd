@@ -1,16 +1,9 @@
-var DATA_URL = 'locations.json';
-var HTTP_OK = 200;
-var XML_HTTP_READY = 4;
 var PADDING = 16;
 
-/** hm_on_data is a callback from hm_draw_map.
+/** make_colour_range utility
  *
- * It coordinates the actual drawing.
- *
- * @param canvas the html5 canvas
- * @param data is parsed but otherwise unprocessed JSON data.
+ * @return a 256 long array of colours or gradients.
  */
-
 function make_colour_range(){
     var colours = [];
     for (var i = 255; i >= 0; i--){
@@ -21,6 +14,14 @@ function make_colour_range(){
     }
     return colours;
 }
+
+/** hm_on_data is a callback from hm_draw_map.
+ *
+ * It coordinates the actual drawing.
+ *
+ * @param canvas the html5 canvas
+ * @param data is parsed but otherwise unprocessed JSON data.
+ */
 
 function hm_on_data(canvas, data){
     var ctx = canvas.getContext("2d");
@@ -55,25 +56,4 @@ function hm_on_data(canvas, data){
                 scale * 2, 0, 6.3);
         ctx.fill();
     }
-}
-
-/** hm_draw_map is the main entrance point.
- *
- * Nothing happens until the json is loaded.
- *
- * @param canvas is the html5 canvas element to draw on
- */
-
-
-function hm_draw_map(canvas){
-    var req = new XMLHttpRequest();
-    req.open("GET", DATA_URL, true);
-    req.onreadystatechange = function(){
-        /*XXX could arguably begin drawing before data is finished */
-        if (req.readyState == XML_HTTP_READY) {
-            var data = JSON.parse(req.responseText);
-            hm_on_data(canvas, data);
-        }
-    };
-    req.send(null);
 }
