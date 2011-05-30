@@ -67,20 +67,16 @@ class HiddenLayer(object):
         # parameters of the model
         self.params = [self.W, self.b]
                 
-        #strictly for tracing only
-        if (self.W.value.shape[0]==(28*28)):
-            self.trace_img_shape = (28,28)    
-            self.trace_tile_shape = (10,10)
-            self.trace_transpose_weights_file = True
-        else:
-            if (self.W.value.shape[1]==(28*28)):
-                self.trace_img_shape = (28,28)    
-                self.trace_tile_shape = (10,10)
-                self.trace_transpose_weights_file = False
-            else:
-                self.trace_img_shape = (self.n_in,1)    
-                self.trace_tile_shape = (self.n_out,1)
-                self.trace_transpose_weights_file = True
+        self.trace_transpose_weights_file = True
+        x = int(numpy.sqrt(self.n_in))
+        y = (self.n_in-1) // x + 1
+        self.trace_img_shape = (x, y)
+        pad = 1 if max(x,y) < 4 else 2
+        self.trace_tile_spacing = (pad, pad)
+        (x1, y1) = [d+s for (d,s) in zip(self.trace_img_shape, self.trace_tile_spacing)]
+        X = min((300 // x1) + 1, int(numpy.sqrt(self.n_out))+1)
+        Y = min((300 // y1) + 1, (self.n_out-1) // X + 1)
+        self.trace_tile_shape = (X, Y)
         
     #added MKT
     def export_model(self):
@@ -101,11 +97,23 @@ class HiddenLayer(object):
             x = self.W.value.T
         else:
             x = self.W.value
-            
-        print 'layer '+ file_name + ' has shape '
-        print self.W.value.shape       
-        #print img_shape + ' ' + tile_shape
-        image = PIL.Image.fromarray(tile_raster_images( x,
+        
+        # scale_rows_to_unit_interval
+        x = x.copy()
+        x -= x.min(axis=1)[:, numpy.newaxis]
+        x /= (x.max(axis=1)[:, numpy.newaxis] + 1e-8)
+        
+        x_padded = numpy.zeros([x.shape[0], numpy.product(self.trace_img_shape)], x.dtype)
+        x_padded[:] = numpy.NaN
+        x_padded[:, 0:x.shape[1]] = x
+        img_array = tile_raster_images( x_padded,
             img_shape = self.trace_img_shape,tile_shape = self.trace_tile_shape, 
-            tile_spacing=(1,1)))
+            tile_spacing=self.trace_tile_spacing)
+        image = PIL.Image.fromarray(255*numpy.nan_to_num(img_array)).convert("L")
+        mask = PIL.Image.fromarray(255-255*(numpy.isnan(img_array))).convert("L")
+        image.putalpha(mask)
+        scale = 300 // max(image.size)
+        if scale > 1:
+            scale = min(scale, 10)
+            image = image.resize([scale*d for d in image.size])
         image.save(file_name)
