@@ -1,3 +1,8 @@
 body{
+  background: #000;
+}
+canvas{
   background: #def;
+  display: block;
+  margin: 20px auto 0 auto;
 }
