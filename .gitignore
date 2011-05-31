@@ -12,6 +12,7 @@ other/*
 **.couchapprc
 **.couchappignore
 *.png
+*.psd
 *.pkl.gz
 *.csv
 *.xlsx
