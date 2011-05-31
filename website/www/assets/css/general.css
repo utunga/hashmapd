@@ -1,0 +1,150 @@
+/*
+    GENERAL.CSS
+    Change this stylesheet only.
+
+    Touching the others may kill
+    the layout system.
+    
+*/
+
+
+/*
+TEXT
+
+Use this section to 
+change the text styles
+of any of the elements.
+
+*/
+
+h1, h2, h3, h4, h5, h6, h7 {
+	font-family: "Trebuchet MS","Lucida Grande","Lucida Sans","Helvetica Neue", "Liberation Sans", FreeSans, Arial, sans-serif;
+	font-weight: 900;
+	padding-top: 20px;
+	padding-bottom: 10px;
+	font-size: 40px;
+	letter-spacing: -0.05em;
+	line-height: 0.9em;
+}
+
+h2 {
+	border-bottom: 4px solid #2A7FFF;
+}
+
+h1 {
+	font-family: Helvetica;
+	font-size: 40px;
+	letter-spacing: -0.05em;
+	line-height: 0.9em;
+}
+
+h1, h2, h3 {
+}
+
+p {
+	line-height: 1.4;
+}
+
+body {color: #444; }
+
+#top-banner-full-width { }
+#top-banner { }
+
+#header-full-width {}
+#header { }
+
+#main-full-width {}
+#main {}
+
+#footer-full-width {}
+#footer * { font-size: 8pt; }
+#footer strong { color: black; text-transform: capitalize; font-size: 11pt;}
+
+#about-the-range {}
+#about-the-range dl {}
+
+span.trademark { font-variant: small-caps; font-weight: 800; color: #003380;}
+
+/*
+ANCHORS
+
+*/
+a{font-weight:900; text-decoration: none;}
+a:link { color:#2A7FFF;}
+a:hover { border-bottom: 1px solid;}
+a:visited { color:#2A7FFF;}
+a:active{color: #003380;}
+
+/*
+NAVIGATION MENU
+
+*/
+
+
+/*
+
+SECTIONS OF THE PAGE
+
+All of the structural
+sections of the page
+live here. This is 
+useful for background
+and similar changes.
+
+*/
+
+body { }
+
+#menu h1 {display:inline;}
+#menu ol {list-style-type: none; padding: 0; min-height:30px; height: inherit;}
+#menu ol li  { display:inline; margin:0; height:100%; font-size: 140%; letter-spacing: 0.03em;}
+#menu ol li:hover  { background-color: white; }
+#menu ol li:hover a  { color: #2A7FFF; }
+#menu a { height: 100%;}
+
+#menu a { padding: 40px 5px 40px 5px; }
+#menu a:active { color: #003380; }
+#menu a:hover { border-bottom: none; }
+#menu a:visited { }
+
+
+#top-banner-full-width {
+    margin-top: -10px;
+}
+#top-banner {}
+
+#header-full-width { margin: 0; background-color: white; margin: -10px;}
+#header { }
+
+#main-full-width { margin: 0; }
+x#main { padding-left: 20px; padding-right: 20px; border-left: 15px solid #eee; border-right: 15px solid #eee; }
+
+#footer-full-width { background-color: #eee; top: 10px; border-top: 8px #2A7FFF solid; margin: 30px -10px -10px -10px; clear:both; background-color: #eee; }
+#footer { margin-top: 20px; background-color: white;  }
+
+.full-width { margin-left: -10px; margin-right: -10px; }
+
+.house-medium-thumbnail { border: 1px solid #ccc; padding: 2px 0;}
+.house-design {}
+
+dl.house-design, dl.design-overview {float: left; padding: 0; }
+.house-design dt, .design-overview dt {float: left; padding: 0;  width: 100px; clear: left; font-weight: bold;}
+.house-design dd, .design-overview dd { float: left; padding: 0; width: 160px; }
+
+/*
+DEV/TESTING
+
+This stuff can be deleted
+when the site goes live.
+
+*/
+
+img.grid_12 {
+	border: 1px solid #eee;
+	border-bottom: 1px solid #ccc;
+	padding: 3px;
+}
+
+.dummy { background-color: #eee; border: 1px solid #ccc; }
+.dummy-house { height:150px; background-color:#eee; }
+
