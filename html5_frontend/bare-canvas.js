@@ -44,10 +44,9 @@ function hm_on_data(canvas, data){
         var x = 0;
         var y = 0;
         for (var i = 0; i < coords.length; i++){
-            /* start from other end */
-            var p = coords[coords.length - i - 1];
-            x += (p & 1) * (1 << i);
-            y += (p >> 1) * (1 << i);
+           var p = coords[i];
+            x = (x << 1) | (p & 1);
+            y = (y << 1) | (p >> 1);
         }
         ctx.fillStyle = colours[parseInt(r.value * colour_scale)];
         ctx.fillRect(PADDING + x * scale, PADDING + y * scale,
