@@ -1,7 +1,12 @@
 
 /* global variables for processing to find. */
-var hm_points = [];
-var hm_points_loaded = false;
+var hm_data = {
+    points: [],
+    points_loaded: false,
+    max_value: 0,
+    scale: 1,
+    PADDING: 16
+}
 
 /* for debugging processing. Push things on here for Chromium debugger
  * to see. */
@@ -22,6 +27,7 @@ function hm_on_data(canvas, data){
      */
     var i, j;
     var rows = data.rows;
+    var max_value = 0;
     for (i = 0; i < rows.length; i++){
         var r = rows[i];
         var coords = r.key;
@@ -32,10 +38,14 @@ function hm_on_data(canvas, data){
             x = (x << 1) | (p & 1);
             y = (y << 1) | (p >> 1);
         }
-        hm_points.push([x, y, r.value]);
+        hm_data.points.push([x, y, r.value]);
+        if (r.value > max_value){
+            max_value = r.value;
+        }
     }
-    /* A flag, just in case processing tries loading hm_points before
+    /* A flag, just in case processing tries loading hm_data.points before
        the preceding loop is done. */
-    hm_points_loaded = true;
+    hm_data.points_loaded = true;
+    hm_data.max_value = max_value;
+    hm_data.scale = (canvas.width - 2 * hm_data.PADDING) / (1 << rows[0].key.length);
 }
-
