@@ -49,11 +49,8 @@ function hm_on_data(canvas, data){
             x += (p & 1) * (1 << i);
             y += (p >> 1) * (1 << i);
         }
-        ctx.globalAlpha = r.value * value_scale;
         ctx.fillStyle = colours[parseInt(r.value * colour_scale)];
-        ctx.beginPath();
-        ctx.arc(PADDING + x * scale, PADDING + y * scale,
-                scale * 2, 0, 6.3);
-        ctx.fill();
+        ctx.fillRect(PADDING + x * scale, PADDING + y * scale,
+                 scale, scale);
     }
 }
