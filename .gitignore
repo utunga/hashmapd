@@ -25,4 +25,5 @@ Thumbs.db
 dropbox
 amazon/credentials.csv
 amazon/ec2-bashrc
-
+.emacs.*
+html5_frontend/processing-examples
