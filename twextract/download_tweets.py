@@ -136,10 +136,12 @@ class RetrieveTweets(threading.Thread):
             hits = status.hits()
             if not status.terminate:
                 if hits:
+                    logger.debug('Multithreaded')
                     tweet_data = self.retrieve_data_from_twitter(self.screen_name, self.page)
                 else:
                     with lock:
-                        time.sleep(BIG_PAUSE)
+                        logger.debug('Grabbed the lock')
+                        time.sleep(10)
                         tweet_data = self.retrieve_data_from_twitter(self.screen_name, self.page)
     
                 # store the tweets in specified db
