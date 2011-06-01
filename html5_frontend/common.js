@@ -1,6 +1,6 @@
 //var DATA_URL = 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true';
-//var DATA_URL = 'locations-xy.json';
-var DATA_URL = 'xy_coords.json';
+var DATA_URL = 'locations-xy.json';
+//var DATA_URL = 'xy_coords.json';
 var HTTP_OK = 200;
 var XML_HTTP_READY = 4;
 

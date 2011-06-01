@@ -1,8 +1,21 @@
 body{
-  background: #000;
+  background: #333;
 }
 canvas{
-  background: #def;
+  background: #000;
   display: block;
   margin: 20px auto 0 auto;
+}
+
+.fuzz {
+  /*visibility: hidden;
+  position: absolute;
+  left: 0;
+  top: 0;*/
+}
+
+#helpers {
+  position: absolute;
+  left: 0;
+  top: 0;
 }
