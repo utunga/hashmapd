@@ -1,4 +1,5 @@
 import logging
+from logging.handlers import RotatingFileHandler, SMTPHandler
 from optparse import OptionParser
 import os
 import threading
@@ -18,11 +19,21 @@ COUNT = 100
 store_tweets = StoreTweets()
 logger = logging.getLogger('download_tweets')
 logger.setLevel(logging.INFO)
+logging.raiseExceptions = 0
+
 
 #Semaphores
 MAX_SIMULTANEOUS_REQUESTS = 5
 lock = threading.Lock()
 semaphore = threading.BoundedSemaphore(MAX_SIMULTANEOUS_REQUESTS)
+
+#Error codes
+
+ERROR_503 = 'Twitter error response: status code = 503'
+ERROR_502 = 'Twitter error response: status code = 502'
+ERROR_500 = 'Twitter error response: status code = 500'
+ERROR_NOT_FOUND = 'Not found'
+ERROR_NOT_AUTHORIZED = 'Not authorized'
 
 class Status(object):
     MIN_BACKOFF_TIME = 0.5
@@ -92,7 +103,7 @@ class Status(object):
             self.get_rate_limit()
             remaining_hits = self.rate_limit['remaining_hits']
         logger.debug('%s hits left (%s)'%(self.rate_limit['remaining_hits'], threading.current_thread().getName()))
-        if self.rate_limit['remaining_hits'] > 2*MAX_SIMULTANEOUS_REQUESTS:
+        if self.rate_limit['remaining_hits'] > 3*MAX_SIMULTANEOUS_REQUESTS:
             return True
         else:
             return False
@@ -125,9 +136,12 @@ class RetrieveTweets(threading.Thread):
             hits = status.hits()
             if not status.terminate:
                 if hits:
+                    logger.debug('Multithreaded')
                     tweet_data = self.retrieve_data_from_twitter(self.screen_name, self.page)
                 else:
                     with lock:
+                        logger.debug('Grabbed the lock')
+                        time.sleep(10)
                         tweet_data = self.retrieve_data_from_twitter(self.screen_name, self.page)
     
                 # store the tweets in specified db
@@ -139,13 +153,16 @@ class RetrieveTweets(threading.Thread):
             semaphore.release()
         except Exception as err:
             semaphore.release()
-            if err.__class__.__name__ == 'TweepError' and str(err) in ('Not found', 'Not authorized'):
+            if err.__class__.__name__ == 'TweepError' and \
+                    str(err) in (ERROR_NOT_FOUND, ERROR_NOT_AUTHORIZED):
                 logger.info('Page not found (%s, %s)'%(self.screen_name, self.page))
                 self.manager.delete_request_doc(self)
-            elif err.__class__.__name__ == 'TweepError' and str(err).startswith('Rate limit exceeded'):
+            elif err.__class__.__name__ == 'TweepError' and \
+                    str(err).startswith('Rate limit exceeded'):
                 status.backoff()
                 self.manager.notify_failed(self, err, notify_error=True)
-            elif err.__class__.__name__ == 'TweepError' and str(err) == 'Twitter error response: status code = 503':
+            elif err.__class__.__name__ == 'TweepError' and \
+                    str(err) in (ERROR_500, ERROR_502, ERROR_503):
                 status.backoff()
                 self.manager.notify_failed(self, err)
             else:
@@ -268,6 +285,7 @@ if __name__ == '__main__':
     parser.add_option("-l", "--log", help="Log file", default='download_tweets.log')
     parser.add_option("-m", "--mode", help="Logging mode (debug, info, or error)", default='info')
 
+
     options, args = parser.parse_args()
     cfg = LoadConfig(options.cfg)
     if options.url is not None:
@@ -287,15 +305,20 @@ if __name__ == '__main__':
     
     # setup logging
     logger.setLevel(options.mode)
-    log_file = logging.FileHandler(options.log)
+    log_file = RotatingFileHandler(options.log, maxBytes=3000000, backupCount=5)
     log_stream = logging.StreamHandler()
+    log_email = SMTPHandler('localhost', 'no-reply@hashmapd.com', 
+        'edward@dragonfly.co.nz', '[Twextract] Error downloading tweets')
+    log_email.setLevel(logging.ERROR)
     log_formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
     log_file.setFormatter(log_formatter)
     log_stream.setFormatter(log_formatter)
+    log_email.setFormatter(log_formatter)
     logger.addHandler(log_file)
     logger.addHandler(log_stream)
+    #logger.addHandler(log_email)
     logger.info('Starting download_tweets.py')
-     
+    
     # run the manager
     manager = Manager(cfg.raw.couch_server_url, cfg.raw.couch_db) 
     manager.start()
