@@ -1,6 +1,18 @@
-//var DATA_URL = 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true';
-var DATA_URL = 'locations-xy.json';
-//var DATA_URL = 'xy_coords.json';
+/* Copyright 2011 Hashmapd Ltd  <http://hashmapd.com>
+ * written by Douglas Bagnall
+ */
+
+/* $hm holds global state.
+ * Capitalised names are assumed to be constant (unnecessarily in some cases).
+ */
+var $hm = {
+    DATA_URL: 'locations-xy.json',
+    //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
+    PADDING: 16,    /*padding for the image as a whole. it should exceed FUZZ_RADIUS */
+    FUZZ_RADIUS: 8, /*distance of points convolution */
+    FUZZ_MAX: 15
+};
+
 var HTTP_OK = 200;
 var XML_HTTP_READY = 4;
 
@@ -16,7 +28,7 @@ var XML_HTTP_READY = 4;
 
 function hm_draw_map(canvas){
     var req = new XMLHttpRequest();
-    req.open("GET", DATA_URL, true);
+    req.open("GET", $hm.DATA_URL, true);
     req.onreadystatechange = function(){
         /*XXX could arguably begin drawing before data is finished */
         if (req.readyState == XML_HTTP_READY) {
@@ -27,11 +39,6 @@ function hm_draw_map(canvas){
     req.send(null);
 }
 
-var hm_globals = {
-    PADDING: 16,    /*padding for the image as a whole. it should exceed FUZZ_RADIUS */
-    FUZZ_RADIUS: 8, /*distance of points convolution */
-    FUZZ_MAX: 15
-};
 
 /** make_colour_range utility
  *
@@ -98,10 +105,10 @@ function make_fuzz(radius){
     //var e = Math.E;
     /* find a good distribution for this size.
      * we want the 2 out pixels to be 1 and the inner pixel to be
-     * hm_globals.FUZZ_MAX
+     * $hm.FUZZ_MAX
      *  */
     var offset = 0.7;
-    var peak = hm_globals.FUZZ_MAX;
+    var peak = $hm.FUZZ_MAX;
     var k = find_nice_shape_constant(-0.5, peak, radius, offset);
     var s = "";
     for (var y = 0; y < size; y++){
@@ -166,8 +173,8 @@ function filter_rows(original, xmin, xmax, ymin, ymax){
 function hm_on_data(canvas, data){
     var i;
     var ctx = canvas.getContext("2d");
-    var width = canvas.width - 2 * hm_globals.PADDING;
-    var height = canvas.height - 2 * hm_globals.PADDING;
+    var width = canvas.width - 2 * $hm.PADDING;
+    var height = canvas.height - 2 * $hm.PADDING;
     var max_value = 0;
     var max_x = -1e999;
     var max_y = -1e999;
@@ -189,7 +196,7 @@ function hm_on_data(canvas, data){
     var x_scale = width / range_x;
     var y_scale = height / range_y;
 
-    var fuzz = make_fuzz(hm_globals.FUZZ_RADIUS);
+    var fuzz = make_fuzz($hm.FUZZ_RADIUS);
     ctx.font = "10px Inconsolata";
     paste_fuzz(ctx, rows, fuzz, min_x, min_y, x_scale, y_scale);
     var img_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -207,8 +214,8 @@ function paste_fuzz(ctx, rows, img, min_x, min_y, x_scale, y_scale){
     }
     for (var i = 0; i < rows.length; i++){
         var r = rows[i];
-        var x = hm_globals.PADDING + (r.key[0] - min_x) * x_scale;
-        var y = hm_globals.PADDING + (r.key[1] - min_y) * y_scale;
+        var x = $hm.PADDING + (r.key[0] - min_x) * x_scale;
+        var y = $hm.PADDING + (r.key[1] - min_y) * y_scale;
         //ctx.putImageData(fuzz, x, y);
         ctx.drawImage(img, x, y);
     }
@@ -222,8 +229,8 @@ function blur_dots(ctx, rows, min_x, min_y, x_scale, y_scale){
     //    ctx.globalAlpha = 0;
     for (i = 0; i < rows.length; i++){
         var r = rows[i];
-        var x = hm_globals.PADDING + (r.key[0] - min_x) * x_scale;
-        var y = hm_globals.PADDING + (r.key[1] - min_y) * y_scale;
+        var x = $hm.PADDING + (r.key[0] - min_x) * x_scale;
+        var y = $hm.PADDING + (r.key[1] - min_y) * y_scale;
         ctx.fillRect(x, y, 1, 1);
     }
 }
