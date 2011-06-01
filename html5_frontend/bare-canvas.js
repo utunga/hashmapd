@@ -203,7 +203,7 @@ function hm_on_data(canvas, data){
 function paste_fuzz(ctx, rows, img, min_x, min_y, x_scale, y_scale){
     if (img === undefined){
         img = new Image();
-        img.src = "fuzz-19.png";
+        img.src = "fuzz-19.PNG";
     }
     for (var i = 0; i < rows.length; i++){
         var r = rows[i];
