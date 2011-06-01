@@ -40,7 +40,6 @@ body
     margin:0;
 }
 
-
 #nav a {
 	text-decoration: none;
 	color:#333;
@@ -76,5 +75,21 @@ body
 	vertical-align:text-top;
 	position:relative;
 	top:20px;
+}
+
+#sidebar P
+{
+	font-size:0.6em;
+	color:#666;
+}
+
+div.mce_inline_error { color:#e26749; !important}
+div.mce-success-response { color:#e26749; !important}
+
+#sidebar #mc_embed_signup {
+	font-size:0.6em;
+	color:#666;
+	margin:0;
+	padding:0;
 }
 
