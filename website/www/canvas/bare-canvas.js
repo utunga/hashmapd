@@ -159,6 +159,7 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
             points.push([r.key[0], r.key[1],  r.value]);
         }
     }
+
     /*passing straight through is a common case*/
     if (xmin === undefined &&
         xmax === undefined &&
@@ -166,18 +167,16 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
         ymax === undefined){
         return points;
     }
-    var points2 = [];
-
-    for (i = 0; i < points.length; i++){
-        var p = points[i];
-        if ((xmin === undefined || xmin < p[0]) &&
-            (xmax === undefined || xmax > p[0]) &&
-            (ymin === undefined || ymin < p[1]) &&
-            (ymax === undefined || ymax > p[1])){
-            points2.push(p);
-        }
-    }
-    return points2;
+    xmin = (xmin !== undefined) ? xmin : -1e999;
+    ymin = (ymin !== undefined) ? ymin : -1e999;
+    xmax = (xmax !== undefined) ? xmax :  1e999;
+    ymax = (ymax !== undefined) ? ymax :  1e999;
+    return points.filter(function(p){
+                             return  ((xmin < p[0]) &&
+                                      (xmax > p[0]) &&
+                                      (ymin < p[1]) &&
+                                      (ymax > p[1]));
+                         });
 }
 
 
