@@ -1,5 +1,4 @@
-
-var map = function(doc) {
+function(doc) {
     /* NB the comment starting !code below is *not just a comment* it
        expands into the entirety of 'hashmapd_quadtree.js' because it
        is a couchapp 'directive' see
