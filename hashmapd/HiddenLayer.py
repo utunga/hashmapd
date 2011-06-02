@@ -66,18 +66,22 @@ class HiddenLayer(object):
         self.output = activation(T.dot(self.input, self.W) + self.b)
         # parameters of the model
         self.params = [self.W, self.b]
-                
-        self.trace_transpose_weights_file = True
-        x = int(numpy.sqrt(self.n_in))
-        y = (self.n_in-1) // x + 1
+        
+        (pixels, tiles) = (self.n_in, self.n_out)
+        self.trace_transpose_weights_file = pixels >= tiles
+        if not self.trace_transpose_weights_file:
+            (tiles, pixels) = (pixels, tiles)
+        x = int(numpy.sqrt(pixels))
+        y = (pixels-1) // x + 1
         self.trace_img_shape = (x, y)
         pad = 1 if max(x,y) < 4 else 2
         self.trace_tile_spacing = (pad, pad)
         (x1, y1) = [d+s for (d,s) in zip(self.trace_img_shape, self.trace_tile_spacing)]
-        X = min((300 // x1) + 1, int(numpy.sqrt(self.n_out))+1)
-        Y = min((300 // y1) + 1, (self.n_out-1) // X + 1)
+        X = min((300 // x1) + 1, int(numpy.sqrt(tiles))+1)
+        Y = min((300 // y1) + 1, (tiles-1) // X + 1)
         self.trace_tile_shape = (X, Y)
-        
+        print (pixels, x, y, X, Y, pad)
+    
     #added MKT
     def export_model(self):
         return self.params;
@@ -93,10 +97,9 @@ class HiddenLayer(object):
     def export_weights_image(self, file_name):
         # Construct image from the weight matrix
         
+        x = self.W.value
         if (self.trace_transpose_weights_file):
-            x = self.W.value.T
-        else:
-            x = self.W.value
+            x = x.T
         
         # scale_rows_to_unit_interval
         x = x.copy()
