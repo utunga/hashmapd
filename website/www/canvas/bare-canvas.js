@@ -270,7 +270,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var cos_alt = Math.cos(alt);
     var perpendicular = angle - Math.PI / 2;
     var stride = height * 4;
-    var colours = make_colour_range_mountains();
+    var colours = make_colour_range_mountains(105);
     var row = stride; /*start on row 1, not row 0 */
     for (var y = 1, yend = height - 1; y < yend; y++){
         for (var x = 4 + 3, xend = stride - 4; x < xend; x += 4){
@@ -330,16 +330,18 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
  * then grey
  * ?
  */
-function make_colour_range_mountains(){
+function make_colour_range_mountains(scale){
     var colours = [];
     var checkpoints = [
-      /*   r    g    b  height */
+      /* r, g, b are out of 100 */
+      /*   r    g    b  height  */
         [ 95,  90,  20,   0],
         [ 60, 105,  10,  10],
-        [ 40,  60,  10,  50],
-        [ 45,  40,   0, 200],
-        [ 45,  45,  45, 150],
-        [105, 105, 105, 255]
+        [ 40,  60,  10,  60],
+        [ 45,  40,   0, 100],
+        [ 45,  45,  35, 150],
+        [ 95,  95,  95, 160],
+        [100, 100, 100, 255]
     ];
     var i = 0;
     for (var j = 0; j < checkpoints.length - 1; j++){
@@ -360,12 +362,16 @@ function make_colour_range_mountains(){
         var dg = (g2 - g) / steps;
         var db = (b2 - b) / steps;
         for (i = start; i < end; i++){
-            colours.push([parseInt(r), parseInt(g), parseInt(b)]);
+            colours.push([parseInt(r / 100 * scale),
+                          parseInt(g / 100 * scale),
+                          parseInt(b / 100 * scale)]);
             r += dr;
             g += dg;
             b += db;
         }
     }
-    colours.push([parseInt(r), parseInt(g), parseInt(b)]);
+    colours.push([parseInt(r / 100 * scale),
+                  parseInt(g / 100 * scale),
+                  parseInt(b / 100 * scale)]);
     return colours;
 }
