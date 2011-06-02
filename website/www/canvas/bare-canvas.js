@@ -30,22 +30,6 @@ function hm_draw_map(canvas){
               });
 }
 
-/** make_colour_range utility
- *
- * @return a 256 long array of colours or gradients.
- */
-function make_colour_range(){
-    var colours = [];
-    for (var i = 255; i >= 0; i--){
-        var r = ((i >> 1) + 16);
-        var g = i;
-        var b = 0;
-        colours.push('rgb(' + r + ',' + g + ',' + b + ')');
-    }
-    return colours;
-}
-
-
 function find_nice_shape_constant(k, peak, radius, offset, concentration){
     if (k >= 0){/*fools, including myself*/
         k = -0.5;
@@ -286,6 +270,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var cos_alt = Math.cos(alt);
     var perpendicular = angle - Math.PI / 2;
     var stride = height * 4;
+    var colours = make_colour_range_mountains();
     var row = stride; /*start on row 1, not row 0 */
     for (var y = 1, yend = height - 1; y < yend; y++){
         for (var x = 4 + 3, xend = stride - 4; x < xend; x += 4){
@@ -321,9 +306,10 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
             /* Shade value */
             var c = Math.max(sin_alt * sin_slope + cos_alt * cos_slope *
                              Math.cos(perpendicular - aspect), 0);
-            target_pixels[a - 3] = 90 + 150.0 * c;
-            target_pixels[a - 2] = 105 + 150 * c;
-            target_pixels[a - 1] = 60 + 130 * c;
+            var colour = colours[cc];
+            target_pixels[a - 3] = colour[0] + 150.0 * c;
+            target_pixels[a - 2] = colour[1] + 150 * c;
+            target_pixels[a - 1] = colour[2] + 130 * c;
             target_pixels[a] = 255;
         }
         row += stride;
@@ -332,3 +318,54 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
 }
 
 
+/** make_colour_range utility
+ *
+ * @return a 256 long array of colours or gradients.
+ * Range is 0 - 105.
+ *
+ * near sea - yellow, brown
+ * then bright green
+ * then darker green
+ * then brown
+ * then grey
+ * ?
+ */
+function make_colour_range_mountains(){
+    var colours = [];
+    var checkpoints = [
+      /*   r    g    b  height */
+        [ 95,  90,  20,   0],
+        [ 60, 105,  10,  10],
+        [ 40,  60,  10,  50],
+        [ 45,  40,   0, 200],
+        [ 45,  45,  45, 150],
+        [105, 105, 105, 255]
+    ];
+    var i = 0;
+    for (var j = 0; j < checkpoints.length - 1; j++){
+        var src = checkpoints[j];
+        var dest = checkpoints[j + 1];
+        var r = src[0];
+        var g = src[1];
+        var b = src[2];
+        var start = src[3];
+        /*destinations*/
+        var r2 = dest[0];
+        var g2 = dest[1];
+        var b2 = dest[2];
+        var end = dest[3];
+        /*deltas*/
+        var steps = end - start;
+        var dr = (r2 - r) / steps;
+        var dg = (g2 - g) / steps;
+        var db = (b2 - b) / steps;
+        for (i = start; i < end; i++){
+            colours.push([parseInt(r), parseInt(g), parseInt(b)]);
+            r += dr;
+            g += dg;
+            b += db;
+        }
+    }
+    colours.push([parseInt(r), parseInt(g), parseInt(b)]);
+    return colours;
+}
