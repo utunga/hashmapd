@@ -6,11 +6,12 @@
  * Capitalised names are assumed to be constant (unnecessarily in some cases).
  */
 var $hm = {
-    DATA_URL: 'locations-xy.json',
+    DATA_URL: 'locations-15.json',
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 16,    /*padding for the image as a whole. it should exceed FUZZ_RADIUS */
     FUZZ_RADIUS: 8, /*distance of points convolution */
-    FUZZ_MAX: 15
+    FUZZ_MAX: 15,
+    USING_QUAD_TREE: true
 };
 
 var HTTP_OK = 200;
@@ -132,25 +133,51 @@ function make_fuzz(radius){
     return img;
 }
 
-function filter_rows(original, xmin, xmax, ymin, ymax){
+
+
+
+function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
+    var i, j;
+    var points = [];
+    if ($hm.USING_QUAD_TREE){
+        for (i = 0; i < raw.length; i++){
+            var r = raw[i];
+            var coords = r.key;
+            var x = 0;
+            var y = 0;
+            for (j = 0; j < coords.length; j++){
+                var p = coords[j];
+                x = (x << 1) | (p & 1);
+                y = (y << 1) | (p >> 1);
+            }
+            points.push([x, y, r.value]);
+        }
+    }
+    else {
+        for (i = 0; i < raw.length; i++){
+            var r = raw[i];
+            points.push([r.key[0], r.key[1],  r.value]);
+        }
+    }
     /*passing straight through is a common case*/
     if (xmin === undefined &&
         xmax === undefined &&
         ymin === undefined &&
         ymax === undefined){
-        return original;
+        return points;
     }
-    var rows = [];
-    for (var i = 0; i < original.length; i++){
-        var r = original[i];
-        if ((xmin === undefined || xmin < r.key[0]) &&
-            (xmax === undefined || xmax > r.key[0]) &&
-            (ymin === undefined || ymin < r.key[1]) &&
-            (ymax === undefined || ymax > r.key[1])){
-            rows.push(r);
+    var points2 = [];
+
+    for (i = 0; i < points.length; i++){
+        var p = points[i];
+        if ((xmin === undefined || xmin < p[0]) &&
+            (xmax === undefined || xmax > p[0]) &&
+            (ymin === undefined || ymin < p[1]) &&
+            (ymax === undefined || ymax > p[1])){
+            points2.push(p);
         }
     }
-    return rows;
+    return points2;
 }
 
 
@@ -172,15 +199,15 @@ function hm_on_data(canvas, data){
     var max_y = -1e999;
     var min_x =  1e999;
     var min_y =  1e999;
-    var rows = filter_rows(data.rows);
+    var rows = decode_and_filter_points(data.rows);
     /*find the coordinate and value ranges */
     for (i = 0; i < rows.length; i++){
         var r = rows[i];
         max_value = Math.max(r.value, max_value);
-        max_x = Math.max(r.key[0], max_x);
-        max_y = Math.max(r.key[1], max_y);
-        min_x = Math.min(r.key[0], min_x);
-        min_y = Math.min(r.key[1], min_y);
+        max_x = Math.max(r[0], max_x);
+        max_y = Math.max(r[1], max_y);
+        min_x = Math.min(r[0], min_x);
+        min_y = Math.min(r[1], min_y);
     }
 
     var range_x = max_x - min_x;
@@ -206,8 +233,8 @@ function paste_fuzz(ctx, rows, img, min_x, min_y, x_scale, y_scale){
     }
     for (var i = 0; i < rows.length; i++){
         var r = rows[i];
-        var x = $hm.PADDING + (r.key[0] - min_x) * x_scale;
-        var y = $hm.PADDING + (r.key[1] - min_y) * y_scale;
+        var x = $hm.PADDING + (r[0] - min_x) * x_scale;
+        var y = $hm.PADDING + (r[1] - min_y) * y_scale;
         //ctx.putImageData(fuzz, x, y);
         ctx.drawImage(img, x, y);
     }
@@ -221,8 +248,8 @@ function blur_dots(ctx, rows, min_x, min_y, x_scale, y_scale){
     //    ctx.globalAlpha = 0;
     for (i = 0; i < rows.length; i++){
         var r = rows[i];
-        var x = $hm.PADDING + (r.key[0] - min_x) * x_scale;
-        var y = $hm.PADDING + (r.key[1] - min_y) * y_scale;
+        var x = $hm.PADDING + (r[0] - min_x) * x_scale;
+        var y = $hm.PADDING + (r[1] - min_y) * y_scale;
         ctx.fillRect(x, y, 1, 1);
     }
 }
