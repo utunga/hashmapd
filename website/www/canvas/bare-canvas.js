@@ -85,6 +85,15 @@ function find_nice_shape_constant(k, peak, radius, offset, concentration){
     return k;
 }
 
+function new_canvas(width, height, id){
+    var canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    if (id){
+        canvas.id = id;
+    }
+    return canvas;
+}
 
 /*XXX ignoring cases where CSS pixels are not device pixels */
 
@@ -117,10 +126,8 @@ function make_fuzz(radius, peak, concentration, floor){
     var offset = (floor === undefined) ? 0.7 : floor + 0.5;
     /* middle pixel + radius on either side */
     var size = 1 + 2 * radius;
-    var canvas = document.createElement("canvas");
+    var canvas = new_canvas(size, size);
     var helpers = document.getElementById("helpers");
-    canvas.width = size;
-    canvas.height = size;
     helpers.appendChild(canvas);
     var ctx = canvas.getContext("2d");
     var imgd = ctx.getImageData(0, 0, size, size);
