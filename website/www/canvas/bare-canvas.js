@@ -12,7 +12,8 @@ var $hm = {
     PADDING: 16,    /*padding for the image as a whole. it should exceed FUZZ_RADIUS */
     FUZZ_RADIUS: 9, /*distance of points convolution */
     FUZZ_MAX: 15,
-    USING_QUAD_TREE: true
+    USING_QUAD_TREE: true,
+    QUAD_TREE_COORDS: 15,
     mapping_done: false, /*set to true when range, origin and scale are decided */
     landscape_done: false, /*set to true when finished drawing landscape */
     canvas: undefined,  /* a reference to the main canvas gets put here */
@@ -181,6 +182,11 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
                 x = (x << 1) | (p & 1);
                 y = (y << 1) | (p >> 1);
             }
+            /* if these coordinates are less than fully accurate,
+             * expand with zeros.
+             */
+            x <<= ($hm.QUAD_TREE_COORDS - coords.length);
+            y <<= ($hm.QUAD_TREE_COORDS - coords.length);
             points.push([x, y, r.value]);
         }
     }
