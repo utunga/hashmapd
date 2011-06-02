@@ -27,18 +27,10 @@ var XML_HTTP_READY = 4;
  */
 
 function hm_draw_map(canvas){
-    var req = new XMLHttpRequest();
-    req.open("GET", $hm.DATA_URL, true);
-    req.onreadystatechange = function(){
-        /*XXX could arguably begin drawing before data is finished */
-        if (req.readyState == XML_HTTP_READY) {
-            var data = JSON.parse(req.responseText);
-            hm_on_data(canvas, data);
-        }
-    };
-    req.send(null);
+    $.getJSON($hm.DATA_URL, function(data){
+                  hm_on_data(canvas, data);
+              });
 }
-
 
 /** make_colour_range utility
  *
@@ -133,7 +125,7 @@ function make_fuzz(radius){
         }
         s+="\n";
     }
-    alert(k);
+    //alert(k);
     ctx.putImageData(imgd, 0, 0);
     var img = new Image();
     img.src = canvas.toDataURL();
