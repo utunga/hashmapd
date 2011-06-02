@@ -7,6 +7,7 @@
  */
 var $hm = {
     DATA_URL: 'locations-15.json',
+    LABELS_URL: 'tokens-7.json',
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 16,    /*padding for the image as a whole. it should exceed FUZZ_RADIUS */
     FUZZ_RADIUS: 9, /*distance of points convolution */
@@ -24,6 +25,10 @@ var $hm = {
     min_y:  undefined,
     max_x:  undefined,
     max_y:  undefined,
+
+
+
+    trailing_commas_are_GOOD: true
 };
 
 /** hm_draw_map is the main entrance point.
@@ -43,6 +48,9 @@ function hm_draw_map(canvas){
 
     $.getJSON($hm.DATA_URL, function(data){
                   hm_on_data(canvas, data);
+              });
+    $.getJSON($hm.LABELS_URL, function(data){
+                  hm_on_labels(canvas, data);
               });
 }
 
@@ -249,6 +257,8 @@ function hm_on_data(canvas, data){
     fuzz.onload = function(){ /* fuzz is async */
         paste_fuzz(fuzz_ctx, points, fuzz);
         hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
+        $hm.landscape_done = true;
+        //alert($hm);
     };
 }
 
@@ -261,21 +271,6 @@ function paste_fuzz(ctx, points, img){
         ctx.drawImage(img, x - img.width / 2, y - img.height / 2);
     }
 }
-
-
-function add_label(ctx, text, x, y, text_fill, rect_fill, rect_w, rect_h){
-    if (text_fill === undefined){
-        text_fill = "#000";
-    }
-    ctx.fillStyle = text_fill;
-    if (rect_w !== undefined && rect_h !== undefined){
-        ctx.fillStyle = rect_fill;
-        ctx.fillRect(x, y, rect_w, rect_h);
-        ctx.fillStyle = text_fill;
-    }
-    ctx.fillText(text, x, y);
-}
-
 
 function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var canvas = target_ctx.canvas;
@@ -304,6 +299,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
                 target_pixels[a] = 255;
                 continue;
             }
+
             var tc = map_pixels[a - stride];
             var tl = map_pixels[a - stride - 4];
             var tr = map_pixels[a - stride + 4];
@@ -395,4 +391,60 @@ function make_colour_range_mountains(scale){
                   parseInt(g / 100 * scale),
                   parseInt(b / 100 * scale)]);
     return colours;
+}
+
+function wait_for_flag(flag, func){
+    if ($hm[flag]){
+        func();
+    }
+    else {
+        window.setTimeout(wait_for_flag, 100, flag, func);
+    }
+}
+
+
+
+/*don't do too much until the drawing is done.*/
+
+function hm_on_labels(canvas, data){
+    var i;
+    //alert(data.rows);
+    var points = decode_and_filter_points(data.rows,
+                                          $hm.min_x, $hm.max_x,
+                                          $hm.min_y, $hm.max_y);
+    var labels = [];
+    var max_freq = 0;
+    for (var i = 0; i < points.length; i++){
+        var freq = points[i][2][0][1];
+        max_freq = Math.max(freq, max_freq);
+    }
+    var scale = 14 / (max_freq * max_freq);
+    var ctx = canvas.getContext("2d");
+
+    function add_labels(){
+        for (var i = 0; i < points.length; i++){
+            var p = points[i];
+            var x = $hm.PADDING + (p[0] - $hm.min_x) * $hm.x_scale;
+            var y = $hm.PADDING + (p[1] - $hm.min_y) * $hm.y_scale;
+            var text = p[2][0][0];
+            var n = p[2][0][1];
+            var size = n * n * scale;
+            add_label(ctx, text, x, y, size, "#000", "#fff");
+        }
+        //alert(points[3].toSource());
+    }
+    wait_for_flag("landscape_done", add_labels);
+}
+
+function add_label(ctx, text, x, y, size, colour, shadow){
+    if (colour === undefined){
+        colour = "#000";
+    }
+    if (shadow && size > 8){
+        ctx.shadowColor = shadow;
+        ctx.shadowBlur = size * 0.25;
+    }
+    ctx.font = size + "px sans-serif";
+    ctx.fillStyle = colour;
+    ctx.fillText(text, x, y);
 }
