@@ -198,10 +198,10 @@ function hm_on_data(canvas, data){
     var max_y = -1e999;
     var min_x =  1e999;
     var min_y =  1e999;
-    var rows = decode_and_filter_points(data.rows);
+    var points = decode_and_filter_points(data.rows);
     /*find the coordinate and value ranges */
-    for (i = 0; i < rows.length; i++){
-        var r = rows[i];
+    for (i = 0; i < points.length; i++){
+        var r = points[i];
         max_value = Math.max(r.value, max_value);
         max_x = Math.max(r[0], max_x);
         max_y = Math.max(r[1], max_y);
@@ -216,7 +216,7 @@ function hm_on_data(canvas, data){
 
     var fuzz = make_fuzz($hm.FUZZ_RADIUS);
     ctx.font = "10px Inconsolata";
-    paste_fuzz(ctx, rows, fuzz, min_x, min_y, x_scale, y_scale);
+    paste_fuzz(ctx, points, fuzz, min_x, min_y, x_scale, y_scale);
     var img_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
     var height_map = img_data.data;
     for (i = 100000; i < 1000000; i++){
@@ -225,13 +225,13 @@ function hm_on_data(canvas, data){
 }
 
 
-function paste_fuzz(ctx, rows, img, min_x, min_y, x_scale, y_scale){
+function paste_fuzz(ctx, points, img, min_x, min_y, x_scale, y_scale){
     if (img === undefined){
         img = new Image();
         img.src = "fuzz-19.PNG";
     }
-    for (var i = 0; i < rows.length; i++){
-        var r = rows[i];
+    for (var i = 0; i < points.length; i++){
+        var r = points[i];
         var x = $hm.PADDING + (r[0] - min_x) * x_scale;
         var y = $hm.PADDING + (r[1] - min_y) * y_scale;
         //ctx.putImageData(fuzz, x, y);
@@ -239,14 +239,14 @@ function paste_fuzz(ctx, rows, img, min_x, min_y, x_scale, y_scale){
     }
 }
 
-function blur_dots(ctx, rows, min_x, min_y, x_scale, y_scale){
+function blur_dots(ctx, points, min_x, min_y, x_scale, y_scale){
     ctx.fillStyle = "rgba(255,255,255,1)";
     //ctx.fillStyle = "#888";
     ctx.shadowColor = "rgba(255,255,255,1)";
     ctx.shadowBlur = 6;
     //    ctx.globalAlpha = 0;
-    for (i = 0; i < rows.length; i++){
-        var r = rows[i];
+    for (i = 0; i < points.length; i++){
+        var r = points[i];
         var x = $hm.PADDING + (r[0] - min_x) * x_scale;
         var y = $hm.PADDING + (r[1] - min_y) * y_scale;
         ctx.fillRect(x, y, 1, 1);
