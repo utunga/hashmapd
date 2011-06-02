@@ -256,8 +256,7 @@ function paste_fuzz(ctx, points, img, min_x, min_y, x_scale, y_scale){
         var r = points[i];
         var x = $hm.PADDING + (r[0] - min_x) * x_scale;
         var y = $hm.PADDING + (r[1] - min_y) * y_scale;
-        //ctx.putImageData(fuzz, x, y);
-        ctx.drawImage(img, x, y);
+        ctx.drawImage(img, x - img.width / 2, y - img.height / 2);
     }
 }
 
