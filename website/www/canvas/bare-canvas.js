@@ -14,9 +14,6 @@ var $hm = {
     USING_QUAD_TREE: true
 };
 
-var HTTP_OK = 200;
-var XML_HTTP_READY = 4;
-
 /** hm_draw_map is the main entrance point.
  *
  * Nothing happens until the json is loaded, then the hm_on_data
@@ -260,23 +257,6 @@ function paste_fuzz(ctx, points, img, min_x, min_y, x_scale, y_scale){
     }
 }
 
-function blur_dots(ctx, points, min_x, min_y, x_scale, y_scale){
-    ctx.fillStyle = "rgba(255,255,255,1)";
-    //ctx.fillStyle = "#888";
-    ctx.shadowColor = "rgba(255,255,255,1)";
-    ctx.shadowBlur = 6;
-    //    ctx.globalAlpha = 0;
-    for (i = 0; i < points.length; i++){
-        var r = points[i];
-        var x = $hm.PADDING + (r[0] - min_x) * x_scale;
-        var y = $hm.PADDING + (r[1] - min_y) * y_scale;
-        ctx.fillRect(x, y, 1, 1);
-    }
-}
-
-
-
-function generate_height_map(){}
 
 function add_label(ctx, text, x, y, text_fill, rect_fill, rect_w, rect_h){
     if (text_fill === undefined){
