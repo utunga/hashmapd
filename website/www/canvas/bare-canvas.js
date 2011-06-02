@@ -12,6 +12,18 @@ var $hm = {
     FUZZ_RADIUS: 9, /*distance of points convolution */
     FUZZ_MAX: 15,
     USING_QUAD_TREE: true
+    mapping_done: false, /*set to true when range, origin and scale are decided */
+    landscape_done: false, /*set to true when finished drawing landscape */
+    canvas: undefined,  /* a reference to the main canvas gets put here */
+    /* convert data coordinates to canvas coordinates */
+    range_x: undefined,
+    range_y: undefined,
+    x_scale: undefined,
+    y_scale: undefined,
+    min_x:  undefined,
+    min_y:  undefined,
+    max_x:  undefined,
+    max_y:  undefined,
 };
 
 /** hm_draw_map is the main entrance point.
@@ -25,6 +37,10 @@ var $hm = {
  */
 
 function hm_draw_map(canvas){
+    $hm.canvas = canvas;
+    $hm.width = canvas.width - 2 * $hm.PADDING;
+    $hm.height = canvas.height - 2 * $hm.PADDING;
+
     $.getJSON($hm.DATA_URL, function(data){
                   hm_on_data(canvas, data);
               });
@@ -79,6 +95,10 @@ function new_canvas(width, height, id){
 
 /** Make_fuzz makes a little fuzzy circle image for point convolution
  *
+ * The returned image is not necessarily ready when the function
+ * returns: you must make use of it in an .onload() handler (or poll
+ * the .complete attribute).
+ *
  * The fuzz is approximately gaussian and carried in the images alpha
  * channel.  All values are 8-bit integers less than <peak>.  The
  * shape is tuned stochastically until the pixels at <radius> and at
@@ -98,6 +118,8 @@ function new_canvas(width, height, id){
  * @param peak is the alpha for the centre pixel
  * @param concentration is a sort of inverse variance. try 0.25.
  * @param floor positive values lift the whole curve, creating long tails.
+ *
+ * @return an Image object that *will* contain the fuzz when it it is ready.
  */
 
 function make_fuzz(radius, peak, concentration, floor){
@@ -192,9 +214,8 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
 
 function hm_on_data(canvas, data){
     var i;
-    var ctx = canvas.getContext("2d");
-    var width = canvas.width - 2 * $hm.PADDING;
-    var height = canvas.height - 2 * $hm.PADDING;
+    var width = $hm.width;
+    var height = $hm.width;
     var max_value = 0;
     var max_x = -1e999;
     var max_y = -1e999;
@@ -211,32 +232,32 @@ function hm_on_data(canvas, data){
         min_y = Math.min(r[1], min_y);
     }
 
-    var range_x = max_x - min_x;
-    var range_y = max_y - min_y;
-    var x_scale = width / range_x;
-    var y_scale = height / range_y;
-
-    ctx.font = "10px Inconsolata";
+    $hm.range_x = max_x - min_x;
+    $hm.range_y = max_y - min_y;
+    $hm.x_scale = width / $hm.range_x;
+    $hm.y_scale = height / $hm.range_y;
+    $hm.min_x = min_x;
+    $hm.min_y = min_y;
+    $hm.max_x = max_x;
+    $hm.max_y = max_y;
+    $hm.mapping_done = true;
+    var ctx = canvas.getContext("2d");
     var fuzz = make_fuzz($hm.FUZZ_RADIUS);
     var fuzz_canvas = new_canvas(canvas.width, canvas.height);
     $(fuzz_canvas).insertAfter(canvas);
     var fuzz_ctx = fuzz_canvas.getContext("2d");
-    fuzz.onload = function(){
-        paste_fuzz(fuzz_ctx, points, fuzz, min_x, min_y, x_scale, y_scale);
+    fuzz.onload = function(){ /* fuzz is async */
+        paste_fuzz(fuzz_ctx, points, fuzz);
         hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
     };
 }
 
 
-function paste_fuzz(ctx, points, img, min_x, min_y, x_scale, y_scale){
-    if (img === undefined){
-        img = new Image();
-        img.src = "fuzz-19.PNG";
-    }
+function paste_fuzz(ctx, points, img){
     for (var i = 0; i < points.length; i++){
         var r = points[i];
-        var x = $hm.PADDING + (r[0] - min_x) * x_scale;
-        var y = $hm.PADDING + (r[1] - min_y) * y_scale;
+        var x = $hm.PADDING + (r[0] - $hm.min_x) * $hm.x_scale;
+        var y = $hm.PADDING + (r[1] - $hm.min_y) * $hm.y_scale;
         ctx.drawImage(img, x - img.width / 2, y - img.height / 2);
     }
 }
