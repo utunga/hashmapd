@@ -9,7 +9,7 @@ var $hm = {
     DATA_URL: 'locations-15.json',
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 16,    /*padding for the image as a whole. it should exceed FUZZ_RADIUS */
-    FUZZ_RADIUS: 8, /*distance of points convolution */
+    FUZZ_RADIUS: 10, /*distance of points convolution */
     FUZZ_MAX: 15,
     USING_QUAD_TREE: true
 };
@@ -49,21 +49,26 @@ function make_colour_range(){
 }
 
 
-function find_nice_shape_constant(k, peak, radius, offset){
-    if (k >= 0){/*fools*/
+function find_nice_shape_constant(k, peak, radius, offset, concentration){
+    if (k >= 0){/*fools, including myself*/
         k = -0.5;
     }
-    for (var i = 0; i < 100; i++){
+    var max_spill = 0.67;
+    for (var i = 0; i < 200; i++){
         var a = parseInt(Math.exp(radius * k) * peak + offset);
-        var outside = parseInt(Math.exp((radius + 1) * k) * peak + offset);
+        var outside = parseInt(Math.exp((radius + max_spill) * k) * peak + offset);
         if (a < 1){
-            k *= 1 - Math.random() * 0.8;
+            k *= 1 - Math.random() * 0.6;
         }
         else if (a > 1 || outside != 0){
-            k /= 1 - Math.random() * 0.8;
+            k /= 1 - Math.random() * 0.6;
         }
-        else { //a == 1
-            var b = parseInt(Math.exp((radius - 1) * k) * peak + offset);
+        else {
+            /* a == 1, and outside == 0.
+             * Now, check concentration.
+             *
+             */
+            var b = parseInt(Math.exp((radius * (1 - concentration)) * k) * peak + offset);
             if (b < 1){
                 k *= 1 - Math.random() * 0.4;
             }
@@ -71,6 +76,7 @@ function find_nice_shape_constant(k, peak, radius, offset){
                 k /= 1 - Math.random() * 0.4;
             }
             else {
+                //alert(i, k);
                 return k;
             }
         }
@@ -82,10 +88,35 @@ function find_nice_shape_constant(k, peak, radius, offset){
 
 /*XXX ignoring cases where CSS pixels are not device pixels */
 
-function make_fuzz(radius){
+/** Make_fuzz makes a little fuzzy circle image for point convolution
+ *
+ * The fuzz is approximately gaussian and carried in the images alpha
+ * channel.  All values are 8-bit integers less than <peak>.  The
+ * shape is tuned stochastically until the pixels at <radius> and at
+ * (1 - <concetnration>) * <radius> have alpha 1, while those a bit
+ * beyond <radius> have alpha 0. The image is sized <radius> * 2 + 1.
+ *
+ * If you ignore <concentration> and <floor>, sensible (or at least
+ * frequently successful) defaults will be chosen.
+ *
+ * The formula used is Math.exp(k * d) + <floor>
+ *
+ * where k is fiddled until both <radius> and <radius> * (1 -
+ * <concentration>) are 1.  Thus increasing <concentration> flattens
+ * the outside and steepens the centre.
+ *
+ * @param radius is the distance
+ * @param peak is the alpha for the centre pixel
+ * @param concentration is a sort of inverse variance. try 0.25.
+ * @param floor positive values lift the whole curve, creating long tails.
+ */
+
+function make_fuzz(radius, peak, concentration, floor){
+    peak = (peak === undefined) ? $hm.FUZZ_MAX : peak;
+    concentration = (concentration === undefined) ? 0.25 : concentration;
+    var offset = (floor === undefined) ? 0.7 : floor + 0.5;
     /* middle pixel + radius on either side */
     var size = 1 + 2 * radius;
-    var middle = radius;
     var canvas = document.createElement("canvas");
     var helpers = document.getElementById("helpers");
     canvas.width = size;
@@ -95,27 +126,13 @@ function make_fuzz(radius){
     var imgd = ctx.getImageData(0, 0, size, size);
     var pixels = imgd.data;
     var stride = size * 4;
-    //var e = Math.E;
-    /* find a good distribution for this size.
-     * we want the 2 out pixels to be 1 and the inner pixel to be
-     * $hm.FUZZ_MAX
-     *  */
-    var offset = 0.7;
-    var peak = $hm.FUZZ_MAX;
-    var k = find_nice_shape_constant(-0.5, peak, radius, offset);
+    var k = find_nice_shape_constant(-0.5, peak, radius, offset, concentration);
     var s = "";
     for (var y = 0; y < size; y++){
         var dy2 = (y - radius) * (y - radius);
         var row = y * stride;
         for (var x = 0; x < size; x++){
             var dx2 = (x - radius) * (x - radius);
-            /* aah, some formula so that
-             * d == FUZZ_PIXELS -> difference of 1, just
-             * d == 0           -> difference of say ~25
-             * d == 1, 2, 3,... falls off sharply.
-             *
-             * presumably ~ e ^ -dk   (+ c ?)
-             * */
             var a = parseInt(Math.exp(Math.sqrt(dx2 + dy2) * k) * peak + offset);
             var p = row + x * 4;
             s += a + " ";
@@ -130,6 +147,7 @@ function make_fuzz(radius){
     ctx.putImageData(imgd, 0, 0);
     var img = new Image();
     img.src = canvas.toDataURL();
+    //alert(img.complete);
     return img;
 }
 
@@ -167,6 +185,7 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
         ymax === undefined){
         return points;
     }
+    /*undefined is equivalent to +/- inf */
     xmin = (xmin !== undefined) ? xmin : -1e999;
     ymin = (ymin !== undefined) ? ymin : -1e999;
     xmax = (xmax !== undefined) ? xmax :  1e999;
@@ -214,14 +233,17 @@ function hm_on_data(canvas, data){
     var x_scale = width / range_x;
     var y_scale = height / range_y;
 
-    var fuzz = make_fuzz($hm.FUZZ_RADIUS);
     ctx.font = "10px Inconsolata";
-    paste_fuzz(ctx, points, fuzz, min_x, min_y, x_scale, y_scale);
-    var img_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    var height_map = img_data.data;
-    for (i = 100000; i < 1000000; i++){
-        height_map[i] = 255;
-    }
+    var fuzz = make_fuzz($hm.FUZZ_RADIUS);
+    //alert(fuzz.complete);
+    fuzz.onload = function(){
+        paste_fuzz(ctx, points, fuzz, min_x, min_y, x_scale, y_scale);
+        var img_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var height_map = img_data.data;
+        for (i = 100000; i < 1000000; i++){
+            height_map[i] = 255;
+        }
+    };
 }
 
 
