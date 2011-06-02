@@ -286,14 +286,14 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var cos_alt = Math.cos(alt);
     var perpendicular = angle - Math.PI / 2;
     var stride = height * 4;
-    var colours = make_colour_range_mountains(105);
+    var colours = make_colour_range_mountains(115);
     var row = stride; /*start on row 1, not row 0 */
     for (var y = 1, yend = height - 1; y < yend; y++){
         for (var x = 4 + 3, xend = stride - 4; x < xend; x += 4){
             var a = row + x;
             var cc = map_pixels[a];
             if (cc < 1){
-                target_pixels[a - 3] = 140;
+                target_pixels[a - 3] = 147;
                 target_pixels[a - 2] = 187;
                 target_pixels[a - 1] = 189;
                 target_pixels[a] = 255;
@@ -324,8 +324,11 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
             var c = Math.max(sin_alt * sin_slope + cos_alt * cos_slope *
                              Math.cos(perpendicular - aspect), 0);
             var colour = colours[cc];
-            target_pixels[a - 3] = colour[0] + 150.0 * c;
-            target_pixels[a - 2] = colour[1] + 150 * c;
+            if (cc == 1){ /* the sea shore has less shadow */
+                c = (0.5 + c) / 2;
+            }
+            target_pixels[a - 3] = colour[0] + 140 * c;
+            target_pixels[a - 2] = colour[1] + 140 * c;
             target_pixels[a - 1] = colour[2] + 130 * c;
             target_pixels[a] = 255;
         }
@@ -335,10 +338,10 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
 }
 
 
-/** make_colour_range utility
+/** make_colour_range_mountains utility
  *
- * @return a 256 long array of colours or gradients.
- * Range is 0 - 105.
+ * @param scale range for rgb values (e.g. 255 for full range)
+ * @return a 256 long array of colours.
  *
  * near sea - yellow, brown
  * then bright green
