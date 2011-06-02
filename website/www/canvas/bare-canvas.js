@@ -9,7 +9,7 @@ var $hm = {
     DATA_URL: 'locations-15.json',
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 16,    /*padding for the image as a whole. it should exceed FUZZ_RADIUS */
-    FUZZ_RADIUS: 10, /*distance of points convolution */
+    FUZZ_RADIUS: 9, /*distance of points convolution */
     FUZZ_MAX: 15,
     USING_QUAD_TREE: true
 };
@@ -237,14 +237,12 @@ function hm_on_data(canvas, data){
 
     ctx.font = "10px Inconsolata";
     var fuzz = make_fuzz($hm.FUZZ_RADIUS);
-    //alert(fuzz.complete);
+    var fuzz_canvas = new_canvas(canvas.width, canvas.height);
+    $(fuzz_canvas).insertAfter(canvas);
+    var fuzz_ctx = fuzz_canvas.getContext("2d");
     fuzz.onload = function(){
-        paste_fuzz(ctx, points, fuzz, min_x, min_y, x_scale, y_scale);
-        var img_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        var height_map = img_data.data;
-        for (i = 100000; i < 1000000; i++){
-            height_map[i] = 255;
-        }
+        paste_fuzz(fuzz_ctx, points, fuzz, min_x, min_y, x_scale, y_scale);
+        hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
     };
 }
 
@@ -293,3 +291,65 @@ function add_label(ctx, text, x, y, text_fill, rect_fill, rect_w, rect_h){
     }
     ctx.fillText(text, x, y);
 }
+
+
+function hillshading(map_ctx, target_ctx, scale, angle, alt){
+    var canvas = target_ctx.canvas;
+    var width = canvas.width;
+    var height = canvas.height;
+    var map_imgd = map_ctx.getImageData(0, 0, width, height);
+    var map_pixels = map_imgd.data;
+    var target_imgd = target_ctx.getImageData(0, 0, width, height);
+    var target_pixels = target_imgd.data;
+
+    scale = 1.0 / (8.0 * scale);
+    var sin_alt = Math.sin(alt);
+    var cos_alt = Math.cos(alt);
+    var perpendicular = angle - Math.PI / 2;
+    var stride = height * 4;
+    var row = stride; /*start on row 1, not row 0 */
+    for (var y = 1, yend = height - 1; y < yend; y++){
+        for (var x = 4 + 3, xend = stride - 4; x < xend; x += 4){
+            var a = row + x;
+            var cc = map_pixels[a];
+            if (cc < 1){
+                target_pixels[a - 3] = 140;
+                target_pixels[a - 2] = 187;
+                target_pixels[a - 1] = 189;
+                target_pixels[a] = 255;
+                continue;
+            }
+            var tc = map_pixels[a - stride];
+            var tl = map_pixels[a - stride - 4];
+            var tr = map_pixels[a - stride + 4];
+            var cl = map_pixels[a - 4];
+            var cr = map_pixels[a + 4];
+            var bc = map_pixels[a + stride];
+            var bl = map_pixels[a + stride - 4];
+            var br = map_pixels[a + stride + 4];
+
+            /* Slope */
+            var dx = ((tl + 2 * cl + bl) - (tr + 2 * cr + br)) * scale;
+            var dy = ((bl + 2 * bc + br) - (tl + 2 * tc + tr)) * scale;
+            var slope = Math.PI / 2 - Math.atan(Math.sqrt(dx * dx + dy * dy));
+
+            var sin_slope = Math.sin(slope);
+            var cos_slope = Math.cos(slope);
+
+            /* Aspect */
+            var aspect = Math.atan2(dx, dy);
+
+            /* Shade value */
+            var c = Math.max(sin_alt * sin_slope + cos_alt * cos_slope *
+                             Math.cos(perpendicular - aspect), 0);
+            target_pixels[a - 3] = 90 + 150.0 * c;
+            target_pixels[a - 2] = 105 + 150 * c;
+            target_pixels[a - 1] = 60 + 130 * c;
+            target_pixels[a] = 255;
+        }
+        row += stride;
+    }
+    target_ctx.putImageData(target_imgd, 0, 0);
+}
+
+
