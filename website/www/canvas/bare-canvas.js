@@ -76,7 +76,6 @@ function find_nice_shape_constant(k, peak, radius, offset, concentration){
                 k /= 1 - Math.random() * 0.4;
             }
             else {
-                //alert(i, k);
                 return k;
             }
         }
@@ -144,17 +143,13 @@ function make_fuzz(radius, peak, concentration, floor){
             var p = row + x * 4;
             s += a + " ";
             pixels[p] = 255;
-            pixels[p + 1] = 255;
-            pixels[p + 2] = 255;
             pixels[p + 3] = a;
         }
         s+="\n";
     }
-    //alert(k);
     ctx.putImageData(imgd, 0, 0);
     var img = new Image();
     img.src = canvas.toDataURL();
-    //alert(img.complete);
     return img;
 }
 
