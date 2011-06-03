@@ -13,6 +13,14 @@ canvas{
   top: 0;
 }
 
+#debug {
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: #aaa;
+}
+
 #helpers img {
   display: block;
 }
+

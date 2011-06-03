@@ -49,6 +49,7 @@ var $hm = {
 
 function hm_draw_map(){
     //$.ready(make_canvas);
+    $hm.timer = {start: Date.now()};
     make_canvas();
     $.getJSON($hm.DATA_URL, function(data){
                   hm_on_data(data);
@@ -264,6 +265,7 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
  */
 
 function hm_on_data(data){
+    $hm.timer.on_data = Date.now();
     var i;
     var width = $hm.width;
     var height = $hm.width;
@@ -298,8 +300,11 @@ function hm_on_data(data){
     var fuzz_canvas = fullsize_canvas();
     var fuzz_ctx = fuzz_canvas.getContext("2d");
     fuzz.onload = function(){ /* fuzz is async */
+        $hm.timer.fuzz_ready = Date.now();
         paste_fuzz(fuzz_ctx, points, fuzz);
+        $hm.timer.fuzz_pasted = Date.now();
         hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
+        $hm.timer.hillshaded = Date.now();
         $hm.landscape_done = true;
     };
 }
@@ -462,6 +467,7 @@ function wait_for_flag(flag, func){
 
 
 function hm_on_token_density(data){
+    $hm.timer.doing_tokens = Date.now();
     var i;
     var points = decode_and_filter_points(data.rows,
                                           $hm.min_x, $hm.max_x,
@@ -476,6 +482,7 @@ function hm_on_token_density(data){
     var ctx = $hm.canvas.getContext("2d");
 
     function add_labels(){
+        $hm.timer.adding_labels = Date.now();
         for (var i = 0; i < points.length; i++){
             var p = points[i];
             var x = $hm.PADDING + (p[0] - $hm.min_x) * $hm.x_scale;
@@ -485,6 +492,8 @@ function hm_on_token_density(data){
             var size = n * n * scale;
             add_label(ctx, text, x, y, size, "#000", "#fff");
         }
+        $hm.timer.label_done = Date.now();
+        hm_timer_results();
     }
     wait_for_flag("landscape_done", add_labels);
 }
@@ -532,4 +541,25 @@ function add_label(ctx, text, x, y, size, colour, shadow){
     ctx.font = size + "px sans-serif";
     ctx.fillStyle = colour;
     ctx.fillText(text, x, y);
+}
+
+
+function hm_timer_results(){
+    var k, v, ordered = [];
+    for (k in $hm.timer){
+        v = $hm.timer[k];
+        ordered.push([v, k]);
+    }
+    ordered.sort();
+    var s = "<table><tr><td><td>time<td>delta";
+    var t2 = 0;
+    for (var i = 0; i < ordered.length; i++){
+        var t = ordered[i][0] - ordered[0][0];
+        var d = t - t2;
+        t2 = t;
+        s += "<tr><td>" + ordered[i][1] + "<td>" + t + "<td>" + d + "\n";
+    }
+    s += "</table>";
+    //alert(s);
+    $("#debug").append(s);
 }
