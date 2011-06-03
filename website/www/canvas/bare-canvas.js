@@ -329,6 +329,10 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var height = canvas.height;
     var map_imgd = map_ctx.getImageData(0, 0, width, height);
     var map_pixels = map_imgd.data;
+
+    /*colour in the sea in one go */
+    target_ctx.fillStyle = "rgb(147,187,189)";
+    target_ctx.fillRect(0, 0, width, height);
     var target_imgd = target_ctx.getImageData(0, 0, width, height);
     var target_pixels = target_imgd.data;
 
@@ -344,10 +348,6 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
             var a = row + x;
             var cc = map_pixels[a];
             if (cc < 1){
-                target_pixels[a - 3] = 147;
-                target_pixels[a - 2] = 187;
-                target_pixels[a - 1] = 189;
-                target_pixels[a] = 255;
                 continue;
             }
 
