@@ -10,9 +10,12 @@ var $hm = {
     TOKEN_DENSITY_URL: 'token_density-8.json',
     LABELS_URL: 'tokens-7.json',
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
-    PADDING: 16,    /*padding for the image as a whole. it should exceed FUZZ_RADIUS */
-    FUZZ_RADIUS: 9, /*distance of points convolution */
-    FUZZ_MAX: 15,
+    PADDING: 16,    /*padding for the image as a whole. */
+    FUZZ_CONSTANT: -0.37, /*concentration of peaks, negative inverse variance */
+    FUZZ_OFFSET: 0.5, /* lift floor by this much (0.5 rounds, more to lengthen tails) */
+    FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
+    FUZZ_MAX_RADIUS: 16, /*fuzz never reaches beyond this far */
+    FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
     USING_QUAD_TREE: true,
     QUAD_TREE_COORDS: 15,
     mapping_done: false, /*set to true when range, origin and scale are decided */
@@ -81,105 +84,91 @@ function fullsize_canvas(){
 }
 
 
-function find_nice_shape_constant(k, peak, radius, offset, concentration){
-    if (k >= 0){/*fools, including myself*/
-        k = -0.5;
-    }
-    var max_spill = 0.67;
-    for (var i = 0; i < 200; i++){
-        var a = parseInt(Math.exp(radius * k) * peak + offset);
-        var outside = parseInt(Math.exp((radius + max_spill) * k) * peak + offset);
-        if (a < 1){
-            k *= 1 - Math.random() * 0.6;
-        }
-        else if (a > 1 || outside != 0){
-            k /= 1 - Math.random() * 0.6;
-        }
-        else {
-            /* a == 1, and outside == 0.
-             * Now, check concentration.
-             *
-             */
-            var b = parseInt(Math.exp((radius * (1 - concentration)) * k) * peak + offset);
-            if (b < 1){
-                k *= 1 - Math.random() * 0.4;
-            }
-            else if (b > 1){
-                k /= 1 - Math.random() * 0.4;
-            }
-            else {
-                return k;
-            }
-        }
-    }
-    /*give up*/
-    return k;
-}
-
-
 /*XXX ignoring cases where CSS pixels are not device pixels */
 
-/** Make_fuzz makes a little fuzzy circle image for point convolution
+/** Make_fuzz makes little fuzzy circle images for point convolution
  *
- * The returned image is not necessarily ready when the function
- * returns: you must make use of it in an .onload() handler (or poll
- * the .complete attribute).
+ * The images is not necessarily ready when the function returns: you
+ * need to use their .onload() handlers or poll their .complete
+ * attributes.
  *
  * The fuzz is approximately gaussian and carried in the images alpha
- * channel.  All values are 8-bit integers less than <peak>.  The
- * shape is tuned stochastically until the pixels at <radius> and at
- * (1 - <concetnration>) * <radius> have alpha 1, while those a bit
- * beyond <radius> have alpha 0. The image is sized <radius> * 2 + 1.
+ * channel.
  *
- * If you ignore <concentration> and <floor>, sensible (or at least
- * frequently successful) defaults will be chosen.
+ * Their size, distribution, and number are controlled by attributes
+ * of the $hm object that start with FUZZ_ look up there for
+ * documentation.
  *
  * The formula used is Math.exp(k * d) + <floor>
  *
- * where k is fiddled until both <radius> and <radius> * (1 -
- * <concentration>) are 1.  Thus increasing <concentration> flattens
- * the outside and steepens the centre.
- *
- * @param radius is the distance
- * @param peak is the alpha for the centre pixel
- * @param concentration is a sort of inverse variance. try 0.25.
- * @param floor positive values lift the whole curve, creating long tails.
- *
- * @return an Image object that *will* contain the fuzz when it it is ready.
+ * @return an object referencing images that *will* contain fuzz when it it is ready.
  */
 
-function make_fuzz(radius, peak, concentration, floor){
-    peak = (peak === undefined) ? $hm.FUZZ_MAX : peak;
-    concentration = (concentration === undefined) ? 0.25 : concentration;
-    var offset = (floor === undefined) ? 0.7 : floor + 0.5;
+function make_fuzz(){
+    var x, y;
+    var offset = $hm.FUZZ_OFFSET;
+    var k = $hm.FUZZ_CONSTANT;
+    /* work out a table 0-1 fuzz values */
+    var table = [];
+    var radius = $hm.FUZZ_MAX_RADIUS;
     /* middle pixel + radius on either side */
-    var size = 1 + 2 * radius;
-    var canvas = new_canvas(size, size);
-    var helpers = document.getElementById("helpers");
-    helpers.appendChild(canvas);
-    var ctx = canvas.getContext("2d");
-    var imgd = ctx.getImageData(0, 0, size, size);
-    var pixels = imgd.data;
-    var stride = size * 4;
-    var k = find_nice_shape_constant(-0.5, peak, radius, offset, concentration);
-    var s = "";
-    for (var y = 0; y < size; y++){
+    var tsize = 2 * radius + 1;
+    for (y = 0; y < tsize; y++){
+        table[y] = [];
+        var ty = table[y];
         var dy2 = (y - radius) * (y - radius);
-        var row = y * stride;
-        for (var x = 0; x < size; x++){
+        for (x = 0; x < tsize; x++){
             var dx2 = (x - radius) * (x - radius);
-            var a = parseInt(Math.exp(Math.sqrt(dx2 + dy2) * k) * peak + offset);
-            var p = row + x * 4;
-            s += a + " ";
-            pixels[p] = 255;
-            pixels[p + 3] = a;
+            ty[x] = Math.exp(Math.sqrt(dx2 + dy2) * k);
         }
-        s+="\n";
     }
-    ctx.putImageData(imgd, 0, 0);
-    var img = new Image();
-    img.src = canvas.toDataURL();
-    return img;
+    var centre_row = table[radius];
+    var images = {unloaded: 0};
+
+    for (var i = 1; i <= $hm.FUZZ_MAX_MULTIPLE; i++){
+        var peak = $hm.FUZZ_PER_POINT * i;
+        /* find how wide it needs to be. We want to clip <clip> off
+         * each side of the table.*/
+        for (var clip = 0; clip < radius; clip++){
+            var value = centre_row[clip] * peak + offset;
+            if (value >= 1){
+                break;
+            }
+        }
+        var size = tsize - 2 * clip;
+        var canvas = new_canvas(size, size);
+        var ctx = canvas.getContext("2d");
+        var imgd = ctx.getImageData(0, 0, size, size);
+        var pixels = imgd.data;
+        var stride = size * 4;
+        for (y = 0; y < size; y++){
+            var sy = clip + y;
+            var row = y * stride;
+            for (x = 0; x < size; x++){
+                var sx = clip + x;
+                var a = parseInt(table[sy][sx] * peak + offset);
+                var p = row + x * 4;
+                pixels[p] = 255;
+                pixels[p + 3] = a;
+            }
+        }
+        ctx.putImageData(imgd, 0, 0);
+        var img = document.createElement("img");
+        img.id = "fuzz-" + i + "-radius-" + (size - 1) / 2;
+        images[i] = img;
+        /*hacky way to forward onload */
+        images.unloaded++;
+        img.onload = function(){
+            images.unloaded--;
+            if(images.unloaded == 0 &&
+              images.onload){
+                images.onload();
+            }
+        };
+        img.src = canvas.toDataURL();
+        $("#helpers").append(img);
+    }
+    return images;
 }
 
 /** decode_and_filter_points turns JSON rows into point arrays.
@@ -309,18 +298,30 @@ function hm_on_data(data){
         paste_fuzz(fuzz_ctx, points, fuzz);
         hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
         $hm.landscape_done = true;
-        //alert($hm);
     };
 }
 
 
-function paste_fuzz(ctx, points, img){
+function paste_fuzz(ctx, points, images){
+    var counts = [];
     for (var i = 0; i < points.length; i++){
-        var r = points[i];
-        var x = $hm.PADDING + (r[0] - $hm.min_x) * $hm.x_scale;
-        var y = $hm.PADDING + (r[1] - $hm.min_y) * $hm.y_scale;
+        var p = points[i];
+        var x = $hm.PADDING + (p[0] - $hm.min_x) * $hm.x_scale;
+        var y = $hm.PADDING + (p[1] - $hm.min_y) * $hm.y_scale;
+        var count = p[2];
+        counts[count] = (counts[count] || 0) + 1;
+        var img;
+        if (count <= $hm.FUZZ_MAX_MULTIPLE){
+            img = images[count];
+        }
+        else{
+            /* XXX jump up to next scale */
+            alert(count);
+            img = images[$hm.FUZZ_MAX_MULTIPLE];
+        }
         ctx.drawImage(img, x - img.width / 2, y - img.height / 2);
     }
+    alert(" " + counts);
 }
 
 function hillshading(map_ctx, target_ctx, scale, angle, alt){
