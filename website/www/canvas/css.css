@@ -7,15 +7,12 @@ canvas{
   margin: 20px auto 0 auto;
 }
 
-.fuzz {
-  /*visibility: hidden;
-  position: absolute;
-  left: 0;
-  top: 0;*/
-}
-
 #helpers {
   position: absolute;
   left: 0;
   top: 0;
+}
+
+#helpers img {
+  display: block;
 }
