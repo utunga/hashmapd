@@ -2,8 +2,11 @@
  * written by Douglas Bagnall
  */
 
-/* $hm holds global state.
- * Capitalised names are assumed to be constant (unnecessarily in some cases).
+/* $hm holds global state.  Capitalised names are assumed to be
+ * constant (unnecessarily in some cases).
+ *
+ * Undefined properties are of course only included here by way of
+ * documention.
  */
 var $hm = {
     DATA_URL: 'locations-9.json',
@@ -316,12 +319,10 @@ function paste_fuzz(ctx, points, images){
         }
         else{
             /* XXX jump up to next scale */
-            alert(count);
             img = images[$hm.FUZZ_MAX_MULTIPLE];
         }
         ctx.drawImage(img, x - img.width / 2, y - img.height / 2);
     }
-    alert(" " + counts);
 }
 
 function hillshading(map_ctx, target_ctx, scale, angle, alt){
@@ -361,7 +362,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
             var bl = map_pixels[a + stride - 4];
             var br = map_pixels[a + stride + 4];
 
-            /* Slope */
+            /* Slope -- there may be a quicker way of calculating sin/cos */
             var dx = ((tl + 2 * cl + bl) - (tr + 2 * cr + br)) * scale;
             var dy = ((bl + 2 * bc + br) - (tl + 2 * tc + tr)) * scale;
             var slope = Math.PI / 2 - Math.atan(Math.sqrt(dx * dx + dy * dy));
@@ -494,7 +495,6 @@ function hm_on_token_density(data){
 
 function hm_on_labels(data){
     var i;
-    //alert(data.rows);
     var points = decode_and_filter_points(data.rows,
                                           $hm.min_x, $hm.max_x,
                                           $hm.min_y, $hm.max_y);
@@ -517,7 +517,6 @@ function hm_on_labels(data){
             var size = n * n * scale;
             add_label(ctx, text, x, y, size, "#000", "#fff");
         }
-        //alert(points[3].toSource());
     }
     wait_for_flag("landscape_done", add_labels);
 }
