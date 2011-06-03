@@ -7,6 +7,7 @@
  */
 var $hm = {
     DATA_URL: 'locations-15.json',
+    TOKEN_DENSITY_URL: 'token_density-8.json',
     LABELS_URL: 'tokens-7.json',
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 16,    /*padding for the image as a whole. it should exceed FUZZ_RADIUS */
@@ -50,8 +51,13 @@ function hm_draw_map(canvas){
     $.getJSON($hm.DATA_URL, function(data){
                   hm_on_data(canvas, data);
               });
+    /*
     $.getJSON($hm.LABELS_URL, function(data){
                   hm_on_labels(canvas, data);
+              });}
+     */
+    $.getJSON($hm.TOKEN_DENSITY_URL, function(data){
+                  hm_on_token_density(canvas, data);
               });
 }
 
@@ -194,10 +200,18 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
     if ($hm.USING_QUAD_TREE){
         for (i = 0; i < raw.length; i++){
             var r = raw[i];
+            r.special_keys = [];
             var coords = r.key;
             var x = 0;
             var y = 0;
-            for (j = 0; j < coords.length; j++){
+            /*filter out any that aren't numbers and put them in a special place */
+            j = 0;
+            while (! (typeof(coords[j]) == 'number')){
+                //alert(j + " " + coords[j]);
+                r.special_keys.push(coords[j]);
+                j++;
+            }
+            for (; j < coords.length; j++){
                 var p = coords[j];
                 x = (x << 1) | (p & 1);
                 y = (y << 1) | (p >> 1);
@@ -205,9 +219,10 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
             /* if these coordinates are less than fully accurate,
              * expand with zeros.
              */
-            x <<= ($hm.QUAD_TREE_COORDS - coords.length);
-            y <<= ($hm.QUAD_TREE_COORDS - coords.length);
-            points.push([x, y, r.value]);
+            var n_coords = coords.length - r.special_keys.length;
+            x <<= ($hm.QUAD_TREE_COORDS - n_coords);
+            y <<= ($hm.QUAD_TREE_COORDS - n_coords);
+            points.push([x, y, r.value, r.special_keys]);
         }
     }
     else {
@@ -429,6 +444,35 @@ function wait_for_flag(flag, func){
     else {
         window.setTimeout(wait_for_flag, 100, flag, func);
     }
+}
+
+
+function hm_on_token_density(canvas, data){
+    var i;
+    var points = decode_and_filter_points(data.rows,
+                                          $hm.min_x, $hm.max_x,
+                                          $hm.min_y, $hm.max_y);
+
+    var max_freq = 0;
+    for (var i = 0; i < points.length; i++){
+        var freq = points[i][2];
+        max_freq = Math.max(freq, max_freq);
+    }
+    var scale = 14 / (max_freq * max_freq);
+    var ctx = canvas.getContext("2d");
+
+    function add_labels(){
+        for (var i = 0; i < points.length; i++){
+            var p = points[i];
+            var x = $hm.PADDING + (p[0] - $hm.min_x) * $hm.x_scale;
+            var y = $hm.PADDING + (p[1] - $hm.min_y) * $hm.y_scale;
+            var text = p[3];
+            var n = p[2];
+            var size = n * n * scale;
+            add_label(ctx, text, x, y, size, "#000", "#fff");
+        }
+    }
+    wait_for_flag("landscape_done", add_labels);
 }
 
 
