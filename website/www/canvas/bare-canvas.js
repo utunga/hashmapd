@@ -105,22 +105,24 @@ function fullsize_canvas(){
  * The fuzz is approximately gaussian and carried in the images alpha
  * channel.
  *
- * Their size, distribution, and number are controlled by attributes
- * of the $hm object that start with FUZZ_ look up there for
- * documentation.
+ * Look at the attributes of the $hm object that start with FUZZ_ for
+ * documentation and useful values.
  *
  * The formula used is Math.exp(k * d) + <floor>
+ *
+ * @param densities make fuzz images with desin=ties from 1 to <densities>
+ * @param radius    size of guassian table. no image will exceed this.
+ * @param k         negative inverse variance. closer to 0 is flatter.
+ * @param offset    lifts floor in truncating (0.5 rounds, more to lengthen tails)
+ * @param intensity level of fuzz at the center of density 1.
  *
  * @return an object referencing images that *will* contain fuzz when it it is ready.
  */
 
-function make_fuzz(){
+function make_fuzz(densities, radius, k, offset, intensity){
     var x, y;
-    var offset = $hm.FUZZ_OFFSET;
-    var k = $hm.FUZZ_CONSTANT;
     /* work out a table 0-1 fuzz values */
     var table = [];
-    var radius = $hm.FUZZ_MAX_RADIUS;
     /* middle pixel + radius on either side */
     var tsize = 2 * radius + 1;
     for (y = 0; y < tsize; y++){
@@ -135,8 +137,8 @@ function make_fuzz(){
     var centre_row = table[radius];
     var images = {unloaded: 0};
 
-    for (var i = 1; i <= $hm.FUZZ_MAX_MULTIPLE; i++){
-        var peak = $hm.FUZZ_PER_POINT * i;
+    for (var i = 1; i <= densities; i++){
+        var peak = intensity * i;
         /* find how wide it needs to be. We want to clip <clip> off
          * each side of the table.*/
         for (var clip = 0; clip < radius; clip++){
@@ -302,7 +304,13 @@ function hm_on_data(data){
     $hm.mapping_done = true;
     var canvas = $hm.canvas;
     var ctx = canvas.getContext("2d");
-    var fuzz = make_fuzz($hm.FUZZ_RADIUS);
+    $hm.timer.pre_fuzz = Date.now();
+    var fuzz = make_fuzz($hm.FUZZ_MAX_MULTIPLE,
+                         $hm.FUZZ_MAX_RADIUS,
+                         $hm.FUZZ_CONSTANT,
+                         $hm.FUZZ_OFFSET,
+                         $hm.FUZZ_PER_POINT);
+    $hm.timer.post_fuzz = Date.now();
     var fuzz_canvas = fullsize_canvas();
     var fuzz_ctx = fuzz_canvas.getContext("2d");
     fuzz.onload = function(){ /* fuzz is async */
