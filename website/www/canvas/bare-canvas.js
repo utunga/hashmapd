@@ -18,7 +18,10 @@ var $hm = {
     mapping_done: false, /*set to true when range, origin and scale are decided */
     landscape_done: false, /*set to true when finished drawing landscape */
     canvas: undefined,  /* a reference to the main canvas gets put here */
-    /* convert data coordinates to canvas coordinates */
+    width: 512,   /* canvas *unpadded* pixel width */
+    height: 512,  /* canvas *unpadded* pixel height */
+
+    /* convert data coordinates to canvas coordinates. */
     range_x: undefined,
     range_y: undefined,
     x_scale: undefined,
@@ -35,31 +38,48 @@ var $hm = {
 
 /** hm_draw_map is the main entrance point.
  *
- * Nothing happens until the json is loaded, then the hm_on_data
- * function is called with the canvas reference and JSON
- * data. hm_on_data is differently defined for processing and bare
- * canvas implementations..
- *
- * @param canvas is the html5 canvas element to draw on
+ * Nothing much happens until the json is loaded.
  */
 
-function hm_draw_map(canvas){
-    $hm.canvas = canvas;
-    $hm.width = canvas.width - 2 * $hm.PADDING;
-    $hm.height = canvas.height - 2 * $hm.PADDING;
-
+function hm_draw_map(){
+    //$.ready(make_canvas);
+    make_canvas();
     $.getJSON($hm.DATA_URL, function(data){
-                  hm_on_data(canvas, data);
+                  hm_on_data(data);
               });
     /*
     $.getJSON($hm.LABELS_URL, function(data){
-                  hm_on_labels(canvas, data);
+                  hm_on_labels(data);
               });}
      */
     $.getJSON($hm.TOKEN_DENSITY_URL, function(data){
-                  hm_on_token_density(canvas, data);
+                  hm_on_token_density(data);
               });
 }
+
+
+function make_canvas(){
+    $hm.canvas = fullsize_canvas();
+    //document.getElementById("content").appendChild($hm.canvas);
+}
+
+function new_canvas(width, height, id){
+    var canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    if (id){
+        canvas.id = id;
+    }
+    return canvas;
+}
+
+function fullsize_canvas(){
+    var canvas = new_canvas($hm.width + 2 * $hm.PADDING,
+                            $hm.height + 2 * $hm.PADDING);
+    document.getElementById("content").appendChild(canvas);
+    return canvas;
+}
+
 
 function find_nice_shape_constant(k, peak, radius, offset, concentration){
     if (k >= 0){/*fools, including myself*/
@@ -96,15 +116,6 @@ function find_nice_shape_constant(k, peak, radius, offset, concentration){
     return k;
 }
 
-function new_canvas(width, height, id){
-    var canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    if (id){
-        canvas.id = id;
-    }
-    return canvas;
-}
 
 /*XXX ignoring cases where CSS pixels are not device pixels */
 
@@ -207,7 +218,6 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
             /*filter out any that aren't numbers and put them in a special place */
             j = 0;
             while (! (typeof(coords[j]) == 'number')){
-                //alert(j + " " + coords[j]);
                 r.special_keys.push(coords[j]);
                 j++;
             }
@@ -261,7 +271,7 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
  * @param data is parsed but otherwise unprocessed JSON data.
  */
 
-function hm_on_data(canvas, data){
+function hm_on_data(data){
     var i;
     var width = $hm.width;
     var height = $hm.width;
@@ -290,10 +300,10 @@ function hm_on_data(canvas, data){
     $hm.max_x = max_x;
     $hm.max_y = max_y;
     $hm.mapping_done = true;
+    var canvas = $hm.canvas;
     var ctx = canvas.getContext("2d");
     var fuzz = make_fuzz($hm.FUZZ_RADIUS);
-    var fuzz_canvas = new_canvas(canvas.width, canvas.height);
-    $(fuzz_canvas).insertAfter(canvas);
+    var fuzz_canvas = fullsize_canvas();
     var fuzz_ctx = fuzz_canvas.getContext("2d");
     fuzz.onload = function(){ /* fuzz is async */
         paste_fuzz(fuzz_ctx, points, fuzz);
@@ -447,7 +457,7 @@ function wait_for_flag(flag, func){
 }
 
 
-function hm_on_token_density(canvas, data){
+function hm_on_token_density(data){
     var i;
     var points = decode_and_filter_points(data.rows,
                                           $hm.min_x, $hm.max_x,
@@ -459,7 +469,7 @@ function hm_on_token_density(canvas, data){
         max_freq = Math.max(freq, max_freq);
     }
     var scale = 14 / (max_freq * max_freq);
-    var ctx = canvas.getContext("2d");
+    var ctx = $hm.canvas.getContext("2d");
 
     function add_labels(){
         for (var i = 0; i < points.length; i++){
@@ -479,7 +489,7 @@ function hm_on_token_density(canvas, data){
 
 /*don't do too much until the drawing is done.*/
 
-function hm_on_labels(canvas, data){
+function hm_on_labels(data){
     var i;
     //alert(data.rows);
     var points = decode_and_filter_points(data.rows,
@@ -492,7 +502,7 @@ function hm_on_labels(canvas, data){
         max_freq = Math.max(freq, max_freq);
     }
     var scale = 14 / (max_freq * max_freq);
-    var ctx = canvas.getContext("2d");
+    var ctx = $hm.canvas.getContext("2d");
 
     function add_labels(){
         for (var i = 0; i < points.length; i++){
