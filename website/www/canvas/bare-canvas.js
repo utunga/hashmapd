@@ -165,7 +165,27 @@ function make_fuzz(radius, peak, concentration, floor){
     return img;
 }
 
-
+/** decode_and_filter_points turns JSON rows into point arrays.
+ *
+ * If you supply <xmin>, <xmax>, <ymin>, or <ymax>, points outside
+ * those bounds are excluded.  If any of those are undefined, there is
+ * no bound in that direction.
+ *
+ * If quad tree coordinates are being used, they are converted to X, Y
+ * coordinates.  The final result is an array of arrays, structured thus:
+ *
+ *  [ [x_coord, y_coord, value], [x_coord, y_coord, value], ...]
+ *
+ * The value is untouched.
+ *
+ * @param raw  the json data (as parsed by JSON or jsquery objects)
+ * @param xmin an exclusive boundary value
+ * @param xmax an exclusive boundary value
+ * @param ymin an exclusive boundary value
+ * @param ymax an exclusive boundary value
+ *
+ * @return an array of points.
+ */
 
 
 function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
