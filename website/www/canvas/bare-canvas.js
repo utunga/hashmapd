@@ -406,7 +406,9 @@ function make_colour_range_mountains(scale){
     var checkpoints = [
       /* r, g, b are out of 100 */
       /*   r    g    b  height  */
-        [ 95,  90,  20,   0],
+        [ 80,  90,  90,   0],
+        [ 70,  90,  90,   1],
+        [ 95,  90,  20,   2],
         [ 60, 105,  10,  10],
         [ 40,  60,  10,  60],
         [ 45,  40,   0, 100],
