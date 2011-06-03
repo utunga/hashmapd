@@ -24,8 +24,8 @@ var $hm = {
     mapping_done: false, /*set to true when range, origin and scale are decided */
     landscape_done: false, /*set to true when finished drawing landscape */
     canvas: undefined,  /* a reference to the main canvas gets put here */
-    width: 512,   /* canvas *unpadded* pixel width */
-    height: 512,  /* canvas *unpadded* pixel height */
+    width: 800,   /* canvas *unpadded* pixel width */
+    height: 600,  /* canvas *unpadded* pixel height */
 
     /* convert data coordinates to canvas coordinates. */
     range_x: undefined,
@@ -67,9 +67,11 @@ function hm_draw_map(){
 
 function make_canvas(){
     $hm.canvas = fullsize_canvas();
-    //document.getElementById("content").appendChild($hm.canvas);
 }
 
+/** new_canvas makes a canvas of the requested size.
+ *
+ */
 function new_canvas(width, height, id){
     var canvas = document.createElement("canvas");
     canvas.width = width;
@@ -80,6 +82,10 @@ function new_canvas(width, height, id){
     return canvas;
 }
 
+/** fullsize_canvas helpfully makes a canvas as big as the main map
+ *
+ * In development it pastes the canvas onto the webpage/
+ */
 function fullsize_canvas(){
     var canvas = new_canvas($hm.width + 2 * $hm.PADDING,
                             $hm.height + 2 * $hm.PADDING);
@@ -347,7 +353,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var sin_alt = Math.sin(alt);
     var cos_alt = Math.cos(alt);
     var perpendicular = angle - Math.PI / 2;
-    var stride = height * 4;
+    var stride = width * 4;
     var colours = make_colour_range_mountains(115);
     var row = stride; /*start on row 1, not row 0 */
     for (var y = 1, yend = height - 1; y < yend; y++){
