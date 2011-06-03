@@ -6,7 +6,7 @@
  * Capitalised names are assumed to be constant (unnecessarily in some cases).
  */
 var $hm = {
-    DATA_URL: 'locations-15.json',
+    DATA_URL: 'locations-9.json',
     TOKEN_DENSITY_URL: 'token_density-8.json',
     LABELS_URL: 'tokens-7.json',
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
