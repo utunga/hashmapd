@@ -59,15 +59,16 @@ function hm_draw_map(){
     $.getJSON($hm.DATA_URL, function(data){
                   hm_on_data(data);
               });
-    /*
-    $.getJSON($hm.LABELS_URL, function(data){
-                  hm_on_labels(data);
-              });}
-     */
+
     $.getJSON($hm.TOKEN_DENSITY_URL, function(data){
                   hm_on_token_density(data);
               });
 
+    if (get_query()["labels"]){
+        $.getJSON($hm.LABELS_URL, function(data){
+                      hm_on_labels(data);
+                  });
+    }
     $hm.map_known.then(paint_map);
     $hm.have_labels.then(paint_labels);
     $hm.have_density.then(paint_density_map);
@@ -622,4 +623,18 @@ function hm_timer_results(){
     s += "</table>";
     //alert(s);
     $("#debug").append(s);
+}
+
+function get_query(){
+    var query = window.location.search.substring(1);
+    if (! query) return {};
+    var args = {};
+    var re = /([^&=]+)=?([^&]*)/g;
+    while (true){
+        var match = re.exec(query);
+        if (match === null){
+            return args;
+        }
+        args[decodeURIComponent(match[1])] = decodeURIComponent(match[2].replace(/\+/g, " "));
+    }
 }
