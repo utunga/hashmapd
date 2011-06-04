@@ -21,8 +21,8 @@ var $hm = {
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
     USING_QUAD_TREE: true,
     QUAD_TREE_COORDS: 15,
-    mapping_done: false, /*set to true when range, origin and scale are decided */
-    landscape_done: false, /*set to true when finished drawing landscape */
+    map_known: undefined, /*will be a deferred that fires when map scale is known */
+    map_drawn: undefined, /*will be a deferredthat fires when the landscape is drawn */
     canvas: undefined,  /* a reference to the main canvas gets put here */
     width: 800,   /* canvas *unpadded* pixel width */
     height: 600,  /* canvas *unpadded* pixel height */
@@ -50,6 +50,12 @@ var $hm = {
 function hm_draw_map(){
     $hm.timer = {start: Date.now()};
     $hm.canvas = fullsize_canvas();
+    $hm.map_known = $.Deferred();
+    $hm.map_drawn = $.Deferred();
+    $hm.have_labels = $.Deferred();
+    $hm.have_density = $.Deferred();
+    start_fuzz_creation();
+
     $.getJSON($hm.DATA_URL, function(data){
                   hm_on_data(data);
               });
@@ -62,17 +68,18 @@ function hm_draw_map(){
                   hm_on_token_density(data);
               });
 
-    start_fuzz_creation();
+    $hm.map_known.then(paint_map);
+    $hm.have_labels.then(paint_labels);
+    $hm.have_density.then(paint_density_map);
 }
 
 /* Start creating fuzz images.  This might take a while and is
- * asynchronous.
+ * partially asynchronous.
  *
  *  (It takes 8-40 ms on an i5-540, at time of writing, which beats
  *  JSON loading from local/cached sources.)
  *
  */
-
 function start_fuzz_creation(){
     $hm.timer.pre_fuzz = Date.now();
     var fuzz = make_fuzz($hm.FUZZ_MAX_MULTIPLE,
@@ -82,6 +89,22 @@ function start_fuzz_creation(){
                          $hm.FUZZ_PER_POINT);
     $hm.timer.post_fuzz = Date.now();
     $hm.hill_fuzz = fuzz;
+}
+
+function paint_map(){
+    $hm.hill_fuzz.ready.then(_paint_map);
+}
+
+function paint_labels(){
+    $hm.map_drawn.then(_paint_labels);
+}
+
+function paint_density_map(){
+    $hm.map_drawn.then(
+        function(){
+            $hm.hill_fuzz.ready.then(_paint_density_map);
+        }
+    );
 }
 
 
@@ -317,7 +340,7 @@ function hm_on_data(data){
         min_x = Math.min(r[0], min_x);
         min_y = Math.min(r[1], min_y);
     }
-
+    $hm.tweeters = points;
     $hm.range_x = max_x - min_x;
     $hm.range_y = max_y - min_y;
     $hm.x_scale = width / $hm.range_x;
@@ -326,25 +349,25 @@ function hm_on_data(data){
     $hm.min_y = min_y;
     $hm.max_x = max_x;
     $hm.max_y = max_y;
-    $hm.mapping_done = true;
-    var canvas = $hm.canvas;
-    var ctx = canvas.getContext("2d");
-
-
-    var fuzz_canvas = fullsize_canvas();
-    var fuzz_ctx = fuzz_canvas.getContext("2d");
-    $hm.hill_fuzz.ready.then(function(){ /* fuzz is async */
-        $hm.timer.fuzz_ready = Date.now();
-        paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
-        $hm.timer.fuzz_pasted = Date.now();
-        hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
-        $hm.timer.hillshaded = Date.now();
-        $hm.landscape_done = true;
-        }
-    );
+    $hm.map_known.resolve();
 }
 
+/** _paint_map() depends on  $hm.hill_fuzz.ready and $hm.map_known
+ */
 
+function _paint_map(){
+    var points = $hm.tweeters;
+    var canvas = $hm.canvas;
+    var ctx = canvas.getContext("2d");
+    var fuzz_canvas = fullsize_canvas();
+    var fuzz_ctx = fuzz_canvas.getContext("2d");
+    $hm.timer.fuzz_ready = Date.now();
+    paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
+    $hm.timer.fuzz_pasted = Date.now();
+    hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
+    $hm.timer.hillshaded = Date.now();
+    $hm.map_drawn.resolve();
+}
 
 function paste_fuzz(ctx, points, images){
     var counts = [];
@@ -520,10 +543,13 @@ function hm_on_token_density(data){
     $hm.hill_fuzz.ready.then(
         function(){
             paste_fuzz(token_ctx, points, $hm.hill_fuzz);
+            hm_timer_results();
         }
     );
+    $hm.have_density.resolve();
+}
 
-    //wait_for_flag("landscape_done", add_labels);
+function _paint_density_map(){
 }
 
 
@@ -531,31 +557,37 @@ function hm_on_token_density(data){
 /*don't do too much until the drawing is done.*/
 
 function hm_on_labels(data){
-    var i;
     var points = decode_and_filter_points(data.rows,
                                           $hm.min_x, $hm.max_x,
                                           $hm.min_y, $hm.max_y);
-    var labels = [];
     var max_freq = 0;
     for (var i = 0; i < points.length; i++){
         var freq = points[i][2][0][1];
         max_freq = Math.max(freq, max_freq);
     }
     var scale = 14 / (max_freq * max_freq);
-    var ctx = $hm.canvas.getContext("2d");
 
-    function add_labels(){
-        for (var i = 0; i < points.length; i++){
-            var p = points[i];
-            var x = $hm.PADDING + (p[0] - $hm.min_x) * $hm.x_scale;
-            var y = $hm.PADDING + (p[1] - $hm.min_y) * $hm.y_scale;
-            var text = p[2][0][0];
-            var n = p[2][0][1];
-            var size = n * n * scale;
-            add_label(ctx, text, x, y, size, "#000", "#fff");
-        }
+    $hm.labels = {
+        points: points,
+        max_freq: max_freq,
+        scale: scale
+    };
+    $hm.have_labels.resolve();
+}
+
+function _paint_labels(){
+    var points = $hm.labels.points;
+    var scale = $hm.labels.scale;
+    var ctx = $hm.canvas.getContext("2d");
+    for (var i = 0; i < points.length; i++){
+        var p = points[i];
+        var x = $hm.PADDING + (p[0] - $hm.min_x) * $hm.x_scale;
+        var y = $hm.PADDING + (p[1] - $hm.min_y) * $hm.y_scale;
+        var text = p[2][0][0];
+        var n = p[2][0][1];
+        var size = n * n * scale;
+        add_label(ctx, text, x, y, size, "#000", "#fff");
     }
-    wait_for_flag("landscape_done", add_labels);
 }
 
 function add_label(ctx, text, x, y, size, colour, shadow){
