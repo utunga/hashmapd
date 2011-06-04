@@ -48,9 +48,8 @@ var $hm = {
  */
 
 function hm_draw_map(){
-    //$.ready(make_canvas);
     $hm.timer = {start: Date.now()};
-    make_canvas();
+    $hm.canvas = fullsize_canvas();
     $.getJSON($hm.DATA_URL, function(data){
                   hm_on_data(data);
               });
@@ -62,12 +61,29 @@ function hm_draw_map(){
     $.getJSON($hm.TOKEN_DENSITY_URL, function(data){
                   hm_on_token_density(data);
               });
+
+    start_fuzz_creation();
 }
 
+/* Start creating fuzz images.  This might take a while and is
+ * asynchronous.
+ *
+ *  (It takes 8-40 ms on an i5-540, at time of writing, which beats
+ *  JSON loading from local/cached sources.)
+ *
+ */
 
-function make_canvas(){
-    $hm.canvas = fullsize_canvas();
+function start_fuzz_creation(){
+    $hm.timer.pre_fuzz = Date.now();
+    var fuzz = make_fuzz($hm.FUZZ_MAX_MULTIPLE,
+                         $hm.FUZZ_MAX_RADIUS,
+                         $hm.FUZZ_CONSTANT,
+                         $hm.FUZZ_OFFSET,
+                         $hm.FUZZ_PER_POINT);
+    $hm.timer.post_fuzz = Date.now();
+    $hm.hill_fuzz = fuzz;
 }
+
 
 /** new_canvas makes a canvas of the requested size.
  *
@@ -98,9 +114,18 @@ function fullsize_canvas(){
 
 /** Make_fuzz makes little fuzzy circle images for point convolution
  *
- * The images is not necessarily ready when the function returns: you
- * need to use their .onload() handlers or poll their .complete
- * attributes.
+ * The returned object contains references to html imgs index by
+ * numbers from 1 to <densities>, which contain fuzz corresponding to
+ * that number of points.  The images vary in size, being clipped at
+ * the edge of the representable curve -- higher densities spread
+ * slightly further.
+ *
+ * The images are not necessarily ready when the function returns.
+ * You can use any individually via its .onload() handler or after
+ * checking its .complete attribute, but the simplest thing is to use
+ * the returned object's .ready jquery deferred attribute.  Like so:
+ *
+ * make_fuzz(...).ready.then(whatever);
  *
  * The fuzz is approximately gaussian and carried in the images alpha
  * channel.
@@ -135,7 +160,9 @@ function make_fuzz(densities, radius, k, offset, intensity){
         }
     }
     var centre_row = table[radius];
-    var images = {unloaded: 0};
+    var images = {loaded: 0,
+                  ready: $.Deferred()
+                 };
 
     for (var i = 1; i <= densities; i++){
         var peak = intensity * i;
@@ -169,12 +196,10 @@ function make_fuzz(densities, radius, k, offset, intensity){
         img.id = "fuzz-" + i + "-radius-" + (size - 1) / 2;
         images[i] = img;
         /*hacky way to forward onload */
-        images.unloaded++;
         img.onload = function(){
-            images.unloaded--;
-            if(images.unloaded == 0 &&
-              images.onload){
-                images.onload();
+            images.loaded++;
+            if(images.loaded == densities){
+                images.ready.resolve();
             }
         };
         img.src = canvas.toDataURL();
@@ -304,24 +329,21 @@ function hm_on_data(data){
     $hm.mapping_done = true;
     var canvas = $hm.canvas;
     var ctx = canvas.getContext("2d");
-    $hm.timer.pre_fuzz = Date.now();
-    var fuzz = make_fuzz($hm.FUZZ_MAX_MULTIPLE,
-                         $hm.FUZZ_MAX_RADIUS,
-                         $hm.FUZZ_CONSTANT,
-                         $hm.FUZZ_OFFSET,
-                         $hm.FUZZ_PER_POINT);
-    $hm.timer.post_fuzz = Date.now();
+
+
     var fuzz_canvas = fullsize_canvas();
     var fuzz_ctx = fuzz_canvas.getContext("2d");
-    fuzz.onload = function(){ /* fuzz is async */
+    $hm.hill_fuzz.ready.then(function(){ /* fuzz is async */
         $hm.timer.fuzz_ready = Date.now();
-        paste_fuzz(fuzz_ctx, points, fuzz);
+        paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
         $hm.timer.fuzz_pasted = Date.now();
         hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
         $hm.timer.hillshaded = Date.now();
         $hm.landscape_done = true;
-    };
+        }
+    );
 }
+
 
 
 function paste_fuzz(ctx, points, images){
@@ -487,29 +509,21 @@ function hm_on_token_density(data){
                                           $hm.min_x, $hm.max_x,
                                           $hm.min_y, $hm.max_y);
 
+    var token_canvas = fullsize_canvas();
+    var token_ctx = token_canvas.getContext("2d");
+
     var max_freq = 0;
     for (var i = 0; i < points.length; i++){
         var freq = points[i][2];
         max_freq = Math.max(freq, max_freq);
     }
-    var scale = 14 / (max_freq * max_freq);
-    var ctx = $hm.canvas.getContext("2d");
-
-    function add_labels(){
-        $hm.timer.adding_labels = Date.now();
-        for (var i = 0; i < points.length; i++){
-            var p = points[i];
-            var x = $hm.PADDING + (p[0] - $hm.min_x) * $hm.x_scale;
-            var y = $hm.PADDING + (p[1] - $hm.min_y) * $hm.y_scale;
-            var text = p[3];
-            var n = p[2];
-            var size = n * n * scale;
-            add_label(ctx, text, x, y, size, "#000", "#fff");
+    $hm.hill_fuzz.ready.then(
+        function(){
+            paste_fuzz(token_ctx, points, $hm.hill_fuzz);
         }
-        $hm.timer.label_done = Date.now();
-        hm_timer_results();
-    }
-    wait_for_flag("landscape_done", add_labels);
+    );
+
+    //wait_for_flag("landscape_done", add_labels);
 }
 
 
