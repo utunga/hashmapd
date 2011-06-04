@@ -9,6 +9,7 @@
  * documention.
  */
 var $hm = {
+    SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     DATA_URL: 'locations-9.json',
     TOKEN_DENSITY_URL: 'token_density-8.json',
     LABELS_URL: 'tokens-7.json',
@@ -325,7 +326,7 @@ function hm_on_data(data){
     $hm.timer.on_data = Date.now();
     var i;
     var width = $hm.width;
-    var height = $hm.width;
+    var height = $hm.height;
     var max_value = 0;
     var max_x = -1e999;
     var max_y = -1e999;
@@ -344,8 +345,17 @@ function hm_on_data(data){
     $hm.tweeters = points;
     $hm.range_x = max_x - min_x;
     $hm.range_y = max_y - min_y;
-    $hm.x_scale = width / $hm.range_x;
-    $hm.y_scale = height / $hm.range_y;
+    var x_scale = width / $hm.range_x;
+    var y_scale = height / $hm.range_y;
+    if ($hm.SQUISH_INTO_SHAPE){
+        $hm.x_scale = x_scale;
+        $hm.y_scale = y_scale;
+    }
+    else{
+        $hm.x_scale = Math.min(x_scale, y_scale);
+        $hm.y_scale = Math.min(x_scale, y_scale);
+        /*XXX range_x, range_y too?*/
+    }
     $hm.min_x = min_x;
     $hm.min_y = min_y;
     $hm.max_x = max_x;
