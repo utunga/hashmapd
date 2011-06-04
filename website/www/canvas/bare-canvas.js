@@ -50,6 +50,12 @@ var $hm = {
 
 function hm_draw_map(){
     $hm.timer = {start: Date.now()};
+    var query = get_query();
+    if (query.width && parseInt(query.width))
+        $hm.width = parseInt(query.width);
+    if (query.height && parseInt(query.height))
+        $hm.height = parseInt(query.height);
+
     $hm.canvas = fullsize_canvas();
     $hm.map_known = $.Deferred();
     $hm.map_drawn = $.Deferred();
@@ -64,8 +70,7 @@ function hm_draw_map(){
     $.getJSON($hm.TOKEN_DENSITY_URL, function(data){
                   hm_on_token_density(data);
               });
-
-    if (get_query()["labels"]){
+    if (query.labels !== undefined){
         $.getJSON($hm.LABELS_URL, function(data){
                       hm_on_labels(data);
                   });
