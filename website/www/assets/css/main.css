@@ -67,14 +67,8 @@ body
 	margin-bottom: 20px;
 }
 
-#main p#download_pdf_link {
-	margin-left: 70px;
-}
-
 #main p#download_pdf_link a {
 	vertical-align:text-top;
-	position:relative;
-	top:20px;
 }
 
 #sidebar P
