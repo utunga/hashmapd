@@ -18,6 +18,7 @@ var $hm = {
     FUZZ_CONSTANT: -0.02, /*concentration of peaks, negative inverse variance */
     ARRAY_FUZZ_CONSTANT: -0.02, /*concetration for array fuzz */
     ARRAY_FUZZ_RADIUS: 16, /*array fuzz goes this far */
+    ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
     FUZZ_OFFSET: 0.5, /* lift floor by this much (0.5 rounds, more to lengthen tails) */
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 16, /*fuzz never reaches beyond this far */

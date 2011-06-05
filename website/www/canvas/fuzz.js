@@ -114,21 +114,30 @@ function paste_fuzz_array(ctx, points, images){
     var img_height = ctx.canvas.height;
     var array_width = img_width + lut.length;
     var array_height = img_height + lut.length;
-    var x, y;
+    var x, y, i;
     var map1 = [];
     var map2 = [];
-    for (y = 0 ; y < array_height; y++){
-        map1[y] = [];
-        map2[y] = [];
-        for (x = 0; x < array_width; x++){
-            map1[y][x] = 0;
-            map2[y][x] = 0;
+    if ($hm.ARRAY_FUZZ_TYPED_ARRAY){
+        for (y = 0 ; y < array_height; y++){
+            map1[y] = new Float32Array(array_width);
+            map2[y] = new Float32Array(array_width);
         }
     }
+    else {
+        for (y = 0 ; y < array_height; y++){
+            map1[y] = [];
+            map2[y] = [];
+            for (x = 0; x < array_width; x++){
+                map1[y][x] = 0;
+                map2[y][x] = 0;
+            }
+        }
+    }
+
     /* first pass: vertical spread from each point */
     var offset = radius + $hm.PADDING;
     var counts = [];
-    for (var i = 0; i < points.length; i++){
+    for (i = 0; i < points.length; i++){
         var p = points[i];
         var px = parseInt(offset + (p[0] - $hm.min_x) * $hm.x_scale);
         var py = parseInt(offset + (p[1] - $hm.min_y) * $hm.y_scale);
@@ -141,15 +150,17 @@ function paste_fuzz_array(ctx, points, images){
     var count = 0;
     if(1){
         for (y = 0; y < array_height; y++){
+            var row1 = map1[y];
+            var row2 = map2[y];
 	    for (x = 0; x < array_width; x++){
-                var v = map1[y][x];
+                var v = row1[x];
                 if (v < 0.01){
                     continue;
                 }
                 count ++;
                 var ox = x - radius;
-                for (var i = 0; i < len; i++){
-                    map2[y][ox + i] += v * lut[i];
+                for (i = 0; i < len; i++){
+                    row2[ox + i] += v * lut[i];
                 }
             }
         }
@@ -166,7 +177,7 @@ function paste_fuzz_array(ctx, points, images){
             }
         }
      }
-    //alert(count);
+    log(count, "expansions");
     /*find a good scale */
     var max_value = 0;
     for (y = 0; y < array_height; y++){
