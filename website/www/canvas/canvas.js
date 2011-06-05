@@ -49,7 +49,7 @@ var $hm = {
  */
 
 function hm_draw_map(){
-    $hm.timer = {start: Date.now()};
+    $hm.timer = get_timer();
     var query = get_query();
     if (query.width && parseInt(query.width))
         $hm.width = parseInt(query.width);
@@ -89,14 +89,14 @@ function hm_draw_map(){
  *
  */
 function start_fuzz_creation(){
-    $hm.timer.pre_fuzz = Date.now();
-    var fuzz = make_fuzz($hm.FUZZ_MAX_MULTIPLE,
-                         $hm.FUZZ_MAX_RADIUS,
-                         $hm.FUZZ_CONSTANT,
-                         $hm.FUZZ_OFFSET,
-                         $hm.FUZZ_PER_POINT);
-    $hm.timer.post_fuzz = Date.now();
-    $hm.hill_fuzz = fuzz;
+    $hm.timer.checkpoint("start make_fuzz");
+    $hm.hill_fuzz = make_fuzz(
+        $hm.FUZZ_MAX_MULTIPLE,
+        $hm.FUZZ_MAX_RADIUS,
+        $hm.FUZZ_CONSTANT,
+        $hm.FUZZ_OFFSET,
+        $hm.FUZZ_PER_POINT);
+    $hm.timer.checkpoint("end make_fuzz");
 }
 
 function paint_map(){
@@ -111,6 +111,7 @@ function paint_density_map(){
     $hm.map_drawn.then(
         function(){
             $hm.hill_fuzz.ready.then(_paint_density_map);
+            $hm.hill_fuzz.ready.then($hm.timer.results);
         }
     );
 }
@@ -230,7 +231,7 @@ function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
  */
 
 function hm_on_data(data){
-    $hm.timer.on_data = Date.now();
+    $hm.timer.checkpoint("got map data");
     var i;
     var width = $hm.width;
     var height = $hm.height;
@@ -279,16 +280,17 @@ function _paint_map(){
     var ctx = canvas.getContext("2d");
     var fuzz_canvas = fullsize_canvas();
     var fuzz_ctx = fuzz_canvas.getContext("2d");
-    $hm.timer.fuzz_ready = Date.now();
+    $hm.timer.checkpoint("start paste_fuzz");
     if ($hm.array_fuzz){
         paste_fuzz_array(fuzz_ctx, points, $hm.hill_fuzz);
     }
     else{
         paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
     }
-    $hm.timer.fuzz_pasted = Date.now();
+    $hm.timer.checkpoint("end paste_fuzz");
+    $hm.timer.checkpoint("start hillshading");
     hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
-    $hm.timer.hillshaded = Date.now();
+    $hm.timer.checkpoint("end hillshading");
     $hm.map_drawn.resolve();
 }
 
@@ -466,7 +468,6 @@ function hm_on_token_density(data){
     $hm.hill_fuzz.ready.then(
         function(){
             paste_fuzz(token_ctx, points, $hm.hill_fuzz);
-            hm_timer_results();
         }
     );
     $hm.have_density.resolve();
@@ -526,26 +527,6 @@ function add_label(ctx, text, x, y, size, colour, shadow){
     ctx.fillText(text, x, y);
 }
 
-
-function hm_timer_results(){
-    var k, v, ordered = [];
-    for (k in $hm.timer){
-        v = $hm.timer[k];
-        ordered.push([v, k]);
-    }
-    ordered.sort();
-    var s = "<table><tr><td><td>time<td>delta";
-    var t2 = 0;
-    for (var i = 0; i < ordered.length; i++){
-        var t = ordered[i][0] - ordered[0][0];
-        var d = t - t2;
-        t2 = t;
-        s += "<tr><td>" + ordered[i][1] + "<td>" + t + "<td>" + d + "\n";
-    }
-    s += "</table>";
-    //alert(s);
-    $("#debug").append(s);
-}
 
 function get_query(){
     var query = window.location.search.substring(1);

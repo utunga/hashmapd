@@ -1,5 +1,6 @@
-
-/*XXX ignoring cases where CSS pixels are not device pixels */
+/* Copyright 2011 Hashmapd Ltd  <http://hashmapd.com>
+ * written by Douglas Bagnall
+ */
 
 /** Make_fuzz makes little fuzzy circle images for point convolution
  *
