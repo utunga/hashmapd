@@ -154,11 +154,12 @@ function paste_fuzz_array(ctx, points, radius, k){
     var radius = parseInt(len / 2);
     var img_width = ctx.canvas.width;
     var img_height = ctx.canvas.height;
-    var array_width = img_width + lut.length;
-    var array_height = img_height + lut.length;
+    var array_width = img_width + len;
+    var array_height = img_height + len;
     var x, y, i;
     var map1 = [];
     var map2 = [];
+    var row1, row2;
     if ($hm.ARRAY_FUZZ_TYPED_ARRAY){
         for (y = 0 ; y < array_height; y++){
             map1[y] = new Float32Array(array_width);
@@ -167,11 +168,11 @@ function paste_fuzz_array(ctx, points, radius, k){
     }
     else {
         for (y = 0 ; y < array_height; y++){
-            map1[y] = [];
-            map2[y] = [];
+            map1[y] = row1 = [];
+            map2[y] = row2 = [];
             for (x = 0; x < array_width; x++){
-                map1[y][x] = 0;
-                map2[y][x] = 0;
+                row1[x] = 0;
+                row2[x] = 0;
             }
         }
     }
@@ -191,8 +192,8 @@ function paste_fuzz_array(ctx, points, radius, k){
     /* second pass: horizontal spread from all pixels */
     var count = 0;
     for (y = 0; y < array_height; y++){
-        var row1 = map1[y];
-        var row2 = map2[y];
+        row1 = map1[y];
+        row2 = map2[y];
 	for (x = 0; x < array_width; x++){
             var v = row1[x];
             if (v < 0.01){
@@ -209,7 +210,7 @@ function paste_fuzz_array(ctx, points, radius, k){
     /*find a good scale */
     var max_value = 0;
     for (y = 0; y < array_height; y++){
-        var row2 = map2[y];
+        row2 = map2[y];
 	for (x = 0; x < array_width; x++){
             if(max_value < row2[x]){
                 max_value = row2[x];
@@ -223,7 +224,7 @@ function paste_fuzz_array(ctx, points, radius, k){
     var pixels = imgd.data;
     var row = 0;
     for (y = 0; y < img_height; y++){
-        var row2 = map2[y + radius];
+        row2 = map2[y + radius];
 	for (x = 0; x < img_width; x++){
             var v = Math.pow(1.27, row2[x + radius]) * scale - 1;
             //var v = parseInt(row2[x + radius] * scale);
