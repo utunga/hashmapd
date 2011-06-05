@@ -71,13 +71,13 @@ function paste_fuzz_array(ctx, points, images){
         }
     }
     /*do the map */
-    var scale = 255 / max_value;
+    var scale = 255.99 / Math.pow(1.27, max_value);
     var imgd = ctx.getImageData(0, 0, img_width, img_height);
     var pixels = imgd.data;
     var row = 0;
     for (y = 0; y < img_height; y++){
 	for (x = 0; x < img_width; x++){
-            var v = map2[y + radius][x + radius] * scale;
+            var v = Math.pow(1.27, map2[y + radius][x + radius]) * scale -1;
             if(v > 0){
                 pixels[row + x * 4] = 255;
                 pixels[row + x * 4 + 3] = v;

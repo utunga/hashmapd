@@ -15,7 +15,7 @@ var $hm = {
     LABELS_URL: 'tokens-7.json',
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 16,    /*padding for the image as a whole. */
-    FUZZ_CONSTANT: -0.03, /*concentration of peaks, negative inverse variance */
+    FUZZ_CONSTANT: -0.02, /*concentration of peaks, negative inverse variance */
     FUZZ_OFFSET: 0.5, /* lift floor by this much (0.5 rounds, more to lengthen tails) */
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 16, /*fuzz never reaches beyond this far */
