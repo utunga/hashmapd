@@ -325,6 +325,10 @@ function paste_fuzz(ctx, points, images){
     }
 }
 
+/* Algorithm borrowed from John Barratt <http://www.langarson.com.au/>
+ * as posted on Python Image-SIG in 2007.
+ */
+
 function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var canvas = target_ctx.canvas;
     var width = canvas.width;

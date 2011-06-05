@@ -2,6 +2,43 @@
  * written by Douglas Bagnall
  */
 
+/** make_fuzz_table_1d makes a one dimensional gaussian distribution */
+function make_fuzz_table_1d(radius, k){
+    var x;
+    /* work out a table of 0-1 fuzz values */
+    var table = [];
+    var size = 2 * radius + 1;
+    for (x = 0; x < size; x++){
+        var dx2 = (x - radius) * (x - radius);
+        //log(x, radius, dx2, k);
+        table[x] = Math.exp(dx2 * k);
+    }
+    return table;
+}
+
+/** make_fuzz_table_2d makes a two dimensional gaussian distribution */
+function make_fuzz_table_2d(radius, k){
+    var x, y;
+    /* work out a table of 0-1 fuzz values */
+    var table = [];
+    /* middle pixel + radius on either side */
+    var size = 2 * radius + 1;
+
+    var height;
+    var centre_y;
+    for (y = 0; y < size; y++){
+        table[y] = [];
+        var ty = table[y];
+        var dy2 = (y - radius) * (y - radius);
+        for (x = 0; x < size; x++){
+            var dx2 = (x - radius) * (x - radius);
+            ty[x] = Math.exp((dx2 + dy2) * k);
+        }
+    }
+    return table;
+}
+
+
 /** Make_fuzz makes little fuzzy circle images for point convolution
  *
  * The returned object contains references to html imgs index by
@@ -23,9 +60,9 @@
  * Look at the attributes of the $hm object that start with FUZZ_ for
  * documentation and useful values.
  *
- * The formula used is Math.exp(k * d) + <floor>
+ * The formula used is parseInt(Math.exp(k * d * d) + offset)
  *
- * @param densities make fuzz images with desin=ties from 1 to <densities>
+ * @param densities make fuzz images with densities from 1 to <densities>
  * @param radius    size of guassian table. no image will exceed this.
  * @param k         negative inverse variance. closer to 0 is flatter.
  * @param offset    lifts floor in truncating (0.5 rounds, more to lengthen tails)
@@ -36,19 +73,10 @@
 
 function make_fuzz(densities, radius, k, offset, intensity){
     var x, y;
-    /* work out a table 0-1 fuzz values */
-    var table = [];
     /* middle pixel + radius on either side */
     var tsize = 2 * radius + 1;
-    for (y = 0; y < tsize; y++){
-        table[y] = [];
-        var ty = table[y];
-        var dy2 = (y - radius) * (y - radius);
-        for (x = 0; x < tsize; x++){
-            var dx2 = (x - radius) * (x - radius);
-            ty[x] = Math.exp((dx2 + dy2) * k);
-        }
-    }
+    var table = make_fuzz_table_2d(radius, k);
+
     var centre_row = table[radius];
     var images = {loaded: 0,
                   ready: $.Deferred()
@@ -101,13 +129,27 @@ function make_fuzz(densities, radius, k, offset, intensity){
 }
 
 
-
-/** 2d decomposition of gaussian
-
+/** paste_fuzz_array gaussian kernel using arrays
+ *
+ * The 2d gaussian is decomposed into 2 1d gaussians.  THe first step
+ * is quite quick because the number of accesses is exactly the
+ * diameter times the number of points.  The second is slower because
+ * the each pixel touched in the first round needs to be expanded.
+ * Therefore it makes sense to perform the first round across the
+ * grain, vertically.
+ *
+ * @param ctx a canvas 2d context to paint on
+ * @param points the array of points
+ * @param radius how far the influence of a point reaches
+ * @param k a constant defining the shape of the gaussian
+ *
+ * <k> and <radius> should agree with each other: if <radius> is too
+ * small for <k>, the image will show clipped square cliffs.  If it is
+ * too large, it wastes time making infinitesimal changes.
 */
 
-function paste_fuzz_array(ctx, points, images){
-    var lut = $hm.hill_fuzz.table1d;
+function paste_fuzz_array(ctx, points, radius, k){
+    var lut = make_fuzz_table_1d(radius, k);
     var len = lut.length;
     var radius = parseInt(len / 2);
     var img_width = ctx.canvas.width;
