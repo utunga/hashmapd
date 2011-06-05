@@ -34,14 +34,15 @@ function paste_fuzz_array(ctx, points, images){
         }
     }
     /* second pass: horizontal spread from all pixels */
-
+    var count = 0;
     if(1){
         for (y = 0; y < array_height; y++){
 	    for (x = 0; x < array_width; x++){
                 var v = map1[y][x];
-                if (v < 0.00001){
+                if (v < 0.01){
                     continue;
                 }
+                count ++;
                 var ox = x - radius;
                 for (var i = 0; i < len; i++){
                     map2[y][ox + i] += v * lut[i];
@@ -54,13 +55,14 @@ function paste_fuzz_array(ctx, points, images){
 	    for (x = radius; x < array_width - radius - 1; x++){
                 var acc = 0;
                 for (var ix = 0; ix < len; ix++){
-                    acc += map1[y][x + ix] * lut[ix];
+                    acc += map1[y][x + ix - radius] * lut[ix];
             }
                 map2[y][x] = acc;
+                count ++;
             }
         }
      }
-
+    //alert(count);
     /*find a good scale */
     var max_value = 0;
     for (y = 0; y < array_height; y++){
