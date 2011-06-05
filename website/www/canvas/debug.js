@@ -42,3 +42,12 @@ function get_timer(){
         }
     };
 }
+
+function log(){
+    var s = "<div>";
+    for (var i = 0; i < arguments.length; i++){
+        s += arguments[i] + " ";
+    }
+    s += "</div>";
+    $("#debug").append(s);
+};
