@@ -16,6 +16,8 @@ var $hm = {
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 16,    /*padding for the image as a whole. */
     FUZZ_CONSTANT: -0.02, /*concentration of peaks, negative inverse variance */
+    ARRAY_FUZZ_CONSTANT: -0.02, /*concetration for array fuzz */
+    ARRAY_FUZZ_RADIUS: 16, /*array fuzz goes this far */
     FUZZ_OFFSET: 0.5, /* lift floor by this much (0.5 rounds, more to lengthen tails) */
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 16, /*fuzz never reaches beyond this far */
@@ -100,7 +102,12 @@ function start_fuzz_creation(){
 }
 
 function paint_map(){
-    $hm.hill_fuzz.ready.then(_paint_map);
+    if ($hm.array_fuzz){
+        _paint_map();
+    }
+    else{
+        $hm.hill_fuzz.ready.then(_paint_map);
+    }
 }
 
 function paint_labels(){
@@ -282,7 +289,10 @@ function _paint_map(){
     var fuzz_ctx = fuzz_canvas.getContext("2d");
     $hm.timer.checkpoint("start paste_fuzz");
     if ($hm.array_fuzz){
-        paste_fuzz_array(fuzz_ctx, points, $hm.hill_fuzz);
+        paste_fuzz_array(fuzz_ctx, points,
+                         $hm.ARRAY_FUZZ_RADIUS,
+                         $hm.ARRAY_FUZZ_CONSTANT
+                        );
     }
     else{
         paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
