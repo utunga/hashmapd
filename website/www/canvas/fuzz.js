@@ -190,42 +190,29 @@ function paste_fuzz_array(ctx, points, radius, k){
     }
     /* second pass: horizontal spread from all pixels */
     var count = 0;
-    if(1){
-        for (y = 0; y < array_height; y++){
-            var row1 = map1[y];
-            var row2 = map2[y];
-	    for (x = 0; x < array_width; x++){
-                var v = row1[x];
-                if (v < 0.01){
-                    continue;
-                }
-                count ++;
-                var ox = x - radius;
-                for (i = 0; i < len; i++){
-                    row2[ox + i] += v * lut[i];
-                }
+    for (y = 0; y < array_height; y++){
+        var row1 = map1[y];
+        var row2 = map2[y];
+	for (x = 0; x < array_width; x++){
+            var v = row1[x];
+            if (v < 0.01){
+                continue;
+            }
+            count ++;
+            var ox = x - radius;
+            for (i = 0; i < len; i++){
+                row2[ox + i] += v * lut[i];
             }
         }
     }
-    else {
-        for (y = radius; y < array_height - radius - 1; y++){
-	    for (x = radius; x < array_width - radius - 1; x++){
-                var acc = 0;
-                for (var ix = 0; ix < len; ix++){
-                    acc += map1[y][x + ix - radius] * lut[ix];
-            }
-                map2[y][x] = acc;
-                count ++;
-            }
-        }
-     }
     log(count, "expansions");
     /*find a good scale */
     var max_value = 0;
     for (y = 0; y < array_height; y++){
+        var row2 = map2[y];
 	for (x = 0; x < array_width; x++){
-            if(max_value < map2[y][x]){
-                max_value = map2[y][x];
+            if(max_value < row2[x]){
+                max_value = row2[x];
             }
         }
     }
