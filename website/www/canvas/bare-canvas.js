@@ -15,7 +15,7 @@ var $hm = {
     LABELS_URL: 'tokens-7.json',
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 16,    /*padding for the image as a whole. */
-    FUZZ_CONSTANT: -0.37, /*concentration of peaks, negative inverse variance */
+    FUZZ_CONSTANT: -0.03, /*concentration of peaks, negative inverse variance */
     FUZZ_OFFSET: 0.5, /* lift floor by this much (0.5 rounds, more to lengthen tails) */
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 16, /*fuzz never reaches beyond this far */
@@ -186,7 +186,7 @@ function make_fuzz(densities, radius, k, offset, intensity){
         var dy2 = (y - radius) * (y - radius);
         for (x = 0; x < tsize; x++){
             var dx2 = (x - radius) * (x - radius);
-            ty[x] = Math.exp(Math.sqrt(dx2 + dy2) * k);
+            ty[x] = Math.exp((dx2 + dy2) * k);
         }
     }
     var centre_row = table[radius];
