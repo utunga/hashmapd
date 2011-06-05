@@ -55,6 +55,7 @@ function hm_draw_map(){
         $hm.width = parseInt(query.width);
     if (query.height && parseInt(query.height))
         $hm.height = parseInt(query.height);
+    $hm.array_fuzz = (query.array_fuzz && query.array_fuzz != "false");
 
     $hm.canvas = fullsize_canvas();
     $hm.map_known = $.Deferred();
@@ -235,6 +236,8 @@ function make_fuzz(densities, radius, k, offset, intensity){
         img.src = canvas.toDataURL();
         $("#helpers").append(img);
     }
+    images.table = table;
+    images.table1d = centre_row;
     return images;
 }
 
@@ -378,7 +381,12 @@ function _paint_map(){
     var fuzz_canvas = fullsize_canvas();
     var fuzz_ctx = fuzz_canvas.getContext("2d");
     $hm.timer.fuzz_ready = Date.now();
-    paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
+    if ($hm.array_fuzz){
+        paste_fuzz_array(fuzz_ctx, points, $hm.hill_fuzz);
+    }
+    else{
+        paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
+    }
     $hm.timer.fuzz_pasted = Date.now();
     hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
     $hm.timer.hillshaded = Date.now();
