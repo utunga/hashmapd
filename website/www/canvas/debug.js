@@ -24,7 +24,7 @@ function get_timer(){
                 args.push(arguments[i]);
             }
             checkpoint("start " + arguments.callee.name);
-            var r = func.apply(args);
+            var r = func.apply(undefined, args);
             checkpoint("finish " + arguments.callee.name);
             return r;
         },
