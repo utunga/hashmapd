@@ -149,6 +149,53 @@ function fullsize_canvas(){
     return canvas;
 }
 
+/** decode_points turns JSON rows into point arrays.
+ *
+ * The quad tree coordinates are converted to X, Y coordinates.  The
+ * final result is an array of arrays, structured thus:
+ *
+ *  [ [x_coord, y_coord, value],
+ *    [x_coord, y_coord, value],
+ *  ...]
+ *
+ * The value is untouched.
+ *
+ * @param raw  the json data (as parsed by JSON or jquery objects)
+ *
+ * @return an array of points.
+ */
+
+function decode_points(raw){
+    var i, j;
+    var points = [];
+    for (i = 0; i < raw.length; i++){
+        var r = raw[i];
+        r.special_keys = [];
+        var coords = r.key;
+        var x = 0;
+        var y = 0;
+        /*filter out any that aren't numbers and put them in a special place */
+        j = 0;
+        while (! (typeof(coords[j]) == 'number')){
+            r.special_keys.push(coords[j]);
+            j++;
+        }
+        for (; j < coords.length; j++){
+            var p = coords[j];
+            x = (x << 1) | (p & 1);
+            y = (y << 1) | (p >> 1);
+        }
+        /* if these coordinates are less than fully accurate,
+         * expand with zeros.
+         */
+        var n_coords = coords.length - r.special_keys.length;
+        x <<= ($hm.QUAD_TREE_COORDS - n_coords);
+        y <<= ($hm.QUAD_TREE_COORDS - n_coords);
+        points.push([x, y, r.value, r.special_keys]);
+    }
+    return points;
+}
+
 /** decode_and_filter_points turns JSON rows into point arrays.
  *
  * If you supply <xmin>, <xmax>, <ymin>, or <ymax>, points outside
@@ -171,51 +218,7 @@ function fullsize_canvas(){
  * @return an array of points.
  */
 
-
-function decode_and_filter_points(raw, xmin, xmax, ymin, ymax){
-    var i, j;
-    var points = [];
-    if ($hm.USING_QUAD_TREE){
-        for (i = 0; i < raw.length; i++){
-            var r = raw[i];
-            r.special_keys = [];
-            var coords = r.key;
-            var x = 0;
-            var y = 0;
-            /*filter out any that aren't numbers and put them in a special place */
-            j = 0;
-            while (! (typeof(coords[j]) == 'number')){
-                r.special_keys.push(coords[j]);
-                j++;
-            }
-            for (; j < coords.length; j++){
-                var p = coords[j];
-                x = (x << 1) | (p & 1);
-                y = (y << 1) | (p >> 1);
-            }
-            /* if these coordinates are less than fully accurate,
-             * expand with zeros.
-             */
-            var n_coords = coords.length - r.special_keys.length;
-            x <<= ($hm.QUAD_TREE_COORDS - n_coords);
-            y <<= ($hm.QUAD_TREE_COORDS - n_coords);
-            points.push([x, y, r.value, r.special_keys]);
-        }
-    }
-    else {
-        for (i = 0; i < raw.length; i++){
-            var r = raw[i];
-            points.push([r.key[0], r.key[1],  r.value]);
-        }
-    }
-
-    /*passing straight through is a common case*/
-    if (xmin === undefined &&
-        xmax === undefined &&
-        ymin === undefined &&
-        ymax === undefined){
-        return points;
-    }
+function bound_points(points, xmin, xmax, ymin, ymax){
     /*undefined is equivalent to +/- inf */
     xmin = (xmin !== undefined) ? xmin : -1e999;
     ymin = (ymin !== undefined) ? ymin : -1e999;
@@ -248,7 +251,7 @@ function hm_on_data(data){
     var max_y = -1e999;
     var min_x =  1e999;
     var min_y =  1e999;
-    var points = decode_and_filter_points(data.rows);
+    var points = decode_points(data.rows);
     /*find the coordinate and value ranges */
     for (i = 0; i < points.length; i++){
         var r = points[i];
@@ -466,11 +469,13 @@ function wait_for_flag(flag, func){
 
 
 function hm_on_token_density(data){
+    log("in hm_on_token_density");
     $hm.timer.doing_tokens = Date.now();
     var i;
-    var points = decode_and_filter_points(data.rows,
-                                          $hm.min_x, $hm.max_x,
-                                          $hm.min_y, $hm.max_y);
+    var points = decode_points(data.rows);
+    points = bound_points(points,
+                          $hm.min_x, $hm.max_x,
+                          $hm.min_y, $hm.max_y);
 
     var token_canvas = fullsize_canvas();
     var token_ctx = token_canvas.getContext("2d");
@@ -496,9 +501,11 @@ function _paint_density_map(){
 /*don't do too much until the drawing is done.*/
 
 function hm_on_labels(data){
-    var points = decode_and_filter_points(data.rows,
-                                          $hm.min_x, $hm.max_x,
-                                          $hm.min_y, $hm.max_y);
+    var points = decode_points(data.rows);
+    /*XXX depends on map_known */
+    points = bound_points(points,
+                          $hm.min_x, $hm.max_x,
+                          $hm.min_y, $hm.max_y);
     var max_freq = 0;
     for (var i = 0; i < points.length; i++){
         var freq = points[i][2][0][1];
