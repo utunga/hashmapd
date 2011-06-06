@@ -11,11 +11,12 @@
  */
 function get_timer(){
     var times = [];
+    var checkpoint = function(label){
+        times.push([Date.now(), label]);
+    };
     return {
         times: times,
-        checkpoint: function(label){
-            times.push([Date.now(), label]);
-        },
+        checkpoint: checkpoint,
         time_func: function(func){
             /*arguments is not real array, no .slice or .shift, so you
              *need to slice by copying.*/
@@ -23,9 +24,9 @@ function get_timer(){
             for (var i = 1; i < arguments.length; i++){
                 args.push(arguments[i]);
             }
-            checkpoint("start " + arguments.callee.name);
+            checkpoint("start " + func.name);
             var r = func.apply(undefined, args);
-            checkpoint("finish " + arguments.callee.name);
+            checkpoint("finish " + func.name);
             return r;
         },
         results: function(){
