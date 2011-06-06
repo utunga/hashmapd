@@ -100,6 +100,7 @@ function hm_draw_map(){
 function start_fuzz_creation(){
     $hm.timer.checkpoint("start make_fuzz");
     $hm.hill_fuzz = make_fuzz(
+        $.Deferred(),
         $hm.FUZZ_MAX_MULTIPLE,
         $hm.FUZZ_MAX_RADIUS,
         $hm.FUZZ_CONSTANT,

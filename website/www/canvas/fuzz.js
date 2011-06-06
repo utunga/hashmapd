@@ -62,6 +62,7 @@ function make_fuzz_table_2d(radius, k){
  *
  * The formula used is parseInt(Math.exp(k * d * d) + offset)
  *
+ * @param deferred  a $.Deferred object to fire when the images are ready
  * @param densities make fuzz images with densities from 1 to <densities>
  * @param radius    size of guassian table. no image will exceed this.
  * @param k         negative inverse variance. closer to 0 is flatter.
@@ -71,7 +72,7 @@ function make_fuzz_table_2d(radius, k){
  * @return an object referencing images that *will* contain fuzz when it it is ready.
  */
 
-function make_fuzz(densities, radius, k, offset, intensity){
+function make_fuzz(deferred, densities, radius, k, offset, intensity){
     var x, y;
     /* middle pixel + radius on either side */
     var tsize = 2 * radius + 1;
@@ -79,7 +80,7 @@ function make_fuzz(densities, radius, k, offset, intensity){
 
     var centre_row = table[radius];
     var images = {loaded: 0,
-                  ready: $.Deferred()
+                  ready: deferred
                  };
 
     for (var i = 1; i <= densities; i++){
