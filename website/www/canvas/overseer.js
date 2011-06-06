@@ -303,51 +303,49 @@ function wait_for_flag(flag, func){
 
 function hm_on_token_density(data){
     log("in hm_on_token_density");
-    $hm.timer.doing_tokens = Date.now();
-    var i;
     var points = decode_points(data.rows);
-    points = bound_points(points,
-                          $hm.min_x, $hm.max_x,
-                          $hm.min_y, $hm.max_y);
-
+    $hm.map_known.then(function(){
+                           points = bound_points(points,
+                                                 $hm.min_x, $hm.max_x,
+                                                 $hm.min_y, $hm.max_y);
+                           $hm.timer.checkpoint("pre density map");
+                       });
     var token_canvas = fullsize_canvas();
     var token_ctx = token_canvas.getContext("2d");
-
-    var max_freq = 0;
-    for (var i = 0; i < points.length; i++){
-        var freq = points[i][2];
-        max_freq = Math.max(freq, max_freq);
-    }
-
     if ($hm.array_fuzz){
-        $hm.map_known.then(
-            function _paste_fuzz (){
-                $hm.timer.checkpoint("pre density map");
-                //hidden_fill(token_ctx, "#ff0");
-                token_ctx.fillStyle = "#ff0";
-                token_ctx.fillRect(0, 0, token_canvas.width, token_canvas.height);
-                paste_fuzz_array(token_ctx, points,
-                                 $hm.ARRAY_FUZZ_DENSITY_RADIUS,
-                                 $hm.ARRAY_FUZZ_DENSITY_CONSTANT,
-                                 $hm.ARRAY_FUZZ_DENSITY_RADIX
-                                );
-                $hm.timer.checkpoint("post density map");
-                }
-        );
+        $hm.map_known.then(function()
+                           {
+                               paint_density_array(token_ctx, points);
+                           });
     }
     else{
-        $hm.hill_fuzz.ready.then(
-            function(){
-                paste_fuzz(token_ctx, points, $hm.hill_fuzz);
-            }
-        );
+        $hm.map_known.then(function()
+                           {
+                               paste_fuzz(token_ctx, points, $hm.hill_fuzz);
+                           });
     }
-    $hm.overlays.push(token_canvas);
+    $hm.map_known.then(function(){
+                           $hm.timer.checkpoint("post density map");
+                           $hm.overlays.push(token_canvas);
+                           $(token_canvas).addClass("overlay").offset(
+                               $($hm.canvas).offset());
+                       });
+}
+
+function paint_density_array(token_ctx, points){
+    token_ctx.fillStyle = "#eee";
+    token_ctx.fillRect(0, 0, token_ctx.canvas.width, token_ctx.canvas.height);
+    paste_fuzz_array(token_ctx, points,
+                     $hm.ARRAY_FUZZ_DENSITY_RADIUS,
+                     $hm.ARRAY_FUZZ_DENSITY_CONSTANT,
+                     $hm.ARRAY_FUZZ_DENSITY_RADIX
+                    );
+
 }
 
 
 function _paint_density_map(){
-    $($hm.overlays[0]).addClass("overlay").offset($($hm.canvas).offset());
+    $hm.timer.checkpoint("_paint_density_map");
 }
 
 
