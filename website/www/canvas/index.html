@@ -6,18 +6,16 @@
   </head>
 
   <body>
-    <div id="helpers">
-      <img src="fuzz-21.PNG" id="fuzz21" class="fuzz" />
-      <img src="fuzz-19.PNG" id="fuzz19" class="fuzz" />
-    </div>
-    <canvas width="544" height="544" id="hm_canvas">
-      oh no. What browser is this?
-    </canvas>
+    <div id="helpers"></div>
+    <div id="content"></div>
+    <div id="debug"></div>
     <script src="jquery.js"></script>
-    <script src="bare-canvas.js"></script>
+    <script src="debug.js"></script>
+    <script src="fuzz.js"></script>
+    <script src="canvas.js"></script>
+    <script src="overseer.js"></script>
     <script>
-      var hm_canvas = document.getElementById("hm_canvas");
-      hm_draw_map(hm_canvas);
+      hm_draw_map();
     </script>
   </body>
 </html>

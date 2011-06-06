@@ -6,12 +6,8 @@ canvas{
   display: block;
   margin: 20px auto 0 auto;
 }
-
-.fuzz {
-  /*visibility: hidden;
-  position: absolute;
-  left: 0;
-  top: 0;*/
+canvas.overlay {
+  background: none;
 }
 
 #helpers {
@@ -19,3 +15,16 @@ canvas{
   left: 0;
   top: 0;
 }
+
+#debug {
+  font: normal 11px sans-serif;
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: #aaa;
+}
+
+#helpers img {
+  display: block;
+}
+
