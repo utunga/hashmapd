@@ -14,14 +14,18 @@ var $hm = {
     TOKEN_DENSITY_URL: 'token_density-8.json',
     LABELS_URL: 'tokens-7.json',
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
-    PADDING: 16,    /*padding for the image as a whole. */
-    FUZZ_CONSTANT: -0.02, /*concentration of peaks, negative inverse variance */
+    PADDING: 20,    /*padding for the image as a whole. */
     ARRAY_FUZZ_CONSTANT: -0.02, /*concetration for array fuzz */
-    ARRAY_FUZZ_RADIUS: 16, /*array fuzz goes this far */
+    ARRAY_FUZZ_RADIUS: 16, /*array fuzz goes this far. shouldn't exceed PADDING */
+    ARRAY_FUZZ_EXPONENT: 1.2, /*exponential scaling for hills */
+    ARRAY_FUZZ_DENSITY_EXPONENT: 0, /*0 means linear */
+    ARRAY_FUZZ_DENSITY_CONSTANT: -0.017, /*concetration for array fuzz */
+    ARRAY_FUZZ_DENSITY_RADIUS: 16, /*array fuzz goes this far */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
+    FUZZ_CONSTANT: -0.015, /*concentration of peaks, negative inverse variance */
     FUZZ_OFFSET: 0.5, /* lift floor by this much (0.5 rounds, more to lengthen tails) */
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
-    FUZZ_MAX_RADIUS: 16, /*fuzz never reaches beyond this far */
+    FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
     USING_QUAD_TREE: true,
     QUAD_TREE_COORDS: 15,
@@ -40,7 +44,7 @@ var $hm = {
     min_y:  undefined,
     max_x:  undefined,
     max_y:  undefined,
-
+    overlays: [],     /*a list of html objects to overlay the main canvas */
 
 
     trailing_commas_are_GOOD: true
@@ -65,7 +69,9 @@ function hm_draw_map(){
     $hm.map_drawn = $.Deferred();
     $hm.have_labels = $.Deferred();
     $hm.have_density = $.Deferred();
-    start_fuzz_creation();
+
+    if (! $hm.array_fuzz)
+        start_fuzz_creation();
 
     $.getJSON($hm.DATA_URL, function(data){
                   hm_on_data(data);
@@ -118,8 +124,13 @@ function paint_labels(){
 function paint_density_map(){
     $hm.map_drawn.then(
         function(){
-            $hm.hill_fuzz.ready.then(_paint_density_map);
-            $hm.hill_fuzz.ready.then($hm.timer.results);
+            if ($hm.array_fuzz){
+                _paint_density_map();
+                $hm.timer.results();
+            }
+            else{
+                $hm.hill_fuzz.ready.then(_paint_density_map, $hm.timer.results);
+            }
         }
     );
 }
@@ -295,7 +306,8 @@ function _paint_map(){
     if ($hm.array_fuzz){
         paste_fuzz_array(fuzz_ctx, points,
                          $hm.ARRAY_FUZZ_RADIUS,
-                         $hm.ARRAY_FUZZ_CONSTANT
+                         $hm.ARRAY_FUZZ_CONSTANT,
+                         $hm.ARRAY_FUZZ_EXPONENT
                         );
     }
     else{
@@ -485,15 +497,58 @@ function hm_on_token_density(data){
         var freq = points[i][2];
         max_freq = Math.max(freq, max_freq);
     }
-    $hm.hill_fuzz.ready.then(
-        function(){
-            paste_fuzz(token_ctx, points, $hm.hill_fuzz);
-        }
-    );
+
+    if ($hm.array_fuzz){
+        $hm.map_known.then(
+            function _paste_fuzz (){
+                $hm.timer.checkpoint("pre density map");
+                //hidden_fill(token_ctx, "#ff0");
+                token_ctx.fillStyle = "#ff0";
+                token_ctx.fillRect(0, 0, token_canvas.width, token_canvas.height);
+                paste_fuzz_array(token_ctx, points,
+                                 $hm.ARRAY_FUZZ_DENSITY_RADIUS,
+                                 $hm.ARRAY_FUZZ_DENSITY_CONSTANT,
+                                 $hm.ARRAY_FUZZ_DENSITY_EXPONENT
+                                );
+                $hm.timer.checkpoint("post density map");
+                $hm.timer.results();
+                }
+        );
+    }
+    else{
+        $hm.hill_fuzz.ready.then(
+            function(){
+                paste_fuzz(token_ctx, points, $hm.hill_fuzz);
+            }
+        );
+    }
+    $hm.overlays.push(token_canvas);
     $hm.have_density.resolve();
 }
 
+/* rather annoyingly, there is no way to fill a canvas with a colour
+*  but keep its alpha at zero, which is what we want for overlays such
+*  as density maps.
+*/
+function hidden_fill(ctx, fill){
+    var width = ctx.canvas.width;
+    var height = ctx.canvas.height;
+    ctx.save();
+    ctx.fillStyle = fill;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+    var imgd = ctx.getImageData(0, 0, width, height);
+    var pixels = imgd.data;
+    for (var i = 3, end = width * height * 4; i < end; i += 4){
+        pixels[i] = 0.01;
+    }
+    log(width, height, fill);
+    ctx.putImageData(imgd, 0, 0);
+}
+
+
 function _paint_density_map(){
+    $($hm.overlays[0]).addClass("overlay").offset($($hm.canvas).offset());
 }
 
 
