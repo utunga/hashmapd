@@ -27,7 +27,6 @@ var $hm = {
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
-    USING_QUAD_TREE: true,
     QUAD_TREE_COORDS: 15,
     map_known: undefined, /*will be a deferred that fires when map scale is known */
     map_drawn: undefined, /*will be a deferredthat fires when the landscape is drawn */
