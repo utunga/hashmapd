@@ -62,29 +62,27 @@ function hm_draw_map(){
     interpret_query();
 
     $hm.canvas = fullsize_canvas();
-    $hm.map_known = $.Deferred();
     $hm.map_drawn = $.Deferred();
-    $hm.have_labels = $.Deferred();
-    $hm.have_density = $.Deferred();
 
-    if (! $hm.array_fuzz)
-        start_fuzz_creation();
-
-    $.getJSON($hm.DATA_URL, function(data){
-                  hm_on_data(data);
-              });
-
-    $.getJSON($hm.TOKEN_DENSITY_URL, function(data){
-                  hm_on_token_density(data);
-              });
-    if ($hm.labels){
-        $.getJSON($hm.LABELS_URL, function(data){
-                      hm_on_labels(data);
-                  });
+    if (! $hm.array_fuzz){
+        $hm.hill_fuzz_ready = $.Deferred();
+        start_fuzz_creation($hm.hill_fuzz_ready);
     }
+
+    $hm.map_known = $.getJSON($hm.DATA_URL, hm_on_data);
+    $hm.have_density = $.getJSON($hm.TOKEN_DENSITY_URL, hm_on_token_density);
+    if ($hm.labels){
+        $hm.have_labels = $.getJSON($hm.LABELS_URL, hm_on_labels);
+        $hm.have_labels.then(paint_labels);
+    }
+
+    $hm.map_known.then(function(){$hm.timer.checkpoint("got map data 2")});
     $hm.map_known.then(paint_map);
-    $hm.have_labels.then(paint_labels);
     $hm.have_density.then(paint_density_map);
+
+    //$hm.map_known.then(paint_map);
+    //$hm.have_labels
+    //$hm.have_density
 }
 
 /* Start creating fuzz images.  This might take a while and is
@@ -94,10 +92,10 @@ function hm_draw_map(){
  *  JSON loading from local/cached sources.)
  *
  */
-function start_fuzz_creation(){
+function start_fuzz_creation(deferred){
     $hm.timer.checkpoint("start make_fuzz");
     $hm.hill_fuzz = make_fuzz(
-        $.Deferred(),
+        deferred,
         $hm.FUZZ_MAX_MULTIPLE,
         $hm.FUZZ_MAX_RADIUS,
         $hm.FUZZ_CONSTANT,
@@ -263,7 +261,6 @@ function hm_on_data(data){
     $hm.min_y = min_y;
     $hm.max_x = max_x;
     $hm.max_y = max_y;
-    $hm.map_known.resolve();
 }
 
 /** _paint_map() depends on  $hm.hill_fuzz.ready and $hm.map_known
@@ -346,7 +343,6 @@ function hm_on_token_density(data){
         );
     }
     $hm.overlays.push(token_canvas);
-    $hm.have_density.resolve();
 }
 
 
@@ -376,7 +372,6 @@ function hm_on_labels(data){
         max_freq: max_freq,
         scale: scale
     };
-    $hm.have_labels.resolve();
 }
 
 function _paint_labels(){
