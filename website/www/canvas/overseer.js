@@ -45,6 +45,8 @@ var $hm = {
     max_x:  undefined,
     max_y:  undefined,
     overlays: [],     /*a list of html objects to overlay the main canvas */
+    array_fuzz: true,
+    labels: false,
 
 
     trailing_commas_are_GOOD: true
@@ -57,12 +59,7 @@ var $hm = {
 
 function hm_draw_map(){
     $hm.timer = get_timer();
-    var query = get_query();
-    if (query.width && parseInt(query.width))
-        $hm.width = parseInt(query.width);
-    if (query.height && parseInt(query.height))
-        $hm.height = parseInt(query.height);
-    $hm.array_fuzz = (query.array_fuzz && query.array_fuzz != "false");
+    interpret_query();
 
     $hm.canvas = fullsize_canvas();
     $hm.map_known = $.Deferred();
@@ -80,7 +77,7 @@ function hm_draw_map(){
     $.getJSON($hm.TOKEN_DENSITY_URL, function(data){
                   hm_on_token_density(data);
               });
-    if (query.labels !== undefined){
+    if ($hm.labels){
         $.getJSON($hm.LABELS_URL, function(data){
                       hm_on_labels(data);
                   });
@@ -397,6 +394,46 @@ function _paint_labels(){
     }
 }
 
+/** interpret_query puts any well specified query parameters into $hm
+ *
+ * This feels completely dodgy to a server side programmer, but is OK
+ * on the client side.  They can only mangle their own browsers.
+ */
+
+function interpret_query(){
+    var query = get_query();
+    for (var param in query){
+        if (param in $hm){
+            var v = query[param];
+            var existing = $hm[param];
+            switch(typeof(existing)){
+            case "number":
+                v = parseFloat(v);
+                if (! isNaN(v)){
+                    $hm[param] = v;
+                }
+                break;
+            case "boolean":
+                v = v.toLowerCase();
+                $hm[param] = (!(v == "0" ||
+                                v == "false" ||
+                                v == "no" ||
+                                v == ""));
+                break;
+            case "string":
+                $hm[param] = v;
+                break;
+            default:
+                log("ignoring " + param + "=" + v +
+                    " (unknown type)");
+            }
+        }
+        else {
+            log("ignoring " + param + "=" + v +
+                " (unknown attribute)");
+        }
+    }
+}
 
 function get_query(){
     var query = window.location.search.substring(1);
