@@ -126,10 +126,9 @@ function paint_density_map(){
         function(){
             if ($hm.array_fuzz){
                 _paint_density_map();
-                $hm.timer.results();
             }
             else{
-                $hm.hill_fuzz.ready.then(_paint_density_map, $hm.timer.results);
+                $hm.hill_fuzz.ready.then(_paint_density_map);
             }
         }
     );
@@ -338,7 +337,6 @@ function hm_on_token_density(data){
                                  $hm.ARRAY_FUZZ_DENSITY_RADIX
                                 );
                 $hm.timer.checkpoint("post density map");
-                $hm.timer.results();
                 }
         );
     }

@@ -10,12 +10,21 @@
  * javascript's scoping of "this" in async contexts.
  */
 function get_timer(){
-    var times = [];
+    var previous = Date.now();
+    var start = previous;
+    var s = ('<table id="hm_timer"><tr><td colspan="3">milliseconds<tr>' +
+             '<td><td>time<td>delta</table>');
+    $("#debug").append(s);
+    var table = $("#hm_timer");
     var checkpoint = function(label){
-        times.push([Date.now(), label]);
+        var now = Date.now();
+        var t = now - start;
+        var d = now - previous;
+        table.append("<tr><td>" + label + "<td>" + t +
+                     "<td><b>" + d + "</b></tr>");
+        previous = now;
     };
     return {
-        times: times,
         checkpoint: checkpoint,
         time_func: function(func){
             /*arguments is not real array, no .slice or .shift, so you
@@ -28,18 +37,6 @@ function get_timer(){
             var r = func.apply(undefined, args);
             checkpoint("finish " + func.name);
             return r;
-        },
-        results: function(){
-            var s = '<table><tr><td colspan="3">milliseconds<tr><td><td>time<td>delta';
-            var t2 = 0;
-            for (var i = 0; i < times.length; i++){
-                var t = times[i][0] - times[0][0];
-                var d = t - t2;
-                t2 = t;
-                s += "<tr><td>" + times[i][1] + "<td>" + t + "<td><b>" + d + "\n";
-            }
-            s += "</table>";
-            $("#debug").append(s);
         }
     };
 }
