@@ -148,12 +148,9 @@ function make_fuzz(densities, radius, k, offset, intensity){
  * too large, it wastes time making infinitesimal changes.
 */
 
-function paste_fuzz_array(ctx, points, radius, k){
+function make_fuzz_array(points, radius, k, img_width, img_height){
     var lut = make_fuzz_table_1d(radius, k);
     var len = lut.length;
-    var radius = parseInt(len / 2);
-    var img_width = ctx.canvas.width;
-    var img_height = ctx.canvas.height;
     var array_width = img_width + len;
     var array_height = img_height + len;
     var x, y, i;
@@ -185,6 +182,10 @@ function paste_fuzz_array(ctx, points, radius, k){
         var px = parseInt(offset + (p[0] - $hm.min_x) * $hm.x_scale);
         var py = parseInt(offset + (p[1] - $hm.min_y) * $hm.y_scale);
         var oy = py - radius;
+        if (oy + len > array_height){
+            log("point", i, "(", p, ") is out of range");
+            continue;
+        }
         for (y = 0; y < len; y++){
             map1[oy + y][px] += lut[y];
         }
@@ -207,6 +208,17 @@ function paste_fuzz_array(ctx, points, radius, k){
         }
     }
     log(count, "expansions");
+    return map2;
+}
+
+function paste_fuzz_array(ctx, points, radius, k, scale_exp){
+    var img_width = ctx.canvas.width;
+    var img_height = ctx.canvas.height;
+    var map2 = make_fuzz_array(points, radius, k, img_width, img_height);
+    var array_height = map2.length;
+    var array_width = map2[0].length;
+    var row2;
+    var x, y;
     /*find a good scale */
     var max_value = 0;
     for (y = 0; y < array_height; y++){
@@ -218,22 +230,30 @@ function paste_fuzz_array(ctx, points, radius, k){
         }
     }
     /*do the map */
-    var scale = 255.99 / Math.pow(1.27, max_value);
-    //var scale = 255.99 / max_value;
     var imgd = ctx.getImageData(0, 0, img_width, img_height);
     var pixels = imgd.data;
-    var row = 0;
-    for (y = 0; y < img_height; y++){
-        row2 = map2[y + radius];
-	for (x = 0; x < img_width; x++){
-            var v = Math.pow(1.27, row2[x + radius]) * scale - 1;
-            //var v = parseInt(row2[x + radius] * scale);
-            if(v >= 1){
-                pixels[row + x * 4] = 255;
-                pixels[row + x * 4 + 3] = v;
+    var yend = img_height + radius;
+    var xend = img_width + radius;
+    var pix = 3;
+
+    if (!scale_exp){
+        var scale = 255.99 / max_value;
+        for (y = radius; y < yend; y++){
+            row2 = map2[y];
+	    for (x = radius; x < xend; x++, pix += 4){
+                pixels[pix] = parseInt(row2[x + radius] * scale);
             }
         }
-        row += img_width * 4;
+    }
+    else{
+        var scale = 255.99 / (Math.pow(scale_exp, max_value) - scale_exp);
+        for (y = radius; y < yend; y++){
+            row2 = map2[y];
+	    for (x = radius; x < xend; x++, pix += 4){
+                pixels[pix] = parseInt(Math.pow(scale_exp, row2[x]) *
+                                       scale - scale_exp);
+            }
+        }
     }
     ctx.putImageData(imgd, 0, 0);
 }
