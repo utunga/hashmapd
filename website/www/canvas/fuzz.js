@@ -237,16 +237,28 @@ function paste_fuzz_array(ctx, points, radius, k, scale_exp){
     var xend = img_width + radius;
     var pix = 3;
 
-    if (!scale_exp){
+    if (scale_exp == 0){
         var scale = 255.99 / max_value;
         for (y = radius; y < yend; y++){
             row2 = map2[y];
 	    for (x = radius; x < xend; x++, pix += 4){
-                pixels[pix] = parseInt(row2[x + radius] * scale);
+                pixels[pix] = parseInt(row2[x] * scale);
+            }
+        }
+    }
+    if (scale_exp < 0){
+        //scale_exp is the exponent
+        scale_exp = -scale_exp;
+        var scale = 255.99 / (Math.pow(max_value, scale_exp) - 0.5);
+        for (y = radius; y < yend; y++){
+            row2 = map2[y];
+	    for (x = radius; x < xend; x++, pix += 4){
+                pixels[pix] = parseInt((Math.pow(row2[x], scale_exp) - 0.5) * scale);
             }
         }
     }
     else{
+        //scale_exp is the radix
         var scale = 255.99 / (Math.pow(scale_exp, max_value) - scale_exp);
         for (y = radius; y < yend; y++){
             row2 = map2[y];
