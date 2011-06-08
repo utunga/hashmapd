@@ -17,7 +17,7 @@ var $hm = {
     PADDING: 20,    /*padding for the image as a whole. */
     ARRAY_FUZZ_CONSTANT: -0.02, /*concetration for array fuzz */
     ARRAY_FUZZ_RADIUS: 16, /*array fuzz goes this far. shouldn't exceed PADDING */
-    ARRAY_FUZZ_RADIX: 1.25, /*exponential scaling for hills */
+    ARRAY_FUZZ_RADIX: 1.44, /*exponential scaling for hills */
     ARRAY_FUZZ_DENSITY_RADIX: 0, /*0 means linear */
     ARRAY_FUZZ_DENSITY_CONSTANT: -0.017, /*concetration for array fuzz */
     ARRAY_FUZZ_DENSITY_RADIUS: 16, /*array fuzz goes this far */
@@ -32,7 +32,7 @@ var $hm = {
     map_drawn: undefined, /*will be a deferredthat fires when the landscape is drawn */
     canvas: undefined,  /* a reference to the main canvas gets put here */
     width: 800,   /* canvas *unpadded* pixel width */
-    height: 600,  /* canvas *unpadded* pixel height */
+    height: 800,  /* canvas *unpadded* pixel height */
 
     /* convert data coordinates to canvas coordinates. */
     range_x: undefined,
