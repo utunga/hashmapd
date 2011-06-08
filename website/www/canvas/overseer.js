@@ -43,6 +43,13 @@ var $hm = {
     min_y:  undefined,
     max_x:  undefined,
     max_y:  undefined,
+
+    absolute_min_x:  0,
+    absolute_min_y:  9 * 1024,
+    absolute_max_x:  23 * 1024,
+    absolute_max_y:  undefined,
+
+
     overlays: [],     /*a list of html objects to overlay the main canvas */
     array_fuzz: true,
     labels: false,
@@ -233,6 +240,15 @@ function hm_on_data(data){
     var min_x =  1e999;
     var min_y =  1e999;
     var points = decode_points(data.rows);
+    if ($hm.absolute_min_x !== undefined ||
+        $hm.absolute_max_x !== undefined ||
+        $hm.absolute_min_y !== undefined ||
+        $hm.absolute_max_y !== undefined){
+        points = bound_points(points, $hm.absolute_min_x,
+                              $hm.absolute_max_x,
+                              $hm.absolute_min_y,
+                              $hm.absolute_max_y);
+    }
     /*find the coordinate and value ranges */
     for (i = 0; i < points.length; i++){
         var r = points[i];
