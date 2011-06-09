@@ -12,10 +12,9 @@
 var $hm = {
     BASE_DB_URL: ((window.location.hostname == '127.0.0.1') ?
                   'http://127.0.0.1:5984/frontend_dev/_design/user/_view/' :
-                  'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/'),
+                  'http://hashmapd.halo.gen.nz:5984/frontend_dev/_design/user/_view/'),
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
-    //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 20,    /*padding for the image as a whole. */
     ARRAY_FUZZ_CONSTANT: -0.013, /*concetration for array fuzz */
     ARRAY_FUZZ_RADIUS: 18, /*array fuzz goes this far. shouldn't exceed PADDING */
@@ -50,7 +49,10 @@ var $hm = {
     absolute_min_y:  9 * 1024,
     absolute_max_x:  23 * 1024,
     absolute_max_y:  undefined,
- */
+*/
+    map_resolution: 9,
+    density_resolution: 7,
+
     overlays: [],     /*a list of html objects to overlay the main canvas */
     array_fuzz: true,
     labels: false,
@@ -65,47 +67,63 @@ var $hm = {
     trailing_commas_are_GOOD: true
 };
 
-/** hm_draw_map is the main entrance point.
+/** hm_setup does any initialisation that needs to be done once, upon
+ * first load.
  *
  * Nothing much happens until the json is loaded.
  */
 
-function hm_draw_map(){
+function hm_setup(){
     $hm.timer = get_timer();
     interpret_query();
     $hm.loading = loading_screen();
     $hm.loading.show("Loading...");
 
+    /* The main map canvas */
     $hm.canvas = scaled_canvas();
     $hm.map_drawn = $.Deferred();
 
-    $.ajaxSetup({
-        dataType: ($hm.use_jsonp) ? 'jsonp': 'json',
-        cache: true /*not on by default in jsonp mode*/
-    });
+    /* start downloading the main map */
+    $hm.map_known = get_json('locations', $hm.map_resolution, hm_on_data);
 
+    /* if using image based convolution, start making the images */
     if (! $hm.array_fuzz){
         $hm.hill_fuzz_ready = $.Deferred();
         start_fuzz_creation($hm.hill_fuzz_ready);
     }
+    else { /*XXX is this right? */
+        $hm.hill_fuzz_ready = true;
+    }
+}
 
-    $hm.map_known = get_json('locations', 9, hm_on_data);
-    $hm.have_density = get_json('token_density', 9, hm_on_token_density);
+/** hm_draw_map draws the approriate map
+ *
+ * Nothing much happens until the json is loaded.
+ */
+
+function hm_draw_map(){
+    interpret_query();
+    //$hm.have_density = get_json('token_density', $hm.density_resolution, hm_on_token_density);
+    //$hm.have_density = $.getJSON('tokens-gonna.json', hm_on_token_density);
+    $hm.have_density = $.getJSON('tokens-check.json', hm_on_token_density);
+
     if ($hm.labels){
         $hm.have_labels = get_json('tokens', 7, hm_on_labels);
-        $hm.have_labels.then(paint_labels);
+        $.when($hm.have_labels,
+               $hm.map_drawn).then(paint_labels);
     }
 
-    $hm.map_known.then(function(){$hm.timer.checkpoint("got map data 2")});
-    $hm.map_known.then(paint_map);
-    $hm.have_density.then(paint_density_map);
+    $.when($hm.map_known).done(make_density_map);
+    $.when($hm.map_known,
+           $hm.hill_fuzz_ready).done(paint_map);
 }
+
 
 /** get_json fetches data.
  *
- *  @param view is a couchDB view
+ *  @param view is a couchDB view name (e.g. "locations")
  *  @param precision is the desired quadtree precision
- *  @param callback is a callback
+ *  @param callback is a callback. It gets the data as first argument.
  *
  *  @return a $.Deferred or $.Deferred-alike object.
 
@@ -126,6 +144,8 @@ function get_json(view, precision, callback){
     var url = $hm.BASE_DB_URL + view + '?' + group_level + '&callback=?';
     var d = $.ajax({
                        url: url,
+                       dataType: ($hm.USE_JSONP) ? 'jsonp': 'json',
+                       cache: true, /*not on by default in jsonp mode*/
                        success: function(data){
                            $hm.loading.tick();
                            $hm.timer.checkpoint("got JSON " + view + "[" + precision + "]");
@@ -154,33 +174,6 @@ function start_fuzz_creation(deferred){
         $hm.FUZZ_PER_POINT);
     $hm.timer.checkpoint("end make_fuzz");
 }
-
-function paint_map(){
-    if ($hm.array_fuzz){
-        _paint_map();
-    }
-    else{
-        $hm.hill_fuzz.ready.then(_paint_map);
-    }
-}
-
-function paint_labels(){
-    $hm.map_drawn.then(_paint_labels);
-}
-
-function paint_density_map(){
-    $hm.map_drawn.then(
-        function(){
-            if ($hm.array_fuzz){
-                _paint_density_map();
-            }
-            else{
-                $hm.hill_fuzz.ready.then(_paint_density_map);
-            }
-        }
-    );
-}
-
 
 /** decode_points turns JSON rows into point arrays.
  *
@@ -324,10 +317,10 @@ function hm_on_data(data){
     $hm.max_y = max_y;
 }
 
-/** _paint_map() depends on  $hm.hill_fuzz.ready and $hm.map_known
+/** paint_map() depends on  $hm.hill_fuzz.ready and $hm.map_known
  */
 
-function _paint_map(){
+function paint_map(){
     var points = $hm.tweeters;
     var canvas = $hm.canvas;
     var ctx = canvas.getContext("2d");
@@ -362,7 +355,6 @@ function wait_for_flag(flag, func){
         window.setTimeout(wait_for_flag, 100, flag, func);
     }
 }
-
 
 function hm_on_token_density(data){
     log("in hm_on_token_density");
@@ -409,9 +401,6 @@ function paint_density_array(token_ctx, points){
 }
 
 
-function _paint_density_map(){
-    $hm.timer.checkpoint("_paint_density_map");
-}
 
 
 
@@ -437,7 +426,7 @@ function hm_on_labels(data){
     };
 }
 
-function _paint_labels(){
+function paint_labels(){
     var points = $hm.labels.points;
     var scale = $hm.labels.scale;
     var ctx = $hm.canvas.getContext("2d");
