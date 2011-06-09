@@ -70,7 +70,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var target_imgd = target_ctx.getImageData(0, 0, width, height);
     var target_pixels = target_imgd.data;
 
-    scale = 1.0 / (8.0 * scale);
+    scale = 1.0 / ($hm.HILL_SHADE_FLATNESS * scale);
     var sin_alt = Math.sin(alt);
     var cos_alt = Math.cos(alt);
     var perpendicular = angle - Math.PI / 2;

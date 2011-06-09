@@ -54,7 +54,7 @@ var $hm = {
     overlays: [],     /*a list of html objects to overlay the main canvas */
     array_fuzz: true,
     labels: false,
-
+    HILL_SHADE_FLATNESS: 16.0, /*8 is standard, higher means flatter hills */
     views : {
         locations: {},
         token_density: {precision_adjust: 1},
