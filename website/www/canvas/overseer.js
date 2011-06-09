@@ -347,13 +347,6 @@ function paint_map(){
 }
 
 
-function wait_for_flag(flag, func){
-    if ($hm[flag]){
-        func();
-    }
-    else {
-        window.setTimeout(wait_for_flag, 100, flag, func);
-    }
 }
 
 function hm_on_token_density(data){

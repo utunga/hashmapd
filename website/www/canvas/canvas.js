@@ -183,27 +183,6 @@ function make_colour_range_mountains(scale){
     return colours;
 }
 
-/* rather annoyingly, there is no way to fill a canvas with a colour
-*  but keep its alpha at zero, which is what we want for overlays such
-*  as density maps.
-*/
-function hidden_fill(ctx, fill){
-    var width = ctx.canvas.width;
-    var height = ctx.canvas.height;
-    ctx.save();
-    ctx.fillStyle = fill;
-    ctx.fillRect(0, 0, width, height);
-    ctx.restore();
-    var imgd = ctx.getImageData(0, 0, width, height);
-    var pixels = imgd.data;
-    for (var i = 3, end = width * height * 4; i < end; i += 4){
-        pixels[i] = 0.01;
-    }
-    log(width, height, fill);
-    ctx.putImageData(imgd, 0, 0);
-}
-
-
 function add_label(ctx, text, x, y, size, colour, shadow){
     if (colour === undefined){
         colour = "#000";
