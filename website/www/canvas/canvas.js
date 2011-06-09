@@ -218,3 +218,27 @@ function add_label(ctx, text, x, y, size, colour, shadow){
 }
 
 
+function apply_density_map(ctx){
+    var canvas2 = scaled_canvas();
+    var ctx2 = canvas2.getContext("2d");
+    var width = canvas2.width;
+    var height = canvas2.height;
+    ctx2.drawImage(ctx.canvas, 0, 0, width, height);
+
+    var imgd = ctx2.getImageData(0, 0, width, height);
+    var pixels = imgd.data;
+    var height_pixels = $hm.height_canvas.getContext("2d").getImageData(0, 0, width, height).data;
+    for (var i = 3, end = width * height * 4; i < end; i += 4){
+        var x = pixels[i] * height_pixels[i];
+        if(x){
+            pixels[i - 2] = pixels[i];
+            pixels[i - 1] = 255 - pixels[i];
+            pixels[i] *= 0.65;
+        }
+        else{
+            //pixels[i] = 0;
+        }
+    }
+    ctx2.putImageData(imgd, 0, 0);
+    return canvas2;
+}

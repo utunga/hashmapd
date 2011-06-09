@@ -344,6 +344,7 @@ function _paint_map(){
     else{
         paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
     }
+    $hm.height_canvas = fuzz_canvas;
     $hm.timer.checkpoint("end paste_fuzz");
     $hm.timer.checkpoint("start hillshading");
     hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
@@ -389,11 +390,7 @@ function hm_on_token_density(data){
 
     $hm.map_known.then(function(){
                            $hm.timer.checkpoint("post density map");
-                           var token_canvas2 = scaled_canvas();
-                           var token_ctx2 = token_canvas2.getContext("2d");
-                           token_ctx2.drawImage(token_canvas, 0, 0,
-                                                token_canvas2.width, token_canvas2.width);
-                           //token_ctx2.fillRect(100,100, 300, 300);
+                           var token_canvas2 = apply_density_map(token_ctx);
                            $hm.overlays.push(token_canvas2);
                            $(token_canvas2).addClass("overlay").offset(
                                $($hm.canvas).offset());
