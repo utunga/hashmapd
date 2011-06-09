@@ -49,3 +49,29 @@ function log(){
     s += "</div>";
     $("#debug").append(s);
 };
+
+
+function loading_screen(){
+    var outer = $("#loading");
+    outer.css("display", "block");
+    outer.css("visibility", "visible");
+    outer.css("z-index", "2");
+
+    var div = outer.append("<div>wheee</div>");
+
+    return {
+        show: function(text){
+            div.html(text);
+            log("set loader to " + div.html());
+        },
+        done: function(text){
+            outer.css("display", "none");
+            outer.css("visibility", "hidden");
+        },
+        tick: function(){
+            div.html(div.html() + ".");
+            log("set loader to " + div.html());
+        }
+
+    };
+}

@@ -73,6 +73,8 @@ var $hm = {
 function hm_draw_map(){
     $hm.timer = get_timer();
     interpret_query();
+    $hm.loading = loading_screen();
+    $hm.loading.show("Loading...");
 
     $hm.canvas = scaled_canvas();
     $hm.map_drawn = $.Deferred();
@@ -125,6 +127,7 @@ function get_json(view, precision, callback){
     var d = $.ajax({
                        url: url,
                        success: function(data){
+                           $hm.loading.tick();
                            $hm.timer.checkpoint("got JSON " + view + "[" + precision + "]");
                            callback(data);
                        }
@@ -273,6 +276,7 @@ function bound_points(points, xmin, xmax, ymin, ymax){
 
 function hm_on_data(data){
     $hm.timer.checkpoint("got map data");
+    $hm.loading.show("Painting");
     var i;
     var width = $hm.width;
     var height = $hm.height;
@@ -345,6 +349,7 @@ function _paint_map(){
     hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
     $hm.timer.checkpoint("end hillshading");
     $hm.map_drawn.resolve();
+    $hm.loading.done();
 }
 
 
