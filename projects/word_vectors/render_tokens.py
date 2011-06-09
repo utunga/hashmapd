@@ -13,8 +13,20 @@ import re
 from pylab import plot, draw, figure, imshow, xlabel, ylabel, cm, show, axis, savefig, text, clf
 from scipy import stats, mgrid, c_, reshape, random, rot90
 
+def get_git_home():
+    testpath = '.'
+    while not '.git' in os.listdir(testpath) and not os.path.abspath(testpath) == '/':
+        testpath = os.path.sep.join(('..', testpath))
+    if not os.path.abspath(testpath) == '/':
+        return os.path.abspath(testpath)
+    else:
+        raise ValueError, "Not in git repository"
 
-from hashmapd import *
+HOME = get_git_home()
+sys.path.append(HOME)
+
+from hashmapd.load_config import LoadConfig, DefaultConfig
+from hashmapd.querycouch import QueryCouch
 from hashmapd.csv_unicode_helpers import UnicodeWriter
 
 
@@ -22,8 +34,7 @@ def clean_filename(filename):
     """util function"""
     return re.sub("[^a-zA-Z]", "", filename)
 
-def output_top_word_per_square(cfg):
-    query = QueryCouch(cfg)
+def output_top_word_per_square(query):
     
     csv_writer_coords = csv.writer(open('out/couch_coords.csv', 'wb'))
     csv_writer_labels = UnicodeWriter(open('out/couch_labels.csv', 'wb'))
@@ -36,15 +47,13 @@ def output_top_word_per_square(cfg):
                 csv_writer_coords.writerow([x_coord,y_coord])
                 csv_writer_labels.writerow([row[2]])
 
-def output_all_tokens(cfg):
-    query = QueryCouch(cfg)
+def output_all_tokens(query):
     
     rows = query.all_tokens()
     for row in rows:
         print row
         
-def output_top_square_per_token(cfg):
-    query = QueryCouch(cfg)
+def output_top_square_per_token(query):
     
     csv_writer_coords = csv.writer(open('out/couch_coords.csv', 'wb'))
     csv_writer_labels = UnicodeWriter(open('out/couch_labels.csv', 'wb'))
@@ -56,8 +65,7 @@ def output_top_square_per_token(cfg):
         csv_writer_coords.writerow([x_coord,y_coord])
         csv_writer_labels.writerow([token])
           
-def render_token(cfg, token='Yoga', output_file='out/word_density.png'):
-    query = QueryCouch(cfg)
+def render_token(query, token='Yoga', output_file='out/yoga_density.png'):
     locations = numpy.array(query.locations_for_token(token))
         
     m1 = locations[:,0] # x-coords
@@ -92,25 +100,30 @@ def render_token(cfg, token='Yoga', output_file='out/word_density.png'):
     print 'saving density map for ', token, 'to ', output_file
     savefig(output_file)    
 
-def render_top_tokens(cfg, skip=0, topN = 100):
-    query = QueryCouch(cfg)    
+def render_top_tokens(query, skip=0, topN = 100):
     rows = query.all_tokens(topN)
     for row in rows[skip:topN]:
         token = row[1][0]
         render_token(cfg, token, 'density_maps/'+clean_filename(token.lower())+'.png')
         
 def main(argv = sys.argv):
-    opts, args = getopt.getopt(argv[1:], "h", ["help"])
-
-    cfg = DefaultConfig() if (len(args)==0) else LoadConfig(args[0])
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-f", "--file", dest="config", default="config",
+        help="Path of the config file to use")
+    (options, args) = parser.parse_args()
+    #cfg = LoadConfig(options.config)
     #validate_config(cfg)
     
-    #render_token(cfg, 'Yoga', 'out/yoga_density.png')
+    couchdb_server_url = "http://127.0.0.1:5984"
+    couchdb = "hashmapd_bak"
+    query = QueryCouch(couchdb_server_url, couchdb)
+    
+    render_token(query, 'Yoga', 'out/yoga_density.png')
     #render_token(cfg, 'Lol', 'out/lol_density.png')
-    render_top_tokens(cfg, 0, 1000)
+    #render_top_tokens(cfg, 0, 1000)
     #output_all_tokens(cfg)
 
-    #query = QueryCouch(cfg)
     
     #rows = query.non_english_screennames()
     #print "<html><body>"
@@ -118,9 +131,9 @@ def main(argv = sys.argv):
     #    print "<a href='http://twitter.com/" + row[1] +"' >" , row[0] , "." , row[1] , "</a><br />"
     #print "</body></html>"
 
-    print "count,screen_name"
-    for row in rows:
-        print row[0],",",row[1]
+    #print "count,screen_name"
+    #for row in rows:
+    #   print row[0],",",row[1]
     
 if __name__ == '__main__':
     sys.exit(main())    
