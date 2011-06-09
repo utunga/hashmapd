@@ -2,6 +2,7 @@
  * written by Douglas Bagnall
  */
 
+
 /* $hm holds global state.  Capitalised names are assumed to be
  * constant (unnecessarily in some cases).
  *
@@ -9,31 +10,31 @@
  * documention.
  */
 var $hm = {
+    BASE_DB_URL: ((window.location.hostname == '127.0.0.1') ?
+                  'http://127.0.0.1:5984/frontend_dev/_design/user/_view/' :
+                  'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/'),
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
-    DATA_URL: 'locations-9.json',
-    TOKEN_DENSITY_URL: 'token_density-8.json',
-    LABELS_URL: 'tokens-7.json',
+    USE_JSONP: true,
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 20,    /*padding for the image as a whole. */
-    ARRAY_FUZZ_CONSTANT: -0.02, /*concetration for array fuzz */
-    ARRAY_FUZZ_RADIUS: 16, /*array fuzz goes this far. shouldn't exceed PADDING */
-    ARRAY_FUZZ_RADIX: 1.25, /*exponential scaling for hills */
+    ARRAY_FUZZ_CONSTANT: -0.013, /*concetration for array fuzz */
+    ARRAY_FUZZ_RADIUS: 18, /*array fuzz goes this far. shouldn't exceed PADDING */
+    ARRAY_FUZZ_RADIX: 1.2, /*exponential scaling for hills */
     ARRAY_FUZZ_DENSITY_RADIX: 0, /*0 means linear */
-    ARRAY_FUZZ_DENSITY_CONSTANT: -0.017, /*concetration for array fuzz */
-    ARRAY_FUZZ_DENSITY_RADIUS: 16, /*array fuzz goes this far */
+    ARRAY_FUZZ_DENSITY_CONSTANT: -0.005, /*concetration for array fuzz */
+    ARRAY_FUZZ_DENSITY_RADIUS: 30, /*array fuzz goes this far */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
     FUZZ_CONSTANT: -0.015, /*concentration of peaks, negative inverse variance */
     FUZZ_OFFSET: 0.5, /* lift floor by this much (0.5 rounds, more to lengthen tails) */
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
-    USING_QUAD_TREE: true,
     QUAD_TREE_COORDS: 15,
     map_known: undefined, /*will be a deferred that fires when map scale is known */
     map_drawn: undefined, /*will be a deferredthat fires when the landscape is drawn */
     canvas: undefined,  /* a reference to the main canvas gets put here */
     width: 800,   /* canvas *unpadded* pixel width */
-    height: 600,  /* canvas *unpadded* pixel height */
+    height: 800,  /* canvas *unpadded* pixel height */
 
     /* convert data coordinates to canvas coordinates. */
     range_x: undefined,
@@ -44,9 +45,21 @@ var $hm = {
     min_y:  undefined,
     max_x:  undefined,
     max_y:  undefined,
+/*
+    absolute_min_x:  0,
+    absolute_min_y:  9 * 1024,
+    absolute_max_x:  23 * 1024,
+    absolute_max_y:  undefined,
+ */
     overlays: [],     /*a list of html objects to overlay the main canvas */
     array_fuzz: true,
     labels: false,
+    HILL_SHADE_FLATNESS: 16.0, /*8 is standard, higher means flatter hills */
+    views : {
+        locations: {},
+        token_density: {precision_adjust: 1},
+        tokens:{}
+    },
 
 
     trailing_commas_are_GOOD: true
@@ -60,30 +73,68 @@ var $hm = {
 function hm_draw_map(){
     $hm.timer = get_timer();
     interpret_query();
+    $hm.loading = loading_screen();
+    $hm.loading.show("Loading...");
 
-    $hm.canvas = fullsize_canvas();
+    $hm.canvas = scaled_canvas();
     $hm.map_drawn = $.Deferred();
+
+    $.ajaxSetup({
+        dataType: ($hm.use_jsonp) ? 'jsonp': 'json',
+        cache: true /*not on by default in jsonp mode*/
+    });
 
     if (! $hm.array_fuzz){
         $hm.hill_fuzz_ready = $.Deferred();
         start_fuzz_creation($hm.hill_fuzz_ready);
     }
 
-    $hm.map_known = $.getJSON($hm.DATA_URL, hm_on_data);
-    $hm.have_density = $.getJSON($hm.TOKEN_DENSITY_URL, hm_on_token_density);
+    $hm.map_known = get_json('locations', 9, hm_on_data);
+    $hm.have_density = get_json('token_density', 9, hm_on_token_density);
     if ($hm.labels){
-        $hm.have_labels = $.getJSON($hm.LABELS_URL, hm_on_labels);
+        $hm.have_labels = get_json('tokens', 7, hm_on_labels);
         $hm.have_labels.then(paint_labels);
     }
 
     $hm.map_known.then(function(){$hm.timer.checkpoint("got map data 2")});
     $hm.map_known.then(paint_map);
     $hm.have_density.then(paint_density_map);
-
-    //$hm.map_known.then(paint_map);
-    //$hm.have_labels
-    //$hm.have_density
 }
+
+/** get_json fetches data.
+ *
+ *  @param view is a couchDB view
+ *  @param precision is the desired quadtree precision
+ *  @param callback is a callback
+ *
+ *  @return a $.Deferred or $.Deferred-alike object.
+
+ */
+function get_json(view, precision, callback){
+    /*If the view has non-quadtree data prepended to its key (e.g. a token),
+     * then the precision needs to be adjusted accordingly.
+     */
+    var adjust = $hm.views[view].precision_adjust || 0;
+    var level = precision + adjust;
+
+    /*inside out compare catches undefined precision, which defaults to deepest level*/
+    var group_level = ((precision <= $hm.QUAD_TREE_COORDS + adjust) ?
+                       "group_level=" + level :
+                       "group=true");
+
+    $hm.timer.checkpoint("req JSON " + view + "[" + precision + "]");
+    var url = $hm.BASE_DB_URL + view + '?' + group_level + '&callback=?';
+    var d = $.ajax({
+                       url: url,
+                       success: function(data){
+                           $hm.loading.tick();
+                           $hm.timer.checkpoint("got JSON " + view + "[" + precision + "]");
+                           callback(data);
+                       }
+    });
+    return d;
+}
+
 
 /* Start creating fuzz images.  This might take a while and is
  * partially asynchronous.
@@ -225,6 +276,7 @@ function bound_points(points, xmin, xmax, ymin, ymax){
 
 function hm_on_data(data){
     $hm.timer.checkpoint("got map data");
+    $hm.loading.show("Painting");
     var i;
     var width = $hm.width;
     var height = $hm.height;
@@ -234,6 +286,15 @@ function hm_on_data(data){
     var min_x =  1e999;
     var min_y =  1e999;
     var points = decode_points(data.rows);
+    if ($hm.absolute_min_x !== undefined ||
+        $hm.absolute_max_x !== undefined ||
+        $hm.absolute_min_y !== undefined ||
+        $hm.absolute_max_y !== undefined){
+        points = bound_points(points, $hm.absolute_min_x,
+                              $hm.absolute_max_x,
+                              $hm.absolute_min_y,
+                              $hm.absolute_max_y);
+    }
     /*find the coordinate and value ranges */
     for (i = 0; i < points.length; i++){
         var r = points[i];
@@ -270,7 +331,7 @@ function _paint_map(){
     var points = $hm.tweeters;
     var canvas = $hm.canvas;
     var ctx = canvas.getContext("2d");
-    var fuzz_canvas = fullsize_canvas();
+    var fuzz_canvas = scaled_canvas();
     var fuzz_ctx = fuzz_canvas.getContext("2d");
     $hm.timer.checkpoint("start paste_fuzz");
     if ($hm.array_fuzz){
@@ -283,11 +344,13 @@ function _paint_map(){
     else{
         paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
     }
+    $hm.height_canvas = fuzz_canvas;
     $hm.timer.checkpoint("end paste_fuzz");
     $hm.timer.checkpoint("start hillshading");
     hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
     $hm.timer.checkpoint("end hillshading");
     $hm.map_drawn.resolve();
+    $hm.loading.done();
 }
 
 
@@ -310,7 +373,7 @@ function hm_on_token_density(data){
                                                  $hm.min_y, $hm.max_y);
                            $hm.timer.checkpoint("pre density map");
                        });
-    var token_canvas = fullsize_canvas();
+    var token_canvas = scaled_canvas(0.25);
     var token_ctx = token_canvas.getContext("2d");
     if ($hm.array_fuzz){
         $hm.map_known.then(function()
@@ -324,16 +387,18 @@ function hm_on_token_density(data){
                                paste_fuzz(token_ctx, points, $hm.hill_fuzz);
                            });
     }
+
     $hm.map_known.then(function(){
                            $hm.timer.checkpoint("post density map");
-                           $hm.overlays.push(token_canvas);
-                           $(token_canvas).addClass("overlay").offset(
+                           var token_canvas2 = apply_density_map(token_ctx);
+                           $hm.overlays.push(token_canvas2);
+                           $(token_canvas2).addClass("overlay").offset(
                                $($hm.canvas).offset());
                        });
 }
 
 function paint_density_array(token_ctx, points){
-    token_ctx.fillStyle = "#eee";
+    token_ctx.fillStyle = "#f00";
     token_ctx.fillRect(0, 0, token_ctx.canvas.width, token_ctx.canvas.height);
     paste_fuzz_array(token_ctx, points,
                      $hm.ARRAY_FUZZ_DENSITY_RADIUS,

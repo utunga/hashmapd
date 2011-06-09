@@ -154,6 +154,9 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     var len = lut.length;
     var array_width = img_width + len;
     var array_height = img_height + len;
+    var x_scale = (img_width * $hm.x_scale) / $hm.canvas.width;
+    var y_scale = (img_height * $hm.y_scale) / $hm.canvas.height;
+
     var x, y, i;
     var map1 = [];
     var map2 = [];
@@ -180,8 +183,8 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     var counts = [];
     for (i = 0; i < points.length; i++){
         var p = points[i];
-        var px = parseInt(offset + (p[0] - $hm.min_x) * $hm.x_scale);
-        var py = parseInt(offset + (p[1] - $hm.min_y) * $hm.y_scale);
+        var px = parseInt(offset + (p[0] - $hm.min_x) * x_scale);
+        var py = parseInt(offset + (p[1] - $hm.min_y) * y_scale);
         var oy = py - radius;
         if (oy + len > array_height){
             log("point", i, "(", p, ") is out of range");
@@ -237,22 +240,43 @@ function paste_fuzz_array(ctx, points, radius, k, scale_exp){
     var xend = img_width + radius;
     var pix = 3;
 
-    if (!scale_exp){
+    if (scale_exp == 0){
         var scale = 255.99 / max_value;
         for (y = radius; y < yend; y++){
             row2 = map2[y];
 	    for (x = radius; x < xend; x++, pix += 4){
-                pixels[pix] = parseInt(row2[x + radius] * scale);
+                pixels[pix] = parseInt(row2[x] * scale);
+            }
+        }
+    }
+    if (scale_exp < 0){
+        //scale_exp is the exponent
+        scale_exp = -scale_exp;
+        var scale = 255.99 / (Math.pow(max_value, scale_exp) - 0.5);
+        for (y = radius; y < yend; y++){
+            row2 = map2[y];
+	    for (x = radius; x < xend; x++, pix += 4){
+                pixels[pix] = parseInt((Math.pow(row2[x], scale_exp) - 0.5) * scale);
             }
         }
     }
     else{
-        var scale = 255.99 / (Math.pow(scale_exp, max_value) - scale_exp);
+        //scale_exp is the radix
+        var scale = 255.94 / (Math.pow(scale_exp, max_value));
+        /* we need to offset the results a bit, because
+         * {scale_exp ^ 0} == 1 which is multiplied by scale.
+         *
+         * So, to get that to zero, subtract scale, but to help
+         * {scale_exp ^ 1} == scale_exp round to 1, we subtract
+         * something a bit less.  Zero height pixels go to 0.95,
+         * which is truncated to zero.
+         */
+        var offset = scale - 0.95;
         for (y = radius; y < yend; y++){
             row2 = map2[y];
 	    for (x = radius; x < xend; x++, pix += 4){
                 pixels[pix] = parseInt(Math.pow(scale_exp, row2[x]) *
-                                       scale - scale_exp);
+                                       scale - offset);
             }
         }
     }

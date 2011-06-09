@@ -15,13 +15,19 @@ function new_canvas(width, height, id){
     return canvas;
 }
 
-/** fullsize_canvas helpfully makes a canvas as big as the main map
+/** scaled_canvas helpfully makes a canvas the same shape as the main canvas.
+ *
+ * By default it is the same size also.
+ *
+ * @param p a size ratio, used to scale each dimension.
  *
  * In development it pastes the canvas onto the webpage/
  */
-function fullsize_canvas(){
-    var canvas = new_canvas($hm.width + 2 * $hm.PADDING,
-                            $hm.height + 2 * $hm.PADDING);
+function scaled_canvas(p){
+    p = p || 1;
+    var w = ($hm.width + 2 * $hm.PADDING) * p;
+    var h = ($hm.height + 2 * $hm.PADDING) * p;
+    var canvas = new_canvas(w, h);
     document.getElementById("content").appendChild(canvas);
     return canvas;
 }
@@ -64,7 +70,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var target_imgd = target_ctx.getImageData(0, 0, width, height);
     var target_pixels = target_imgd.data;
 
-    scale = 1.0 / (8.0 * scale);
+    scale = 1.0 / ($hm.HILL_SHADE_FLATNESS * scale);
     var sin_alt = Math.sin(alt);
     var cos_alt = Math.cos(alt);
     var perpendicular = angle - Math.PI / 2;
@@ -212,3 +218,29 @@ function add_label(ctx, text, x, y, size, colour, shadow){
 }
 
 
+function apply_density_map(ctx){
+    var canvas2 = scaled_canvas();
+    var ctx2 = canvas2.getContext("2d");
+    var width = canvas2.width;
+    var height = canvas2.height;
+    ctx2.drawImage(ctx.canvas, 0, 0, width, height);
+
+    var imgd = ctx2.getImageData(0, 0, width, height);
+    var pixels = imgd.data;
+    var height_pixels = $hm.height_canvas.getContext("2d").getImageData(0, 0, width, height).data;
+    var map_pixels = $hm.canvas.getContext("2d").getImageData(0, 0, width, height).data;
+    for (var i = 3, end = width * height * 4; i < end; i += 4){
+        var x = pixels[i] * height_pixels[i];
+        if(1){
+            pixels[i - 3] = map_pixels[i - 2] * 2;
+            pixels[i - 2] = map_pixels[i - 1] * 2;
+            pixels[i - 1] = map_pixels[i - 3] * 2;
+            //pixels[i] *= 0.65;
+        }
+        else{
+            pixels[i] = 0;
+        }
+    }
+    ctx2.putImageData(imgd, 0, 0);
+    return canvas2;
+}
