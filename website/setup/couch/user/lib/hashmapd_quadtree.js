@@ -11,28 +11,24 @@
  * doesn't particularly limit what you can do.
  */
 
-/*should the map be turned upside down?  (If so, make sure the various
-bounds and translations take this into account, as the default case
-does (it is symmetrical).  */
+/* should the map be turned upside down?  This happens *after* the
+ * translation and bounding.  */
 var Y_FLIP = true;
 
-/* {X,Y}_TRANSLATE and the various BOUNDs don't need to be powers of
- * 2, or even integers, or the same as each other.  It just happens
- * that all of these things are true for now.
- */
-var X_TRANSLATE = 128;
-var Y_TRANSLATE = 128;
+/* {X,Y}_TRANSLATE: add this much to x and y coordinates. */
+var X_TRANSLATE = 104;
+var Y_TRANSLATE = 104;
 
 /*bounds checking is done BEFORE translation.  The lower bounds can't
- * be smaller than the coreesponding translation, or negative numbers
+ * be smaller than the corresponding translation, or negative numbers
  * might sneak through.
  The bounds themselves are excluded.
  */
-var X_BOUND_LOW = -X_TRANSLATE;
-var X_BOUND_HIGH = X_TRANSLATE;
+var X_BOUND_LOW = -104;
+var X_BOUND_HIGH = 56;
 
-var Y_BOUND_LOW = -Y_TRANSLATE;
-var Y_BOUND_HIGH = Y_TRANSLATE;
+var Y_BOUND_LOW = -104;
+var Y_BOUND_HIGH = 56;
 
 /*what is the ultimate scale (in bits) / number of coordinates
  * 12 ->  4k square
@@ -41,17 +37,12 @@ var Y_BOUND_HIGH = Y_TRANSLATE;
  * 15 -> 32k   "
  * 16 -> 64k   "
  *
- * group_level can't go deeper than 12, so you can get 1-12, or all
- * coordinates (using group=exact).
  */
 var MAX_QUAD_COORDS = 15;
 var X_SCALE = (1 << MAX_QUAD_COORDS) / (X_BOUND_HIGH - X_BOUND_LOW);
 var Y_SCALE = (1 << MAX_QUAD_COORDS) / (Y_BOUND_HIGH - Y_BOUND_LOW);
 
 function convert_coords(x, y){
-    if (Y_FLIP) {
-        y = -y;
-    }
     if (x <= X_BOUND_LOW ||
         x >= X_BOUND_HIGH ||
         y <= Y_BOUND_LOW ||
@@ -60,6 +51,9 @@ function convert_coords(x, y){
     }
     x += X_TRANSLATE;
     y += Y_TRANSLATE;
+    if (Y_FLIP) {
+        y = -y;
+    }
     x = parseInt(x * X_SCALE);
     y = parseInt(y * Y_SCALE);
     var quadkey = [];

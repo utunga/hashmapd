@@ -45,13 +45,12 @@ var $hm = {
     min_y:  undefined,
     max_x:  undefined,
     max_y:  undefined,
-
+/*
     absolute_min_x:  0,
     absolute_min_y:  9 * 1024,
     absolute_max_x:  23 * 1024,
     absolute_max_y:  undefined,
-
-
+ */
     overlays: [],     /*a list of html objects to overlay the main canvas */
     array_fuzz: true,
     labels: false,
