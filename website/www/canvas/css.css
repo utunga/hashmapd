@@ -4,10 +4,20 @@ body{
 canvas{
   background: #000;
   display: block;
-  margin: 20px auto 0 auto;
+  margin: 10px auto 0 auto;
 }
 canvas.overlay {
   background: none;
+}
+
+#content{
+  margin: 30px auto 0 auto;
+}
+
+#ui {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 #helpers {
