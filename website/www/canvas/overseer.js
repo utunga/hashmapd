@@ -2,6 +2,10 @@
  * written by Douglas Bagnall
  */
 
+var BASE_DB_URL = ((window.location.hostname == '127.0.0.1') ?
+                   'http://127.0.0.1:5984' :
+                   'http://hashmapd.couchone.com');
+
 /* $hm holds global state.  Capitalised names are assumed to be
  * constant (unnecessarily in some cases).
  *
@@ -10,9 +14,10 @@
  */
 var $hm = {
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
-    DATA_URL: 'locations-9.json',
-    TOKEN_DENSITY_URL: 'token_density-8.json',
-    LABELS_URL: 'tokens-7.json',
+    DATA_URL: BASE_DB_URL + '/frontend_dev/_design/user/_view/locations?callback=?&$GROUP_LEVEL',
+    TOKEN_DENSITY_URL: BASE_DB_URL + '/frontend_dev/_design/user/_view/token_density?callback=?&$GROUP_LEVEL',
+    LABELS_URL: BASE_DB_URL + '/frontend_dev/_design/user/_view/tokens?callback=?&$GROUP_LEVEL',
+    USE_JSONP: true,
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 20,    /*padding for the image as a whole. */
     ARRAY_FUZZ_CONSTANT: -0.02, /*concetration for array fuzz */
@@ -70,26 +75,46 @@ function hm_draw_map(){
     $hm.canvas = fullsize_canvas();
     $hm.map_drawn = $.Deferred();
 
+    $.ajaxSetup({
+        dataType: ($hm.use_jsonp) ? 'jsonp': 'json',
+        cache: true /*not on by default in jsonp mode*/
+    });
+
     if (! $hm.array_fuzz){
         $hm.hill_fuzz_ready = $.Deferred();
         start_fuzz_creation($hm.hill_fuzz_ready);
     }
 
-    $hm.map_known = $.getJSON($hm.DATA_URL, hm_on_data);
-    $hm.have_density = $.getJSON($hm.TOKEN_DENSITY_URL, hm_on_token_density);
+    $hm.map_known = get_json($hm.DATA_URL, hm_on_data);
+    $hm.have_density = get_json($hm.TOKEN_DENSITY_URL, hm_on_token_density);
     if ($hm.labels){
-        $hm.have_labels = $.getJSON($hm.LABELS_URL, hm_on_labels);
+        $hm.have_labels = get_json($hm.LABELS_URL, hm_on_labels);
         $hm.have_labels.then(paint_labels);
     }
 
     $hm.map_known.then(function(){$hm.timer.checkpoint("got map data 2")});
     $hm.map_known.then(paint_map);
     $hm.have_density.then(paint_density_map);
-
-    //$hm.map_known.then(paint_map);
-    //$hm.have_labels
-    //$hm.have_density
 }
+
+function get_json(url, callback, depth){
+    var group_level;
+    if (depth <= 20){ /*inside out compare catches undefined*/
+        group_level = "group_level=" + depth;
+    }
+    else{/*deepest level*/
+        group_level = "group=true";
+    }
+    url = url.replace("$GROUP_LEVEL", group_level);
+
+    //log("getting", url);
+    var d = $.ajax({
+                url: url,
+                success: callback
+    });
+    return d;
+}
+
 
 /* Start creating fuzz images.  This might take a while and is
  * partially asynchronous.
