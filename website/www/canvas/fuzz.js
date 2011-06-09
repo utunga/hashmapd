@@ -154,8 +154,12 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     var len = lut.length;
     var array_width = img_width + len;
     var array_height = img_height + len;
-    var x_scale = (img_width * $hm.x_scale) / $hm.canvas.width;
-    var y_scale = (img_height * $hm.y_scale) / $hm.canvas.height;
+
+    /*XXX assuming equal scaling on each dimension, which other places don't do */
+    var im_scale = img_width / $hm.canvas.width;
+
+    var x_scale = $hm.x_scale * im_scale;
+    var y_scale = $hm.y_scale * im_scale;
 
     var x, y, i;
     var map1 = [];
@@ -179,12 +183,13 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     }
 
     /* first pass: vertical spread from each point */
-    var offset = radius + $hm.PADDING;
+    var x_offset = radius + $hm.PADDING * im_scale;
+    var y_offset = radius + $hm.PADDING * im_scale;
     var counts = [];
     for (i = 0; i < points.length; i++){
         var p = points[i];
-        var px = parseInt(offset + (p[0] - $hm.min_x) * x_scale);
-        var py = parseInt(offset + (p[1] - $hm.min_y) * y_scale);
+        var px = parseInt(x_offset + (p[0] - $hm.min_x) * x_scale);
+        var py = parseInt(y_offset + (p[1] - $hm.min_y) * y_scale);
         var oy = py - radius;
         if (oy + len > array_height){
             log("point", i, "(", p, ") is out of range");
@@ -210,6 +215,7 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
                 row2[ox + i] += v * lut[i];
             }
         }
+
     }
     log(count, "expansions");
     return map2;

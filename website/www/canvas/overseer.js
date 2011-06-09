@@ -20,7 +20,7 @@ var $hm = {
     ARRAY_FUZZ_RADIUS: 18, /*array fuzz goes this far. shouldn't exceed PADDING */
     ARRAY_FUZZ_RADIX: 1.2, /*exponential scaling for hills */
     ARRAY_FUZZ_DENSITY_RADIX: 0, /*0 means linear */
-    ARRAY_FUZZ_DENSITY_CONSTANT: -0.005, /*concetration for array fuzz */
+    ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concetration for array fuzz */
     ARRAY_FUZZ_DENSITY_RADIUS: 30, /*array fuzz goes this far */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
     FUZZ_CONSTANT: -0.015, /*concentration of peaks, negative inverse variance */
@@ -32,6 +32,7 @@ var $hm = {
     map_known: undefined, /*will be a deferred that fires when map scale is known */
     map_drawn: undefined, /*will be a deferredthat fires when the landscape is drawn */
     canvas: undefined,  /* a reference to the main canvas gets put here */
+    density_canvas: undefined,  /* a smaller scale canvas for subtracting from density overlays*/
     width: 800,   /* canvas *unpadded* pixel width */
     height: 800,  /* canvas *unpadded* pixel height */
 
@@ -347,50 +348,40 @@ function paint_map(){
 }
 
 
+function make_density_map(){
+    var canvas = scaled_canvas(0.25);
+    var ctx = canvas.getContext("2d");
+    $.when($hm.map_known).done(function()
+                       {
+                          paint_density_array(ctx, $hm.tweeters);
+                       });
+    $hm.density_canvas = canvas;
 }
 
 function hm_on_token_density(data){
     log("in hm_on_token_density");
     var points = decode_points(data.rows);
-    $hm.map_known.then(function(){
+    var token_canvas = scaled_canvas(0.25);
+    var token_ctx = token_canvas.getContext("2d");
+    $.when($hm.map_known).done(function(){
                            points = bound_points(points,
                                                  $hm.min_x, $hm.max_x,
                                                  $hm.min_y, $hm.max_y);
                            $hm.timer.checkpoint("pre density map");
-                       });
-    var token_canvas = scaled_canvas(0.25);
-    var token_ctx = token_canvas.getContext("2d");
-    if ($hm.array_fuzz){
-        $hm.map_known.then(function()
-                           {
-                               paint_density_array(token_ctx, points);
-                           });
-    }
-    else{
-        $hm.map_known.then(function()
-                           {
-                               paste_fuzz(token_ctx, points, $hm.hill_fuzz);
-                           });
-    }
 
-    $hm.map_known.then(function(){
-                           $hm.timer.checkpoint("post density map");
+                           if ($hm.array_fuzz){
+                               paint_density_array(token_ctx, points);
+                           }
+                           else{
+                               paste_fuzz(token_ctx, points, $hm.hill_fuzz);
+                           }
+                           $hm.timer.checkpoint("applying density map");
                            var token_canvas2 = apply_density_map(token_ctx);
+                           $hm.timer.checkpoint("post density map");
                            $hm.overlays.push(token_canvas2);
                            $(token_canvas2).addClass("overlay").offset(
                                $($hm.canvas).offset());
                        });
-}
-
-function paint_density_array(token_ctx, points){
-    token_ctx.fillStyle = "#f00";
-    token_ctx.fillRect(0, 0, token_ctx.canvas.width, token_ctx.canvas.height);
-    paste_fuzz_array(token_ctx, points,
-                     $hm.ARRAY_FUZZ_DENSITY_RADIUS,
-                     $hm.ARRAY_FUZZ_DENSITY_CONSTANT,
-                     $hm.ARRAY_FUZZ_DENSITY_RADIX
-                    );
-
 }
 
 

@@ -196,12 +196,33 @@ function add_label(ctx, text, x, y, size, colour, shadow){
     ctx.fillText(text, x, y);
 }
 
+function subtract(ctx, ctx2, degree){
+    var width = ctx.canvas.width;
+    var height = ctx.canvas.height;
+    var imgd = ctx.getImageData(0, 0, width, height);
+    var pixels = imgd.data;
+    var pixels2 = ctx.getImageData(0, 0, width, height).data;
+    var max_pixel = 0;
+    for (var i = 3, end = width * height * 4; i < end; i += 4){
+        var p = pixels[i] - pixels2[i] * degree;
+        if (p > max_pixel)
+            max_pixel = p;
+        pixels[i] = p;
+    }
+    var scale = 255 / max_pixel;
+    for (var i = 3, end = width * height * 4; i < end; i += 4){
+        pixels[i] *= scale;
+    }
+    ctx.putImageData(imgd, 0, 0);
+}
+
 
 function apply_density_map(ctx){
     var canvas2 = scaled_canvas();
     var ctx2 = canvas2.getContext("2d");
     var width = canvas2.width;
     var height = canvas2.height;
+    subtract(ctx, $hm.density_canvas.getContext("2d"), 0.99);
     ctx2.drawImage(ctx.canvas, 0, 0, width, height);
 
     var imgd = ctx2.getImageData(0, 0, width, height);
@@ -210,10 +231,10 @@ function apply_density_map(ctx){
     var map_pixels = $hm.canvas.getContext("2d").getImageData(0, 0, width, height).data;
     for (var i = 3, end = width * height * 4; i < end; i += 4){
         var x = pixels[i] * height_pixels[i];
-        if(1){
-            pixels[i - 3] = map_pixels[i - 2] * 2;
-            pixels[i - 2] = map_pixels[i - 1] * 2;
-            pixels[i - 1] = map_pixels[i - 3] * 2;
+        if(x){
+            pixels[i - 3] = (map_pixels[i - 2] * 2 - map_pixels[i - 1]);
+            pixels[i - 2] = (map_pixels[i - 1] * 2 - map_pixels[i - 3]);
+            pixels[i - 1] = (map_pixels[i - 3] * 2 - map_pixels[i - 2]);
             //pixels[i] *= 0.65;
         }
         else{
@@ -222,4 +243,14 @@ function apply_density_map(ctx){
     }
     ctx2.putImageData(imgd, 0, 0);
     return canvas2;
+}
+
+function paint_density_array(token_ctx, points){
+    token_ctx.fillStyle = "#f00";
+    token_ctx.fillRect(0, 0, token_ctx.canvas.width, token_ctx.canvas.height);
+    paste_fuzz_array(token_ctx, points,
+                     $hm.ARRAY_FUZZ_DENSITY_RADIUS,
+                     $hm.ARRAY_FUZZ_DENSITY_CONSTANT,
+                     $hm.ARRAY_FUZZ_DENSITY_RADIX
+                    );
 }
