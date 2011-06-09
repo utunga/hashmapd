@@ -2,9 +2,6 @@
  * written by Douglas Bagnall
  */
 
-var BASE_DB_URL = ((window.location.hostname == '127.0.0.1') ?
-                   'http://127.0.0.1:5984' :
-                   'http://hashmapd.couchone.com');
 
 /* $hm holds global state.  Capitalised names are assumed to be
  * constant (unnecessarily in some cases).
@@ -13,10 +10,10 @@ var BASE_DB_URL = ((window.location.hostname == '127.0.0.1') ?
  * documention.
  */
 var $hm = {
+    BASE_DB_URL: ((window.location.hostname == '127.0.0.1') ?
+                  'http://127.0.0.1:5984/frontend_dev/_design/user/_view/' :
+                  'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/'),
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
-    DATA_URL: BASE_DB_URL + '/frontend_dev/_design/user/_view/locations?callback=?&$GROUP_LEVEL',
-    TOKEN_DENSITY_URL: BASE_DB_URL + '/frontend_dev/_design/user/_view/token_density?callback=?&$GROUP_LEVEL',
-    LABELS_URL: BASE_DB_URL + '/frontend_dev/_design/user/_view/tokens?callback=?&$GROUP_LEVEL',
     USE_JSONP: true,
     //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
     PADDING: 20,    /*padding for the image as a whole. */
@@ -59,6 +56,12 @@ var $hm = {
     array_fuzz: true,
     labels: false,
 
+    views : {
+        locations: {},
+        token_density: {precision_adjust: 1},
+        tokens:{}
+    },
+
 
     trailing_commas_are_GOOD: true
 };
@@ -85,10 +88,10 @@ function hm_draw_map(){
         start_fuzz_creation($hm.hill_fuzz_ready);
     }
 
-    $hm.map_known = get_json($hm.DATA_URL, hm_on_data);
-    $hm.have_density = get_json($hm.TOKEN_DENSITY_URL, hm_on_token_density);
+    $hm.map_known = get_json('locations', 9, hm_on_data);
+    $hm.have_density = get_json('token_density', 9, hm_on_token_density);
     if ($hm.labels){
-        $hm.have_labels = get_json($hm.LABELS_URL, hm_on_labels);
+        $hm.have_labels = get_json('tokens', 7, hm_on_labels);
         $hm.have_labels.then(paint_labels);
     }
 
@@ -97,20 +100,35 @@ function hm_draw_map(){
     $hm.have_density.then(paint_density_map);
 }
 
-function get_json(url, callback, depth){
-    var group_level;
-    if (depth <= 20){ /*inside out compare catches undefined*/
-        group_level = "group_level=" + depth;
-    }
-    else{/*deepest level*/
-        group_level = "group=true";
-    }
-    url = url.replace("$GROUP_LEVEL", group_level);
+/** get_json fetches data.
+ *
+ *  @param view is a couchDB view
+ *  @param precision is the desired quadtree precision
+ *  @param callback is a callback
+ *
+ *  @return a $.Deferred or $.Deferred-alike object.
 
-    //log("getting", url);
+ */
+function get_json(view, precision, callback){
+    /*If the view has non-quadtree data prepended to its key (e.g. a token),
+     * then the precision needs to be adjusted accordingly.
+     */
+    var adjust = $hm.views[view].precision_adjust || 0;
+    var level = precision + adjust;
+
+    /*inside out compare catches undefined precision, which defaults to deepest level*/
+    var group_level = ((precision <= $hm.QUAD_TREE_COORDS + adjust) ?
+                       "group_level=" + level :
+                       "group=true");
+
+    $hm.timer.checkpoint("req JSON " + view + "[" + precision + "]");
+    var url = $hm.BASE_DB_URL + view + '?' + group_level + '&callback=?';
     var d = $.ajax({
-                url: url,
-                success: callback
+                       url: url,
+                       success: function(data){
+                           $hm.timer.checkpoint("got JSON " + view + "[" + precision + "]");
+                           callback(data);
+                       }
     });
     return d;
 }
