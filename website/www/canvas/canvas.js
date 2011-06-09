@@ -15,13 +15,19 @@ function new_canvas(width, height, id){
     return canvas;
 }
 
-/** fullsize_canvas helpfully makes a canvas as big as the main map
+/** scaled_canvas helpfully makes a canvas the same shape as the main canvas.
+ *
+ * By default it is the same size also.
+ *
+ * @param p a size ratio, used to scale each dimension.
  *
  * In development it pastes the canvas onto the webpage/
  */
-function fullsize_canvas(){
-    var canvas = new_canvas($hm.width + 2 * $hm.PADDING,
-                            $hm.height + 2 * $hm.PADDING);
+function scaled_canvas(p){
+    p = p || 1;
+    var w = ($hm.width + 2 * $hm.PADDING) * p;
+    var h = ($hm.height + 2 * $hm.PADDING) * p;
+    var canvas = new_canvas(w, h);
     document.getElementById("content").appendChild(canvas);
     return canvas;
 }

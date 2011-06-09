@@ -154,6 +154,9 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     var len = lut.length;
     var array_width = img_width + len;
     var array_height = img_height + len;
+    var x_scale = (img_width * $hm.x_scale) / $hm.canvas.width;
+    var y_scale = (img_height * $hm.y_scale) / $hm.canvas.height;
+
     var x, y, i;
     var map1 = [];
     var map2 = [];
@@ -180,8 +183,8 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     var counts = [];
     for (i = 0; i < points.length; i++){
         var p = points[i];
-        var px = parseInt(offset + (p[0] - $hm.min_x) * $hm.x_scale);
-        var py = parseInt(offset + (p[1] - $hm.min_y) * $hm.y_scale);
+        var px = parseInt(offset + (p[0] - $hm.min_x) * x_scale);
+        var py = parseInt(offset + (p[1] - $hm.min_y) * y_scale);
         var oy = py - radius;
         if (oy + len > array_height){
             log("point", i, "(", p, ") is out of range");
