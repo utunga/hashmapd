@@ -29,12 +29,19 @@ var $hm = {
     FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
     QUAD_TREE_COORDS: 15,
+    COORD_MAX: 1 << 16,   /* exclusive maximum xy coordinates (1 << (QUAD_TREE_COORDS + 1)) */
+    COORD_MIN: 0,   /* inclusive minimum xy coordinates. */
     map_known: undefined, /*will be a deferred that fires when map scale is known */
-    map_drawn: undefined, /*will be a deferredthat fires when the landscape is drawn */
+    map_drawn: undefined, /*will be a deferred that fires when the landscape is drawn */
     canvas: undefined,  /* a reference to the main canvas gets put here */
     density_canvas: undefined,  /* a smaller scale canvas for subtracting from density overlays*/
     width: 800,   /* canvas *unpadded* pixel width */
     height: 800,  /* canvas *unpadded* pixel height */
+
+    left: 0,    /* left edge of drawn map (0 to COORD_MAX) */
+    top: 0,     /* top edge of drawn map */
+    zoom: 0,    /* zoom level. 0 is full size, 1 is 1/2, 2 is 1/4, etc */
+
 
     /* convert data coordinates to canvas coordinates. */
     range_x: undefined,
@@ -83,6 +90,7 @@ function hm_setup(){
     /* The main map canvas */
     $hm.canvas = scaled_canvas();
     $hm.map_drawn = $.Deferred();
+    $hm.height_map_drawn = $.Deferred();
 
     /* start downloading the main map */
     $hm.map_known = get_json('locations', $hm.map_resolution, hm_on_data);
@@ -92,9 +100,10 @@ function hm_setup(){
         $hm.hill_fuzz_ready = $.Deferred();
         start_fuzz_creation($hm.hill_fuzz_ready);
     }
-    else { /*XXX is this right? */
+    else { /*a non-deferred acts as resolved to $.when() */
         $hm.hill_fuzz_ready = true;
     }
+    $.when($hm.map_known, $hm.hill_fuzz_ready).done(make_height_map);
 }
 
 /** hm_draw_map draws the approriate map
@@ -251,11 +260,11 @@ function decode_points(raw){
  */
 
 function bound_points(points, xmin, xmax, ymin, ymax){
-    /*undefined is equivalent to +/- inf */
-    xmin = (xmin !== undefined) ? xmin : -1e999;
-    ymin = (ymin !== undefined) ? ymin : -1e999;
-    xmax = (xmax !== undefined) ? xmax :  1e999;
-    ymax = (ymax !== undefined) ? ymax :  1e999;
+    /*undefined is equivalent to extreme bounds */
+    xmin = (xmin !== undefined) ? xmin : $hm.COORD_MIN - 1;
+    ymin = (ymin !== undefined) ? ymin : $hm.COORD_MIN - 1;
+    xmax = (xmax !== undefined) ? xmax : $hm.COORD_MAX;
+    ymax = (ymax !== undefined) ? ymax : $hm.COORD_MAX;
     return points.filter(function(p){
                              return  ((xmin < p[0]) &&
                                       (xmax > p[0]) &&
@@ -280,20 +289,21 @@ function hm_on_data(data){
     var width = $hm.width;
     var height = $hm.height;
     var max_value = 0;
-    var max_x = -1e999;
-    var max_y = -1e999;
-    var min_x =  1e999;
-    var min_y =  1e999;
     var points = decode_points(data.rows);
     if ($hm.absolute_min_x !== undefined ||
         $hm.absolute_max_x !== undefined ||
         $hm.absolute_min_y !== undefined ||
         $hm.absolute_max_y !== undefined){
-        points = bound_points(points, $hm.absolute_min_x,
+        points = bound_points(points,
+                              $hm.absolute_min_x,
                               $hm.absolute_max_x,
                               $hm.absolute_min_y,
                               $hm.absolute_max_y);
     }
+    var max_x = $hm.COORD_MIN;
+    var max_y = $hm.COORD_MIN;
+    var min_x = $hm.COORD_MAX;
+    var min_y = $hm.COORD_MAX;
     /*find the coordinate and value ranges */
     for (i = 0; i < points.length; i++){
         var r = points[i];
@@ -323,31 +333,66 @@ function hm_on_data(data){
     $hm.max_y = max_y;
 }
 
-/** paint_map() depends on  $hm.hill_fuzz.ready and $hm.map_known
+/** make_height_map() depends on  $hm.hill_fuzz.ready and $hm.map_known
  */
-
-function paint_map(){
+function make_height_map(){
+    $hm.timer.checkpoint("start height_map");
     var points = $hm.tweeters;
-    var canvas = $hm.canvas;
+    var canvas = scaled_canvas();
     var ctx = canvas.getContext("2d");
-    var fuzz_canvas = scaled_canvas();
-    var fuzz_ctx = fuzz_canvas.getContext("2d");
-    $hm.timer.checkpoint("start paste_fuzz");
     if ($hm.array_fuzz){
-        paste_fuzz_array(fuzz_ctx, points,
+        paste_fuzz_array(ctx, points,
                          $hm.ARRAY_FUZZ_RADIUS,
                          $hm.ARRAY_FUZZ_CONSTANT,
                          $hm.ARRAY_FUZZ_RADIX
                         );
     }
     else{
-        paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
+        paste_fuzz(ctx, points, $hm.hill_fuzz);
     }
-    $hm.height_canvas = fuzz_canvas;
-    $hm.timer.checkpoint("end paste_fuzz");
+    $hm.height_canvas = canvas;
+    $hm.timer.checkpoint("end height_map");
+
+    $hm.height_map_drawn.resolve();
+}
+
+
+
+function paint_map(){
+    $hm.timer.checkpoint("start paint_map");
+    var points = $hm.tweeters;
+    var height_map;
+    if ($hm.zoom){
+        height_map = scaled_canvas();
+        var height_ctx = height_map.getContext("2d");
+        var w = height_map.width;
+        var h = height_map.height;
+        var zw = w / (1 << $hm.zoom);
+        var zh = h / (1 << $hm.zoom);
+        var x = Math.min($hm.left * w / $hm.COORD_MAX, w - zw);
+        var y = Math.min($hm.top * h / $hm.COORD_MAX, h - zh);
+        height_ctx.drawImage($hm.height_canvas, x, y, zw, zh, 0, 0, w, h);
+        /*
+        var size = 1 << ($hm.XY_PRECISION - $hm.zoom);
+        var outside = (1 << $hm.XY_PRECISION) - size;
+        var min_x = Math.min($hm.left, outside);
+        var min_y = Math.min($hm.top, outside);
+        var max_x = min_x + size;
+        var max_y = min_y + size;
+        log("zoom", $hm.zoom, "size", size, outside);
+        log("clipping to", min_x, max_x, min_y, max_y);
+        points = bound_points(points, min_x, max_x, min_y, max_y);
+         */
+    }
+    else {
+        height_map = $hm.height_canvas;
+        var height_ctx = height_map.getContext("2d");
+    }
+    var canvas = $hm.canvas;
+    var ctx = canvas.getContext("2d");
     $hm.timer.checkpoint("start hillshading");
-    hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
-    $hm.timer.checkpoint("end hillshading");
+    hillshading(height_ctx, ctx, 1 / ($hm.zoom + 1), Math.PI * 1 / 4, Math.PI / 4);
+    $hm.timer.checkpoint("end paint_map");
     $hm.map_drawn.resolve();
     $hm.loading.done();
 }
