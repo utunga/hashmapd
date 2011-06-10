@@ -1,0 +1,30 @@
+body{
+  background: #333;
+}
+canvas{
+  background: #000;
+  display: block;
+  margin: 20px auto 0 auto;
+}
+canvas.overlay {
+  background: none;
+}
+
+#helpers {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+#debug {
+  font: normal 11px sans-serif;
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: #aaa;
+}
+
+#helpers img {
+  display: block;
+}
+

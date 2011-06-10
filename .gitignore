@@ -12,6 +12,7 @@ other/*
 **.couchapprc
 **.couchappignore
 *.png
+*.psd
 *.pkl.gz
 *.csv
 *.xlsx
@@ -24,4 +25,5 @@ Thumbs.db
 dropbox
 amazon/credentials.csv
 amazon/ec2-bashrc
-
+.emacs.*
+website/www/canvas/junk

@@ -1,0 +1,99 @@
+
+body 
+{
+  font-size: 22px;
+  color:#333;
+}
+
+#header 
+{
+	padding:0px;
+	margin:0px;
+	padding-bottom:6px;
+	background-color:#e0e9ed;
+}
+
+#header img.logo 
+{
+	margin-left:-190px;
+	/*margin-top:-100px; */
+}
+
+#nav {
+	position:relative;
+	float:left;
+	left:660px;
+	top: 40px;
+	height:0px;
+	width: 400px;   
+}
+
+#nav ol {
+    padding:0;
+    margin:0;
+}
+
+#nav ol li {
+    display:inline;
+    list-style-type: none;
+    padding: 0 0.4em 0 0;
+    margin:0;
+}
+
+#nav a {
+	text-decoration: none;
+	color:#333;
+}
+
+#nav a:hover {
+	text-decoration: underline;
+	color: #e26749;
+}
+
+#main {
+	font-size:25px;
+	line-height: auto;
+}
+
+#main p.slogan {
+	font-size: 38px;
+	line-height: auto;
+	padding-top:30px;
+	padding-bottom:10px;
+}
+
+#main ul li {
+	margin-left: 50px;
+	margin-bottom: 20px;
+}
+
+#main p#download_pdf_link {
+	margin-left: 70px;
+}
+
+#main p#download_pdf_link a {
+	vertical-align:text-top;
+	position:relative;
+	top:20px;
+}
+
+#sidebar P
+{
+	font-size:0.6em;
+	color:#666;
+}
+
+div.mce_inline_error { color:#e26749; !important}
+div.mce-success-response { color:#e26749; !important}
+
+#sidebar #mc_embed_signup {
+	font-size:0.6em;
+	color:#666;
+	margin:0;
+	padding:0;
+}
+
+#about_main {
+	font-size:0.8em;
+}
+
