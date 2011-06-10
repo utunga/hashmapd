@@ -557,8 +557,9 @@ function interpret_query(dest, query){
     }
 }
 
-function get_query(){
-    var query = window.location.search.substring(1);
+function get_query(query){
+    if (query === undefined)
+        query = window.location.search.substring(1);
     if (! query) return {};
     var args = {};
     var re = /([^&=]+)=?([^&]*)/g;
@@ -569,4 +570,45 @@ function get_query(){
         }
         args[decodeURIComponent(match[1])] = decodeURIComponent(match[2].replace(/\+/g, " "));
     }
+}
+
+/**construct_form makes a quick for for testing purposes
+ */
+
+function construct_form(){
+    $("#helpers").append('<form id="state"></form>');
+    var form = $("#state");
+    for (var param in $state){
+        var existing = $state[param];
+        if (typeof(existing) in {number: 1, string: 1}){
+            form.append(param + '<input name="' + param + '" value="' +
+                        existing + '"><br>');
+        }
+    }
+
+    var submit = function() {
+        var q = form.serialize();
+        set_state(q);
+        return false;
+    };
+
+    form.append(param + '<button name="go" value="go">');
+    form.submit(submit);
+}
+
+function set_state(data){
+    var q;
+    if (typeof(data) == 'string'){
+        q = data;
+    }
+    else{
+        q = $.param(data);
+    }
+    alert(q);
+    interpret_query($state, q);
+    //window.location.search = "?" + q;
+    var h = window.history;
+    var loc = window.location;
+    var url = loc.href.split("?", 1)[0] + "?" + q;
+    h.pushState($state, "Hashmapd", url);
 }

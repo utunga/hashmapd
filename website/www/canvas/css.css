@@ -17,13 +17,16 @@ canvas.overlay {
 #ui {
   position: absolute;
   top: 0;
-  left: 0;
+  left: 300px;
 }
 
 #helpers {
   position: absolute;
   left: 0;
   top: 0;
+  width: 200px;
+  font: normal 11px sans-serif;
+  color: #ccc;
 }
 
 #debug {
@@ -32,10 +35,6 @@ canvas.overlay {
   right: 0;
   top: 0;
   background: #aaa;
-}
-
-#helpers img {
-  display: block;
 }
 
 #loading {
@@ -51,6 +50,7 @@ canvas.overlay {
   background: black;
   padding: 100px;
 }
+
 #loading div{
   text-align: center;
   margin: 100px auto 0 auto;
