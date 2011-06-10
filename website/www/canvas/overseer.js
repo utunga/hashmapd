@@ -89,9 +89,8 @@ var $state = {
 
     labels: false,
     map_resolution: 9,
-    density_resolution: 7,
+    density_resolution: 7
 
-    trailing_commas_are_GOOD: true
 };
 
 /* $timestamp is a global timer (once hm_setup is run)*/
@@ -605,7 +604,7 @@ function construct_form(){
         return false;
     };
 
-    form.append(param + '<button name="go" value="go">');
+    form.append(param + '<button>go</button>');
     form.submit(submit);
 }
 
@@ -617,11 +616,11 @@ function set_state(data){
     else{
         q = $.param(data);
     }
-    alert(q);
     interpret_query($state, q);
-    //window.location.search = "?" + q;
     var h = window.history;
     var loc = window.location;
     var url = loc.href.split("?", 1)[0] + "?" + q;
-    h.pushState($state, "Hashmapd", url);
+    if (url != loc.href){
+        h.pushState($state, "Hashmapd", url);
+    }
 }

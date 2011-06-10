@@ -35,6 +35,7 @@ canvas.overlay {
   right: 0;
   top: 0;
   background: #aaa;
+  z-index: 99;
 }
 
 #loading {
