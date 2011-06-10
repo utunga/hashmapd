@@ -57,7 +57,7 @@ function make_fuzz_table_2d(radius, k){
  * The fuzz is approximately gaussian and carried in the images alpha
  * channel.
  *
- * Look at the attributes of the $hm object that start with FUZZ_ for
+ * Look at the attributes of the $const object that start with FUZZ_ for
  * documentation and useful values.
  *
  * The formula used is parseInt(Math.exp(k * d * d) + offset)
@@ -156,16 +156,16 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     var array_height = img_height + len;
 
     /*XXX assuming equal scaling on each dimension, which other places don't do */
-    var im_scale = img_width / $hm.canvas.width;
+    var im_scale = img_width / $page.canvas.width;
 
-    var x_scale = $hm.x_scale * im_scale;
-    var y_scale = $hm.y_scale * im_scale;
+    var x_scale = $page.x_scale * im_scale;
+    var y_scale = $page.y_scale * im_scale;
 
     var x, y, i;
     var map1 = [];
     var map2 = [];
     var row1, row2;
-    if ($hm.ARRAY_FUZZ_TYPED_ARRAY){
+    if ($const.ARRAY_FUZZ_TYPED_ARRAY){
         for (y = 0 ; y < array_height; y++){
             map1[y] = new Float32Array(array_width);
             map2[y] = new Float32Array(array_width);
@@ -183,13 +183,13 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     }
 
     /* first pass: vertical spread from each point */
-    var x_offset = radius + $hm.PADDING * im_scale;
-    var y_offset = radius + $hm.PADDING * im_scale;
+    var x_offset = radius + $const.PADDING * im_scale;
+    var y_offset = radius + $const.PADDING * im_scale;
     var counts = [];
     for (i = 0; i < points.length; i++){
         var p = points[i];
-        var px = parseInt(x_offset + (p[0] - $hm.min_x) * x_scale);
-        var py = parseInt(y_offset + (p[1] - $hm.min_y) * y_scale);
+        var px = parseInt(x_offset + (p[0] - $page.min_x) * x_scale);
+        var py = parseInt(y_offset + (p[1] - $page.min_y) * y_scale);
         var oy = py - radius;
         if (oy + len > array_height){
             log("point", i, "(", p, ") is out of range");

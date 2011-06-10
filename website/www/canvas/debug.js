@@ -16,28 +16,13 @@ function get_timer(){
              '<td><td>time<td>delta</table>');
     $("#debug").append(s);
     var table = $("#hm_timer");
-    var checkpoint = function(label){
+    return function(label){
         var now = Date.now();
         var t = now - start;
         var d = now - previous;
         table.append("<tr><td>" + label + "<td>" + t +
                      "<td><b>" + d + "</b></tr>");
         previous = now;
-    };
-    return {
-        checkpoint: checkpoint,
-        time_func: function(func){
-            /*arguments is not real array, no .slice or .shift, so you
-             *need to slice by copying.*/
-            var args = [];
-            for (var i = 1; i < arguments.length; i++){
-                args.push(arguments[i]);
-            }
-            checkpoint("start " + func.name);
-            var r = func.apply(undefined, args);
-            checkpoint("finish " + func.name);
-            return r;
-        }
     };
 }
 

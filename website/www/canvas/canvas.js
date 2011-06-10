@@ -25,8 +25,8 @@ function new_canvas(width, height, id){
  */
 function scaled_canvas(p){
     p = p || 1;
-    var w = ($hm.width + 2 * $hm.PADDING) * p;
-    var h = ($hm.height + 2 * $hm.PADDING) * p;
+    var w = ($const.width + 2 * $const.PADDING) * p;
+    var h = ($const.height + 2 * $const.PADDING) * p;
     var canvas = new_canvas(w, h);
     document.getElementById("content").appendChild(canvas);
     return canvas;
@@ -37,17 +37,17 @@ function paste_fuzz(ctx, points, images){
     var counts = [];
     for (var i = 0; i < points.length; i++){
         var p = points[i];
-        var x = $hm.PADDING + (p[0] - $hm.min_x) * $hm.x_scale;
-        var y = $hm.PADDING + (p[1] - $hm.min_y) * $hm.y_scale;
+        var x = $const.PADDING + (p[0] - $page.min_x) * $page.x_scale;
+        var y = $const.PADDING + (p[1] - $page.min_y) * $page.y_scale;
         var count = p[2];
         counts[count] = (counts[count] || 0) + 1;
         var img;
-        if (count <= $hm.FUZZ_MAX_MULTIPLE){
+        if (count <= $const.FUZZ_MAX_MULTIPLE){
             img = images[count];
         }
         else{
             /* XXX jump up to next scale */
-            img = images[$hm.FUZZ_MAX_MULTIPLE];
+            img = images[$const.FUZZ_MAX_MULTIPLE];
         }
         ctx.drawImage(img, x - img.width / 2, y - img.height / 2);
     }
@@ -70,7 +70,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var target_imgd = target_ctx.getImageData(0, 0, width, height);
     var target_pixels = target_imgd.data;
 
-    scale = 1.0 / ($hm.HILL_SHADE_FLATNESS * scale);
+    scale = 1.0 / ($const.HILL_SHADE_FLATNESS * scale);
     var sin_alt = Math.sin(alt);
     var cos_alt = Math.cos(alt);
     var perpendicular = angle - Math.PI / 2;
@@ -222,13 +222,13 @@ function apply_density_map(ctx){
     var ctx2 = canvas2.getContext("2d");
     var width = canvas2.width;
     var height = canvas2.height;
-    subtract(ctx, $hm.density_canvas.getContext("2d"), 0.99);
+    subtract(ctx, $page.density_canvas.getContext("2d"), 0.99);
     ctx2.drawImage(ctx.canvas, 0, 0, width, height);
 
     var imgd = ctx2.getImageData(0, 0, width, height);
     var pixels = imgd.data;
-    var height_pixels = $hm.height_canvas.getContext("2d").getImageData(0, 0, width, height).data;
-    var map_pixels = $hm.canvas.getContext("2d").getImageData(0, 0, width, height).data;
+    var height_pixels = $page.height_canvas.getContext("2d").getImageData(0, 0, width, height).data;
+    var map_pixels = $page.canvas.getContext("2d").getImageData(0, 0, width, height).data;
     for (var i = 3, end = width * height * 4; i < end; i += 4){
         var x = pixels[i] * height_pixels[i];
         if(x){
@@ -249,8 +249,8 @@ function paint_density_array(token_ctx, points){
     token_ctx.fillStyle = "#f00";
     token_ctx.fillRect(0, 0, token_ctx.canvas.width, token_ctx.canvas.height);
     paste_fuzz_array(token_ctx, points,
-                     $hm.ARRAY_FUZZ_DENSITY_RADIUS,
-                     $hm.ARRAY_FUZZ_DENSITY_CONSTANT,
-                     $hm.ARRAY_FUZZ_DENSITY_RADIX
+                     $const.ARRAY_FUZZ_DENSITY_RADIUS,
+                     $const.ARRAY_FUZZ_DENSITY_CONSTANT,
+                     $const.ARRAY_FUZZ_DENSITY_RADIX
                     );
 }
