@@ -14,7 +14,6 @@ var $const = {
                   'http://hashmapd.halo.gen.nz:5984/frontend_dev/_design/user/_view/'),
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
-    PADDING: 20,    /*padding for the image as a whole. */
     ARRAY_FUZZ_CONSTANT: -0.013, /*concetration for array fuzz */
     ARRAY_FUZZ_RADIUS: 18, /*array fuzz goes this far. shouldn't exceed PADDING */
     ARRAY_FUZZ_RADIX: 1.2, /*exponential scaling for hills */
@@ -30,8 +29,9 @@ var $const = {
     QUAD_TREE_COORDS: 15,
     COORD_MAX: 1 << 16,   /* exclusive maximum xy coordinates (1 << (QUAD_TREE_COORDS + 1)) */
     COORD_MIN: 0,   /* inclusive minimum xy coordinates. */
-    width: 800,   /* canvas *unpadded* pixel width */
-    height: 800,  /* canvas *unpadded* pixel height */
+    PADDING: 24,    /*padding for the full size map in pixels*/
+    width: 800,   /* canvas padded pixel width */
+    height: 800,  /* canvas padded pixel height */
 
     array_fuzz: true,
     HILL_SHADE_FLATNESS: 16.0, /*8 is standard, higher means flatter hills */
@@ -337,11 +337,28 @@ function hm_on_data(data){
         min_x = Math.min(r[0], min_x);
         min_y = Math.min(r[1], min_y);
     }
-    $page.tweeters = points;
-    $page.range_x = max_x - min_x;
-    $page.range_y = max_y - min_y;
-    var x_scale = width / $page.range_x;
-    var y_scale = height / $page.range_y;
+    /*save the discovered extrema for the points, just in case, but
+     *the padded values will be more useful for most things.  The
+     *discovered extrema are likely to exclude some points if this
+     *data is not using the full resolution quadtree.
+     */
+    $page.point_min_x = min_x;
+    $page.point_min_y = min_y;
+    $page.point_max_x = max_x;
+    $page.point_max_y = max_y;
+
+    var point_range_x = max_x - min_x;
+    var pixel_range_x = $const.width - 2 * $const.PADDING;
+    var x_scale = pixel_range_x / point_range_x;
+    $page.min_x = min_x - $const.PADDING / x_scale;
+    $page.max_x = max_x + $const.PADDING / x_scale;
+
+    var point_range_y = max_y - min_y;
+    var pixel_range_y = $const.width - 2 * $const.PADDING;
+    var y_scale = pixel_range_y / point_range_y;
+    $page.min_y = min_y - $const.PADDING / y_scale;
+    $page.max_y = max_y - $const.PADDING / y_scale;
+
     if ($const.SQUISH_INTO_CANVAS){
         $page.x_scale = x_scale;
         $page.y_scale = y_scale;
@@ -349,12 +366,8 @@ function hm_on_data(data){
     else{
         $page.x_scale = Math.min(x_scale, y_scale);
         $page.y_scale = Math.min(x_scale, y_scale);
-        /*XXX range_x, range_y too?*/
     }
-    $page.min_x = min_x;
-    $page.min_y = min_y;
-    $page.max_x = max_x;
-    $page.max_y = max_y;
+    $page.tweeters = points;
 }
 
 /** make_height_map() depends on  $waiters.hill_fuzz_ready and $waiters.map_known
@@ -502,8 +515,8 @@ function paint_labels(){
     var ctx = $page.canvas.getContext("2d");
     for (var i = 0; i < points.length; i++){
         var p = points[i];
-        var x = $const.PADDING + (p[0] - $page.min_x) * $page.x_scale;
-        var y = $const.PADDING + (p[1] - $page.min_y) * $page.y_scale;
+        var x = (p[0] - $page.min_x) * $page.x_scale;
+        var y = (p[1] - $page.min_y) * $page.y_scale;
         var text = p[2][0][0];
         var n = p[2][0][1];
         var size = n * n * scale;

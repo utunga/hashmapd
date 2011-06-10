@@ -156,7 +156,7 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     var array_height = img_height + len;
 
     /*XXX assuming equal scaling on each dimension, which other places don't do */
-    var im_scale = img_width / $page.canvas.width;
+    var im_scale = img_width / $const.width;
 
     var x_scale = $page.x_scale * im_scale;
     var y_scale = $page.y_scale * im_scale;
@@ -183,14 +183,15 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     }
 
     /* first pass: vertical spread from each point */
-    var x_offset = radius + $const.PADDING * im_scale;
-    var y_offset = radius + $const.PADDING * im_scale;
+    var x_offset = radius;
+    var y_offset = radius;
     var counts = [];
     for (i = 0; i < points.length; i++){
         var p = points[i];
         var px = parseInt(x_offset + (p[0] - $page.min_x) * x_scale);
         var py = parseInt(y_offset + (p[1] - $page.min_y) * y_scale);
         var oy = py - radius;
+        //log(y_offset, p[1], $page.min_y, y_scale);
         if (oy + len > array_height){
             log("point", i, "(", p, ") is out of range");
             continue;

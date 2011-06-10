@@ -25,8 +25,8 @@ function new_canvas(width, height, id){
  */
 function scaled_canvas(p){
     p = p || 1;
-    var w = ($const.width + 2 * $const.PADDING) * p;
-    var h = ($const.height + 2 * $const.PADDING) * p;
+    var w = $const.width * p;
+    var h = $const.height * p;
     var canvas = new_canvas(w, h);
     document.getElementById("content").appendChild(canvas);
     return canvas;
@@ -37,8 +37,8 @@ function paste_fuzz(ctx, points, images){
     var counts = [];
     for (var i = 0; i < points.length; i++){
         var p = points[i];
-        var x = $const.PADDING + (p[0] - $page.min_x) * $page.x_scale;
-        var y = $const.PADDING + (p[1] - $page.min_y) * $page.y_scale;
+        var x = (p[0] - $page.min_x) * $page.x_scale;
+        var y = (p[1] - $page.min_y) * $page.y_scale;
         var count = p[2];
         counts[count] = (counts[count] || 0) + 1;
         var img;
