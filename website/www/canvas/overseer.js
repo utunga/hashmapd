@@ -215,14 +215,14 @@ function decode_points(raw){
         /* add an extra one to put it in the middle of the specified square,
          * rather than the top left corner.
          */
-        x = x << 1 + 1;
-        y = y << 1 + 1;
+        x = (x << 1) + 1;
+        y = (y << 1) + 1;
         /* if these coordinates are less than fully accurate,
          * expand with zeros.
          */
         var n_coords = coords.length - r.special_keys.length;
-        x <<= ($hm.QUAD_TREE_COORDS + 1 - n_coords);
-        y <<= ($hm.QUAD_TREE_COORDS + 1 - n_coords);
+        x <<= ($hm.QUAD_TREE_COORDS - n_coords);
+        y <<= ($hm.QUAD_TREE_COORDS - n_coords);
         points.push([x, y, r.value, r.special_keys]);
     }
     return points;
