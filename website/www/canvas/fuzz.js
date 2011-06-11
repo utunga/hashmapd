@@ -129,26 +129,16 @@ function make_fuzz(deferred, densities, radius, k, offset, intensity){
     return images;
 }
 
-
-/** paste_fuzz_array gaussian kernel using arrays
+/** make_fuzz_array helper for paste_fuzz_array
  *
- * The 2d gaussian is decomposed into 2 1d gaussians.  THe first step
+ * The 2d gaussian is decomposed into 2 1d gaussians.  The first step
  * is quite quick because the number of accesses is exactly the
  * diameter times the number of points.  The second is slower because
  * the each pixel touched in the first round needs to be expanded.
  * Therefore it makes sense to perform the first round across the
  * grain, vertically.
  *
- * @param ctx a canvas 2d context to paint on
- * @param points the array of points
- * @param radius how far the influence of a point reaches
- * @param k a constant defining the shape of the gaussian
- *
- * <k> and <radius> should agree with each other: if <radius> is too
- * small for <k>, the image will show clipped square cliffs.  If it is
- * too large, it wastes time making infinitesimal changes.
-*/
-
+ */
 function make_fuzz_array(points, radius, k, img_width, img_height){
     var lut = make_fuzz_table_1d(radius, k);
     var len = lut.length;
@@ -222,6 +212,17 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
     return map2;
 }
 
+/** paste_fuzz_array gaussian kernel using arrays
+ *
+ * @param ctx a canvas 2d context to paint on
+ * @param points the array of points
+ * @param radius how far the influence of a point reaches
+ * @param k a constant defining the shape of the gaussian
+ *
+ * <k> and <radius> should agree with each other: if <radius> is too
+ * small for <k>, the image will show clipped square cliffs.  If it is
+ * too large, it wastes time making infinitesimal changes.
+*/
 function paste_fuzz_array(ctx, points, radius, k, scale_exp){
     var img_width = ctx.canvas.width;
     var img_height = ctx.canvas.height;
@@ -248,7 +249,7 @@ function paste_fuzz_array(ctx, points, radius, k, scale_exp){
     var pix = 3;
 
     if (scale_exp == 0){
-        var scale = 255.99 / max_value;
+        var scale = $const.ARRAY_FUZZ_SCALE / max_value;
         for (y = radius; y < yend; y++){
             row2 = map2[y];
 	    for (x = radius; x < xend; x++, pix += 4){
@@ -259,7 +260,7 @@ function paste_fuzz_array(ctx, points, radius, k, scale_exp){
     if (scale_exp < 0){
         //scale_exp is the exponent
         scale_exp = -scale_exp;
-        var scale = 255.99 / (Math.pow(max_value, scale_exp) - 0.5);
+        var scale = $const.ARRAY_FUZZ_SCALE / (Math.pow(max_value, scale_exp) - 0.5);
         for (y = radius; y < yend; y++){
             row2 = map2[y];
 	    for (x = radius; x < xend; x++, pix += 4){
@@ -269,7 +270,7 @@ function paste_fuzz_array(ctx, points, radius, k, scale_exp){
     }
     else{
         //scale_exp is the radix
-        var scale = 255.94 / (Math.pow(scale_exp, max_value));
+        var scale = $const.ARRAY_FUZZ_SCALE / (Math.pow(scale_exp, max_value));
         /* we need to offset the results a bit, because
          * {scale_exp ^ 0} == 1 which is multiplied by scale.
          *

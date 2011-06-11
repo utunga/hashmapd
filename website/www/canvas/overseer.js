@@ -14,11 +14,12 @@ var $const = {
                   'http://hashmapd.halo.gen.nz:5984/frontend_dev/_design/user/_view/'),
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
+    ARRAY_FUZZ_SCALE: 255.99, /*highest peak is this high*/
     ARRAY_FUZZ_CONSTANT: -0.013, /*concentration for array fuzz */
     ARRAY_FUZZ_RADIUS: 18, /*array fuzz goes this far. shouldn't exceed PADDING */
     ARRAY_FUZZ_RADIX: 1.2, /*exponential scaling for hills */
     ARRAY_FUZZ_DENSITY_RADIX: 0, /*0 means linear */
-    ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concetration for array fuzz */
+    ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concentration for array fuzz */
     ARRAY_FUZZ_DENSITY_RADIUS: 30, /*array fuzz goes this far */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
     FUZZ_CONSTANT: -0.015, /*concentration of peaks, negative inverse variance */
