@@ -253,10 +253,10 @@ function decode_points(raw){
         /* if these coordinates are less than fully accurate,
          * expand with zeros.
          */
-        var n_coords = coords.length - r.special_keys.length;
-        x <<= ($const.QUAD_TREE_COORDS - n_coords);
-        y <<= ($const.QUAD_TREE_COORDS - n_coords);
-        points.push([x, y, r.value, r.special_keys]);
+        var precision = coords.length - r.special_keys.length;
+        x <<= ($const.QUAD_TREE_COORDS - precision);
+        y <<= ($const.QUAD_TREE_COORDS - precision);
+        points.push([x, y, r.value, precision, r.special_keys]);
     }
     return points;
 }
