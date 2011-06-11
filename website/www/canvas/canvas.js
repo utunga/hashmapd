@@ -308,3 +308,28 @@ function paint_density_array(token_ctx, points){
                      $const.ARRAY_FUZZ_DENSITY_RADIX
                     );
 }
+
+
+/** zoom_in puts a bit of the src canvas all over the dest canvas */
+function zoom_in(src, dest, x, y, w, h){
+    $timestamp("zooming");
+    if (dest.getContext){
+        dest = dest.getContext("2d");
+    }
+    if (src.canvas){
+        src = src.canvas;
+    }
+    if(1){
+        dest.drawImage(src, x, y, w, h, 0, 0, dest.canvas.width, dest.canvas.height);
+    }
+    else {
+        var sx = dest.canvas.width / w;
+        var sy = dest.canvas.width / h;
+
+        dest.save();
+        dest.scale(sx, sy);
+        dest.drawImage(src, x, y, w, h, 0, 0, w, h);
+        dest.restore();
+    }
+    $timestamp("end zoom");
+}

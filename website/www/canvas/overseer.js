@@ -26,6 +26,8 @@ var $const = {
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
+    REDRAW_HEIGHT_MAP: false, /*whether to redraw the height map on zoom */
+
     QUAD_TREE_COORDS: 15,
     COORD_MAX: 1 << 16,   /* exclusive maximum xy coordinates (1 << (QUAD_TREE_COORDS + 1)) */
     COORD_MIN: 0,   /* inclusive minimum xy coordinates. */
@@ -426,12 +428,24 @@ function paint_map(){
     $timestamp("start paint_map");
     var points = $page.tweeters;
     var height_map;
-    if ($state.zoom){
+    var zoom = $state.zoom;
+    if (zoom){
         height_map = named_canvas("zoomed_height_map", 'rgba(255,255,0,0)', 1);
         var height_ctx = height_map.getContext("2d");
-        var d = get_zoom_pixel_bounds($state.zoom, $state.left, $state.top);
-        height_ctx.drawImage($page.height_canvas, d.x, d.y, d.width, d.height,
-                             0, 0, $const.width, $const.height);
+        var d = get_zoom_pixel_bounds(zoom, $state.left, $state.top);
+        if ($const.REDRAW_HEIGHT_MAP){
+            var scale = 1 << zoom;
+            var r = $const.ARRAY_FUZZ_RADIUS * scale;
+            var k = $const.ARRAY_FUZZ_CONSTANT / scale;
+            var padded_left = Math.max(0, d.x - r);
+            var padded_top = Math.max(0, d.y - r);
+            var padded_right = Math.min($const.width, d.x + r);
+            var padded_bottom = Math.min($const.height, d.y + r);
+            paste_fuzz_array(height_ctx, points, r, k, $const.ARRAY_FUZZ_RADIX);
+        }
+        else {
+            zoom_in($page.height_canvas, height_ctx, d.x, d.y, d.width, d.height);
+        }
     }
     else {
         height_map = $page.height_canvas;
@@ -440,7 +454,7 @@ function paint_map(){
     var canvas = $page.canvas;
     var ctx = canvas.getContext("2d");
     $timestamp("start hillshading");
-    hillshading(height_ctx, ctx, 1 / ($state.zoom + 1), Math.PI * 1 / 4, Math.PI / 4);
+    hillshading(height_ctx, ctx, 1 / (zoom + 1), Math.PI * 1 / 4, Math.PI / 4);
     $timestamp("end paint_map");
     $waiters.map_drawn.resolve();
     $page.loading.done();
