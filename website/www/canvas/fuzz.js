@@ -180,14 +180,14 @@ function make_fuzz_array(points, radius, k, img_width, img_height){
         var p = points[i];
         var px = parseInt(x_offset + (p[0] - $page.min_x) * x_scale);
         var py = parseInt(y_offset + (p[1] - $page.min_y) * y_scale);
+        var pv = p[2];
         var oy = py - radius;
-        //log(y_offset, p[1], $page.min_y, y_scale);
         if (oy + len > array_height){
             log("point", i, "(", p, ") is out of range");
             continue;
         }
         for (y = 0; y < len; y++){
-            map1[oy + y][px] += lut[y];
+            map1[oy + y][px] += pv * lut[y];
         }
     }
     /* second pass: horizontal spread from all pixels */
