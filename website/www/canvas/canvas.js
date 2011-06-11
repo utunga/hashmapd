@@ -41,8 +41,14 @@ function named_canvas(name, blank, p){
         $page[name] = canvas;
         if (blank){
             var ctx = canvas.getContext("2d");
-            ctx.fillStyle = "rgba(0,0,0,0)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (typeof(blank) == 'string'){
+                ctx.fillStyle = blank;
+                ctx.globalCompositeOperation = 'copy';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
         }
     }
     return canvas;

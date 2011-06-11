@@ -373,7 +373,7 @@ function hm_on_data(data){
 function make_height_map(){
     $timestamp("start height_map");
     var points = $page.tweeters;
-    var canvas = scaled_canvas();
+    var canvas = named_canvas("height_map", "rgba(255,0,0, 1)", 1);
     var ctx = canvas.getContext("2d");
     if ($const.array_fuzz){
         paste_fuzz_array(ctx, points,
@@ -425,7 +425,7 @@ function paint_map(){
     var points = $page.tweeters;
     var height_map;
     if ($state.zoom){
-        height_map = named_canvas("zoomed_height_map", true, 1);
+        height_map = named_canvas("zoomed_height_map", 'rgba(255,255,0,0)', 1);
         var height_ctx = height_map.getContext("2d");
         var d = get_zoom_pixel_bounds($state.zoom, $state.left, $state.top);
         height_ctx.drawImage($page.height_canvas, d.x, d.y, d.width, d.height,
