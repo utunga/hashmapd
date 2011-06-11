@@ -34,6 +34,7 @@ var $const = {
     height: 800,  /* canvas padded pixel height */
 
     array_fuzz: true,
+    HILL_LUT_CENTRE: 300,
     HILL_SHADE_FLATNESS: 16.0, /*8 is standard, higher means flatter hills */
     views : {  /* helps in interpreting various views. */
         locations: {},
@@ -60,7 +61,7 @@ var $page = {
     min_y:  undefined,
     max_x:  undefined,
     max_y:  undefined,
-
+    hillshade_luts: {},
     tweeters: undefined, /*the parsed user data that makes the main map. */
 
     trailing_commas_are_GOOD: true

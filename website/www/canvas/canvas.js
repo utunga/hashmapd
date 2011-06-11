@@ -78,20 +78,21 @@ function paste_fuzz(ctx, points, images){
 /* Algorithm borrowed from John Barratt <http://www.langarson.com.au/>
  * as posted on Python Image-SIG in 2007.
  */
-
 function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var canvas = target_ctx.canvas;
     var width = canvas.width;
     var height = canvas.height;
     var map_imgd = map_ctx.getImageData(0, 0, width, height);
     var map_pixels = map_imgd.data;
-
+    $timestamp("start lut");
+    var lut = hillshading_lut(scale, angle, alt);
+    $timestamp("made lut");
+    var lut_offset = $const.HILL_LUT_CENTRE;
     /*colour in the sea in one go */
     target_ctx.fillStyle = "rgb(147,187,189)";
     target_ctx.fillRect(0, 0, width, height);
     var target_imgd = target_ctx.getImageData(0, 0, width, height);
     var target_pixels = target_imgd.data;
-
     scale = 1.0 / ($const.HILL_SHADE_FLATNESS * scale);
     var sin_alt = Math.sin(alt);
     var cos_alt = Math.cos(alt);
@@ -106,7 +107,6 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
             if (cc < 1){
                 continue;
             }
-
             var tc = map_pixels[a - stride];
             var tl = map_pixels[a - stride - 4];
             var tr = map_pixels[a - stride + 4];
@@ -116,20 +116,10 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
             var bl = map_pixels[a + stride - 4];
             var br = map_pixels[a + stride + 4];
 
-            /* Slope -- there may be a quicker way of calculating sin/cos */
-            var dx = ((tl + 2 * cl + bl) - (tr + 2 * cr + br)) * scale;
-            var dy = ((bl + 2 * bc + br) - (tl + 2 * tc + tr)) * scale;
-            var slope = Math.PI / 2 - Math.atan(Math.sqrt(dx * dx + dy * dy));
+            var _dx = ((tl + 2 * cl + bl) - (tr + 2 * cr + br));
+            var _dy = ((bl + 2 * bc + br) - (tl + 2 * tc + tr));
+            var c = lut[lut_offset + _dy][lut_offset + _dx];
 
-            var sin_slope = Math.sin(slope);
-            var cos_slope = Math.cos(slope);
-
-            /* Aspect */
-            var aspect = Math.atan2(dx, dy);
-
-            /* Shade value */
-            var c = Math.max(sin_alt * sin_slope + cos_alt * cos_slope *
-                             Math.cos(perpendicular - aspect), 0);
             var colour = colours[cc];
             if (cc == 1){ /* the sea shore has less shadow */
                 c = (0.5 + c) / 2;
@@ -142,6 +132,52 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
         row += stride;
     }
     target_ctx.putImageData(target_imgd, 0, 0);
+}
+
+
+/*make hillshading LUT*/
+function hillshading_lut(scale, angle, alt){
+    var key = "lut_" + scale + "_" + angle + "_" + alt;
+    if ($page.hillshade_luts[key] !== undefined){
+        return $page.hillshade_luts[key];
+    }
+
+    scale = 1.0 / ($const.HILL_SHADE_FLATNESS * scale);
+    var sin_alt = Math.sin(alt);
+    var cos_alt = Math.cos(alt);
+    var perpendicular = angle - Math.PI / 2;
+    var dx, dy;
+    var table = [];
+    var lut_centre = $const.HILL_LUT_CENTRE;
+    for (dy = -lut_centre; dy <= lut_centre; dy++){
+        //var row = [];
+        var row = new Float32Array(2 * lut_centre + 1);
+        table[dy + lut_centre] = row;
+        for (dx = -lut_centre; dx <= lut_centre; dx++){
+            /* Slope -- there may be a quicker way of calculating sin/cos */
+            var c = _hillshade(dx, dy, scale, sin_alt, cos_alt, perpendicular);
+            row[lut_centre + dx] = c;
+        }
+    }
+    $page.hillshade_luts[key] = table;
+    return table;
+}
+
+function _hillshade(_dx, _dy, scale, sin_alt, cos_alt, perpendicular){
+    var dx = _dx * scale;
+    var dy = _dy * scale;
+    var slope = Math.PI / 2 - Math.atan(Math.sqrt(dx * dx + dy * dy));
+
+    var sin_slope = Math.sin(slope);
+    var cos_slope = Math.cos(slope);
+
+    /* Aspect */
+    var aspect = Math.atan2(dx, dy);
+
+    /* Shade value */
+    var c = Math.max(sin_alt * sin_slope + cos_alt * cos_slope *
+                     Math.cos(perpendicular - aspect), 0);
+    return c;
 }
 
 
