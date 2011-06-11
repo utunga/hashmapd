@@ -93,10 +93,6 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     target_ctx.fillRect(0, 0, width, height);
     var target_imgd = target_ctx.getImageData(0, 0, width, height);
     var target_pixels = target_imgd.data;
-    scale = 1.0 / ($const.HILL_SHADE_FLATNESS * scale);
-    var sin_alt = Math.sin(alt);
-    var cos_alt = Math.cos(alt);
-    var perpendicular = angle - Math.PI / 2;
     var stride = width * 4;
     var colours = make_colour_range_mountains(115);
     var row = stride; /*start on row 1, not row 0 */
