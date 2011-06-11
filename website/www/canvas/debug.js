@@ -16,8 +16,11 @@ function get_timer(){
              '<td><td>time<td>delta</table>');
     $("#debug").append(s);
     var table = $("#hm_timer");
-    return function(label){
+    return function(label, reset){
         var now = Date.now();
+        if (reset){
+            start = now;
+        }
         var t = now - start;
         var d = now - previous;
         table.append("<tr><td>" + label + "<td>" + t +

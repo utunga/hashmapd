@@ -138,7 +138,7 @@ function hm_draw_map(){
     //$waiters.have_density = get_json('token_density', $state.density_resolution, hm_on_token_density);
     //$waiters.have_density = $.getJSON('tokens-gonna.json', hm_on_token_density);
     //$waiters.have_density = $.getJSON('tokens-check.json', hm_on_token_density);
-
+    $timestamp("start hm_draw_map", true);
     if ($state.labels){
         $waiters.have_labels = get_json('tokens', 7, hm_on_labels);
         $.when($waiters.have_labels,
