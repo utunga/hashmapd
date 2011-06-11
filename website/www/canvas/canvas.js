@@ -32,6 +32,22 @@ function scaled_canvas(p){
     return canvas;
 }
 
+/* get a particular canvas that is a member of $page, or if it doesn't
+ * exist, make it up and store it */
+function named_canvas(name, blank, p){
+    var canvas = $page[name];
+    if (canvas === undefined){
+        canvas = scaled_canvas(p);
+        $page[name] = canvas;
+        if (blank){
+            var ctx = canvas.getContext("2d");
+            ctx.fillStyle = "rgba(0,0,0,0)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+    return canvas;
+}
+
 
 function paste_fuzz(ctx, points, images){
     var counts = [];

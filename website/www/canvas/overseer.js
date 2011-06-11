@@ -14,7 +14,7 @@ var $const = {
                   'http://hashmapd.halo.gen.nz:5984/frontend_dev/_design/user/_view/'),
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
-    ARRAY_FUZZ_CONSTANT: -0.013, /*concetration for array fuzz */
+    ARRAY_FUZZ_CONSTANT: -0.013, /*concentration for array fuzz */
     ARRAY_FUZZ_RADIUS: 18, /*array fuzz goes this far. shouldn't exceed PADDING */
     ARRAY_FUZZ_RADIX: 1.2, /*exponential scaling for hills */
     ARRAY_FUZZ_DENSITY_RADIX: 0, /*0 means linear */
@@ -49,7 +49,6 @@ var $const = {
 var $page = {
     canvas: undefined,  /* a reference to the main canvas gets put here */
     density_canvas: undefined,  /* a smaller scale canvas for subtracting from density overlays*/
-    overlays: [],     /*a list of html objects to overlay the main canvas */
     loading: undefined,
 
     /* convert data coordinates to canvas coordinates. */
@@ -421,19 +420,16 @@ function get_zoom_point_bounds(zoom, left, top){
     };
 }
 
-
 function paint_map(){
     $timestamp("start paint_map");
     var points = $page.tweeters;
     var height_map;
     if ($state.zoom){
-        height_map = scaled_canvas();
+        height_map = named_canvas("zoomed_height_map", true, 1);
         var height_ctx = height_map.getContext("2d");
-        var w = height_map.width;
-        var h = height_map.height;
         var d = get_zoom_pixel_bounds($state.zoom, $state.left, $state.top);
         height_ctx.drawImage($page.height_canvas, d.x, d.y, d.width, d.height,
-                             0, 0, height_map.width, height_map.height);
+                             0, 0, $const.width, $const.height);
     }
     else {
         height_map = $page.height_canvas;
@@ -450,39 +446,40 @@ function paint_map(){
 
 
 function make_density_map(){
-    var canvas = scaled_canvas(0.25);
+    var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
-    $.when($waiters.map_known).done(function()
-                       {
-                          paint_density_array(ctx, $page.tweeters);
-                       });
+    paint_density_array(ctx, $page.tweeters);
     $page.density_canvas = canvas;
 }
 
 function hm_on_token_density(data){
     log("in hm_on_token_density");
     var points = decode_points(data.rows);
-    var token_canvas = scaled_canvas(0.25);
-    var token_ctx = token_canvas.getContext("2d");
-    $.when($waiters.map_known).done(function(){
-                           points = bound_points(points,
-                                                 $page.min_x, $page.max_x,
-                                                 $page.min_y, $page.max_y);
-                           $timestamp("pre density map");
+    $.when($waiters.map_known, $waiters.hill_fuzz_ready).done(
+        function(){
+            paint_token_density(points);
+        });
+}
 
-                           if ($const.array_fuzz){
-                               paint_density_array(token_ctx, points);
-                           }
-                           else{
-                               paste_fuzz(token_ctx, points, $page.hill_fuzz);
-                           }
-                           $timestamp("applying density map");
-                           var token_canvas2 = apply_density_map(token_ctx);
-                           $timestamp("post density map");
-                           $page.overlays.push(token_canvas2);
-                           $(token_canvas2).addClass("overlay").offset(
-                               $($page.canvas).offset());
-                       });
+function paint_token_density(points){
+    var canvas = scaled_canvas(0.25);
+    var ctx = canvas.getContext("2d");
+    points = bound_points(points,
+                          $page.min_x, $page.max_x,
+                          $page.min_y, $page.max_y);
+    $timestamp("pre density map");
+
+    if ($const.array_fuzz){
+        paint_density_array(ctx, points);
+    }
+    else{
+        paste_fuzz(ctx, points, $page.hill_fuzz);
+    }
+    $timestamp("applying density map");
+
+    var canvas2 = apply_density_map(ctx);
+    $timestamp("post density map");
+    $(canvas2).addClass("overlay").offset($($page.canvas).offset());
 }
 
 
@@ -623,4 +620,5 @@ function set_state(data){
     if (url != loc.href){
         h.pushState($state, "Hashmapd", url);
     }
+    hm_draw_map();
 }
