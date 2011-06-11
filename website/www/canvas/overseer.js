@@ -126,6 +126,8 @@ function hm_setup(){
     }
     $.when($waiters.map_known, $waiters.hill_fuzz_ready).done(make_height_map);
     construct_form();
+
+    $.when($waiters.map_known).done(make_density_map);
 }
 
 /** hm_draw_map draws the approriate map
@@ -145,7 +147,6 @@ function hm_draw_map(){
                $waiters.map_drawn).done(paint_labels);
     }
 
-    $.when($waiters.map_known).done(make_density_map);
     $.when($waiters.map_known,
            $waiters.hill_fuzz_ready).done(paint_map);
 }
@@ -451,6 +452,7 @@ function make_density_map(){
     var ctx = canvas.getContext("2d");
     paint_density_array(ctx, $page.tweeters);
     $page.density_canvas = canvas;
+    $timestamp("end make_density_map", true);
 }
 
 function hm_on_token_density(data){
