@@ -12,6 +12,9 @@ function make_fuzz_table_1d(radius, k){
         var dx2 = (x - radius) * (x - radius);
         //log(x, radius, dx2, k);
         table[x] = Math.exp(dx2 * k);
+        if (table[x] < 0.001){
+            table[x] = 0;
+        }
     }
     return table;
 }
