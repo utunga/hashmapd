@@ -55,26 +55,6 @@ function named_canvas(name, blank, p){
 }
 
 
-function paste_fuzz(ctx, points, images){
-    var counts = [];
-    for (var i = 0; i < points.length; i++){
-        var p = points[i];
-        var x = (p[0] - $page.min_x) * $page.x_scale;
-        var y = (p[1] - $page.min_y) * $page.y_scale;
-        var count = p[2];
-        counts[count] = (counts[count] || 0) + 1;
-        var img;
-        if (count <= $const.FUZZ_MAX_MULTIPLE){
-            img = images[count];
-        }
-        else{
-            /* XXX jump up to next scale */
-            img = images[$const.FUZZ_MAX_MULTIPLE];
-        }
-        ctx.drawImage(img, x - img.width / 2, y - img.height / 2);
-    }
-}
-
 /* Algorithm borrowed from John Barratt <http://www.langarson.com.au/>
  * as posted on Python Image-SIG in 2007.
  */
