@@ -398,9 +398,9 @@ function make_height_map(){
                                   $const.width, $const.height,
                                   $page.min_x, $page.min_y,
                                   $page.x_scale, $page.y_scale);
-        paste_fuzz_array(ctx, map,
-                         $const.ARRAY_FUZZ_RADIUS,
-                         $const.ARRAY_FUZZ_RADIX);
+        $page.scale = paste_fuzz_array(ctx, map,
+                                       $const.ARRAY_FUZZ_RADIUS,
+                                       $const.ARRAY_FUZZ_RADIX);
     }
     else{
         paste_fuzz(ctx, points, $page.hill_fuzz);
@@ -473,13 +473,16 @@ function paint_map(){
                                   z.max_x + x_padding,
                                   z.min_y - y_padding,
                                   z.max_y + y_padding);
-
+            $timestamp("start map");
             var map = make_fuzz_array(points, r, k,
                                       $const.width, $const.height,
                                       z.min_x, z.min_y,
                                       z.x_scale, z.y_scale);
+            $timestamp("made map");
+            paste_fuzz_array(height_ctx, map, r, $const.ARRAY_FUZZ_RADIX,
+                             $page.scale);
+            $timestamp("pasted map");
 
-            paste_fuzz_array(height_ctx, map, r, $const.ARRAY_FUZZ_RADIX);
         }
         else {
             zoom_in($page.height_canvas, height_ctx, d.x, d.y, d.width, d.height);
