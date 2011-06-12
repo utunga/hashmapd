@@ -27,11 +27,18 @@ var $const = {
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
-    REDRAW_HEIGHT_MAP: false, /*whether to redraw the height map on zoom */
+    REDRAW_HEIGHT_MAP: true, /*whether to redraw the height map on zoom */
 
     QUAD_TREE_COORDS: 15,
     COORD_MAX: 1 << 16,   /* exclusive maximum xy coordinates (1 << (QUAD_TREE_COORDS + 1)) */
     COORD_MIN: 0,   /* inclusive minimum xy coordinates. */
+    /*PADDING should be both:
+     * - bigger than the fuzz radius used to construct the map (so edge is sea).
+     *
+     * - big enough that PADDING/{width,height} is greater than the
+     *   inverse minimum resolution. That is > 1.0/128 if 7 quad tree
+     *   coordinates are used.
+     */
     PADDING: 24,    /*padding for the full size map in pixels*/
     width: 800,   /* canvas padded pixel width */
     height: 800,  /* canvas padded pixel height */
@@ -317,6 +324,10 @@ function hm_on_data(data){
     var height = $const.height;
     var max_value = 0;
     var points = decode_points(data.rows);
+    /* $const.absolute_{min,max}_{x,y} can be used to restrict the
+     * overall map to some region.  But you should really try to do
+     * that on the server.
+     */
     if ($const.absolute_min_x !== undefined ||
         $const.absolute_max_x !== undefined ||
         $const.absolute_min_y !== undefined ||
@@ -354,13 +365,11 @@ function hm_on_data(data){
     var pixel_range_x = $const.width - 2 * $const.PADDING;
     var x_scale = pixel_range_x / point_range_x;
     $page.min_x = min_x - $const.PADDING / x_scale;
-    $page.max_x = max_x + $const.PADDING / x_scale;
 
     var point_range_y = max_y - min_y;
-    var pixel_range_y = $const.width - 2 * $const.PADDING;
+    var pixel_range_y = $const.height - 2 * $const.PADDING;
     var y_scale = pixel_range_y / point_range_y;
     $page.min_y = min_y - $const.PADDING / y_scale;
-    $page.max_y = max_y - $const.PADDING / y_scale;
 
     if ($const.SQUISH_INTO_CANVAS){
         $page.x_scale = x_scale;
@@ -370,6 +379,8 @@ function hm_on_data(data){
         $page.x_scale = Math.min(x_scale, y_scale);
         $page.y_scale = Math.min(x_scale, y_scale);
     }
+    $page.max_x = $page.min_x + $const.width / $page.x_scale;
+    $page.max_y = $page.min_y + $const.width / $page.y_scale;
     $page.tweeters = points;
 }
 
@@ -381,11 +392,15 @@ function make_height_map(){
     var canvas = named_canvas("height_map", "rgba(255,0,0, 1)", 1);
     var ctx = canvas.getContext("2d");
     if ($const.array_fuzz){
-        paste_fuzz_array(ctx, points,
+        var map = make_fuzz_array(points,
+                                  $const.ARRAY_FUZZ_RADIUS,
+                                  $const.ARRAY_FUZZ_CONSTANT,
+                                  $const.width, $const.height,
+                                  $page.min_x, $page.min_y,
+                                  $page.x_scale, $page.y_scale);
+        paste_fuzz_array(ctx, map,
                          $const.ARRAY_FUZZ_RADIUS,
-                         $const.ARRAY_FUZZ_CONSTANT,
-                         $const.ARRAY_FUZZ_RADIX
-                        );
+                         $const.ARRAY_FUZZ_RADIX);
     }
     else{
         paste_fuzz(ctx, points, $page.hill_fuzz);
@@ -413,16 +428,28 @@ function get_zoom_pixel_bounds(zoom, left, top){
 }
 
 function get_zoom_point_bounds(zoom, left, top){
-    var size = COORD_MAX / (1 << zoom);
-    var outside = $const.COORD_MAX - size;
-    var min_x = Math.min(left, outside);
-    var min_y = Math.min(top, outside);
-    return {
+    var range_x = $page.max_x - $page.min_x;
+    var range_y = $page.max_y - $page.min_y;
+    var scale = 1.0 / (1 << zoom);
+    var size_x = range_x * scale;
+    var size_y = range_y * scale;
+    var out_x = range_x - size_x;
+    var out_y = range_y - size_y;
+    var min_x = Math.min(left, out_x);
+    var min_y = Math.min(top, out_y);
+
+    var x_scale = $const.width / size_x;
+    var y_scale = $const.height / size_y;
+
+    var z = {
         min_x: min_x,
         min_y: min_y,
-        max_x: min_x + size,
-        max_y: min_y + size
+        max_x: min_x + size_x,
+        max_y: min_y + size_y,
+        x_scale: x_scale,
+        y_scale: y_scale
     };
+    return z;
 }
 
 function paint_map(){
@@ -438,11 +465,21 @@ function paint_map(){
             var scale = 1 << zoom;
             var r = $const.ARRAY_FUZZ_RADIUS * scale;
             var k = $const.ARRAY_FUZZ_CONSTANT / scale;
-            var padded_left = Math.max(0, d.x - r);
-            var padded_top = Math.max(0, d.y - r);
-            var padded_right = Math.min($const.width, d.x + r);
-            var padded_bottom = Math.min($const.height, d.y + r);
-            paste_fuzz_array(height_ctx, points, r, k, $const.ARRAY_FUZZ_RADIX);
+            var z = get_zoom_point_bounds(zoom, $state.left, $state.top);
+            var x_padding = r / z.x_scale;
+            var y_padding = r / z.y_scale;
+
+            points = bound_points(points, z.min_x - x_padding,
+                                  z.max_x + x_padding,
+                                  z.min_y - y_padding,
+                                  z.max_y + y_padding);
+
+            var map = make_fuzz_array(points, r, k,
+                                      $const.width, $const.height,
+                                      z.min_x, z.min_y,
+                                      z.x_scale, z.y_scale);
+
+            paste_fuzz_array(height_ctx, map, r, $const.ARRAY_FUZZ_RADIX);
         }
         else {
             zoom_in($page.height_canvas, height_ctx, d.x, d.y, d.width, d.height);
