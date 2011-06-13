@@ -5,6 +5,7 @@ canvas{
   background: #000;
   display: block;
   margin: 10px auto 0 auto;
+  cursor:move;
 }
 canvas.overlay {
   background: none;
@@ -44,6 +45,13 @@ canvas.overlay {
   top: 0;
   background: #aaa;
   z-index: 99;
+
+  /*stop annoying selection interaction with drag */
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -o-user-select: none;
+  user-select: none;
 }
 
 #loading {
@@ -58,6 +66,7 @@ canvas.overlay {
   font: 40px bold sans-serif;
   background: black;
   padding: 100px;
+  cursor: progress;
 }
 
 #loading div{

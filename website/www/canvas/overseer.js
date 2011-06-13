@@ -115,7 +115,7 @@ var $timestamp;
 
 function hm_setup(){
     $timestamp = get_timer();
-    interpret_query();
+    interpret_query($state);
     $page.loading = loading_screen();
     $page.loading.show("Loading...");
 
@@ -148,7 +148,8 @@ function hm_setup(){
  */
 
 function hm_draw_map(){
-    interpret_query();
+    interpret_query($state);
+    set_ui($state);
     //$waiters.have_density = get_json('token_density', $state.density_resolution, hm_on_token_density);
     //$waiters.have_density = $.getJSON('tokens-gonna.json', hm_on_token_density);
     //$waiters.have_density = $.getJSON('tokens-check.json', hm_on_token_density);
@@ -590,157 +591,3 @@ function paint_labels(){
     }
 }
 
-/** interpret_query puts any well specified query parameters into $state
- *
- * This feels completely dodgy to a server side programmer, but is OK
- * on the client side.  They can only mangle their own browsers.
- */
-
-function interpret_query(dest, query){
-    if (dest === undefined){
-        dest = $state;
-    }
-    if (query === undefined || typeof(query) == 'string'){
-        query = get_query(query);
-    }
-    for (var param in query){
-        if (param in dest){
-            var v = query[param];
-            var existing = dest[param];
-            switch(typeof(existing)){
-            case "number":
-                v = parseFloat(v);
-                if (! isNaN(v)){
-                    dest[param] = v;
-                }
-                break;
-            case "boolean":
-                v = v.toLowerCase();
-                dest[param] = (!(v == "0" ||
-                                v == "false" ||
-                                v == "no" ||
-                                v == ""));
-                break;
-            case "string":
-                dest[param] = v;
-                break;
-            default:
-                log("ignoring " + param + "=" + v +
-                    " (unknown type)");
-            }
-        }
-        else {
-            log("ignoring " + param + "=" + v +
-                " (unknown attribute)");
-        }
-    }
-}
-
-function get_query(query){
-    if (query === undefined)
-        query = window.location.search.substring(1);
-    if (! query) return {};
-    var args = {};
-    var re = /([^&=]+)=?([^&]*)/g;
-    while (true){
-        var match = re.exec(query);
-        if (match === null){
-            return args;
-        }
-        args[decodeURIComponent(match[1])] = decodeURIComponent(match[2].replace(/\+/g, " "));
-    }
-}
-
-/**construct_form makes a quick for for testing purposes
- */
-
-function construct_form(){
-    $("#helpers").append('<form id="state"></form>');
-    var form = $("#state");
-    for (var param in $state){
-        var existing = $state[param];
-        if (typeof(existing) in {number: 1, string: 1}){
-            form.append(param + '<input name="' + param + '" value="' +
-                        existing + '"><br>');
-        }
-    }
-
-    var submit = function() {
-        var q = form.serialize();
-        set_state(q);
-        return false;
-    };
-
-    form.append(param + '<button>go</button>');
-    form.submit(submit);
-}
-
-function set_state(data){
-    var q;
-    if (typeof(data) == 'string'){
-        q = data;
-    }
-    else{
-        q = $.param(data);
-    }
-    interpret_query($state, q);
-    var h = window.history;
-    var loc = window.location;
-    var url = loc.href.split("?", 1)[0] + "?" + q;
-    if (url != loc.href){
-        h.replaceState($state, "Hashmapd", url);
-    }
-    hm_draw_map();
-}
-
-function update_state(args){
-    //XXX very round about
-    for (var k in args){
-        $state[k] = args[k];
-    }
-    set_state($state);
-}
-
-function construct_ui(){
-    var slider = $("#zoom-slider");
-    $(slider).slider({ orientation: 'vertical',
-                       max: 6,
-                       min: 0,
-                       slide: function( event, ui ) {
-                           update_state({'zoom': ui.value});
-                       }
-                     });
-    slider.offset($($page.canvas).offset());
-    var canvas = $($page.canvas);
-    var x, y;
-    canvas.mousedown(function(e){
-        x = e.pageX;
-        y = e.pageY;
-    });
-    var finish = function(e){
-        //dump_object(e);
-        log("x, y, e", x, y, e);
-        if (x !== undefined && y !== undefined){
-            var p = pixel_to_point_delta({'x': e.pageX - x, 'y': e.pageY - y});
-            log(p.x, p.y);
-            update_state({x: parseInt($state.x - p.x), y: parseInt($state.y - p.y)});
-        }
-        x = undefined;
-        y = undefined;
-    };
-    canvas.mouseup(finish);
-    canvas.mouseout(finish);
-}
-
-function pixel_to_point_delta(pix){
-    //dump_object($page);
-    log(pix.x, pix.y);
-
-    var scale_x = $page.x_scale * (1 << $state.zoom);
-    var scale_y = $page.y_scale * (1 << $state.zoom);
-
-    return {
-        x: pix.x / scale_x,
-        y: pix.y / scale_y
-    };
-};
