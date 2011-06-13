@@ -38,6 +38,13 @@ function log(){
     $("#debug").append(s);
 };
 
+function dump_object(o){
+    var s = '';
+    for (x in o){
+        s += x + ':' + o[x] + ', ';
+    }
+    alert(s);
+}
 
 function loading_screen(){
     var outer = $("#loading");

@@ -711,5 +711,36 @@ function construct_ui(){
                        }
                      });
     slider.offset($($page.canvas).offset());
-
+    var canvas = $($page.canvas);
+    var x, y;
+    canvas.mousedown(function(e){
+        x = e.pageX;
+        y = e.pageY;
+    });
+    var finish = function(e){
+        //dump_object(e);
+        log("x, y, e", x, y, e);
+        if (x !== undefined && y !== undefined){
+            var p = pixel_to_point_delta({'x': e.pageX - x, 'y': e.pageY - y});
+            log(p.x, p.y);
+            update_state({x: parseInt($state.x - p.x), y: parseInt($state.y - p.y)});
+        }
+        x = undefined;
+        y = undefined;
+    };
+    canvas.mouseup(finish);
+    canvas.mouseout(finish);
 }
+
+function pixel_to_point_delta(pix){
+    //dump_object($page);
+    log(pix.x, pix.y);
+
+    var scale_x = $page.x_scale * (1 << $state.zoom);
+    var scale_y = $page.y_scale * (1 << $state.zoom);
+
+    return {
+        x: pix.x / scale_x,
+        y: pix.y / scale_y
+    };
+};
