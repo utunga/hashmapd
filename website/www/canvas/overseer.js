@@ -94,8 +94,8 @@ var $waiters = {
  */
 
 var $state = {
-    left: 0,    /* left edge of drawn map (0 to COORD_MAX) */
-    top: 0,     /* top edge of drawn map */
+    x: 0,    /* centre of drawn map (0 to COORD_MAX) */
+    y: 0,
     zoom: 0,    /* zoom level. 0 is full size, 1 is 1/2, 2 is 1/4, etc */
 
     labels: false,
@@ -414,13 +414,19 @@ function make_height_map(){
 }
 
 
-function get_zoom_pixel_bounds(zoom, left, top){
+function get_zoom_pixel_bounds(zoom, centre_x, centre_y){
     var w = $page.canvas.width;
     var h = $page.canvas.height;
     var zw = w / (1 << zoom);
     var zh = h / (1 << zoom);
-    var x = Math.min(left * w / $const.COORD_MAX, w - zw);
-    var y = Math.min(top * h / $const.COORD_MAX, h - zh);
+    var range_x = $page.max_x - $page.min_x;
+    var range_y = $page.max_y - $page.min_y;
+
+    var left = Math.max(0, centre_x - range_x / (1 << zoom) / 2);
+    var top = Math.max(0, centre_y - range_y / (1 << zoom) / 2);
+
+    var x = Math.min(left * w / range_x, w - zw);
+    var y = Math.min(top * h / range_y, h - zh);
     return {
         x: x,
         y: y,
@@ -429,7 +435,7 @@ function get_zoom_pixel_bounds(zoom, left, top){
     };
 }
 
-function get_zoom_point_bounds(zoom, left, top){
+function get_zoom_point_bounds(zoom, centre_x, centre_y){
     var range_x = $page.max_x - $page.min_x;
     var range_y = $page.max_y - $page.min_y;
     var scale = 1.0 / (1 << zoom);
@@ -437,6 +443,9 @@ function get_zoom_point_bounds(zoom, left, top){
     var size_y = range_y * scale;
     var out_x = range_x - size_x;
     var out_y = range_y - size_y;
+    var left = Math.max(0, centre_x - size_x / 2);
+    var top = Math.max(0, centre_y - size_y / 2);
+
     var min_x = Math.min(left, out_x);
     var min_y = Math.min(top, out_y);
 
@@ -460,14 +469,15 @@ function paint_map(){
     var height_map;
     var zoom = $state.zoom;
     if (zoom){
+        var scale = 1 << zoom;
+
         height_map = named_canvas("zoomed_height_map", 'rgba(255,255,0,0)', 1);
         var height_ctx = height_map.getContext("2d");
-        var d = get_zoom_pixel_bounds(zoom, $state.left, $state.top);
+        var d = get_zoom_pixel_bounds(zoom, $state.x, $state.y);
         if ($const.REDRAW_HEIGHT_MAP){
-            var scale = 1 << zoom;
             var r = $const.ARRAY_FUZZ_RADIUS * scale;
             var k = $const.ARRAY_FUZZ_CONSTANT / scale;
-            var z = get_zoom_point_bounds(zoom, $state.left, $state.top);
+            var z = get_zoom_point_bounds(zoom, $state.x, $state.y);
             var x_padding = r / z.x_scale;
             var y_padding = r / z.y_scale;
 
