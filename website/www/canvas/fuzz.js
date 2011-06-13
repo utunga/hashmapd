@@ -10,7 +10,6 @@ function make_fuzz_table_1d(radius, k){
     var size = 2 * radius + 1;
     for (x = 0; x < size; x++){
         var dx2 = (x - radius) * (x - radius);
-        //log(x, radius, dx2, k);
         table[x] = Math.exp(dx2 * k);
         if (table[x] < 0.001){
             table[x] = 0;
@@ -267,76 +266,85 @@ function make_fuzz_array(points, radius, k,
  * small for <k>, the image will show clipped square cliffs.  If it is
  * too large, it wastes time making infinitesimal changes.
 */
-function paste_fuzz_array(ctx, map, radius, scale_radix, scale){
+function paste_fuzz_array(ctx, map, radius, radix, max_value){
     var img_width = ctx.canvas.width;
     var img_height = ctx.canvas.height;
     var img_height = map.length;
     var img_width = map[0].length;
     var row;
     var x, y;
-    /*find a good scale */
-    var max_value = 0;
-    for (y = 0; y < img_height; y++){
-        row = map[y];
-	for (x = 0; x < img_width; x++){
-            if(max_value < row[x]){
-                max_value = row[x];
+
+    if (max_value === undefined){
+        max_value = 0;
+        /*find the maximum to calculate a good scale */
+        for (y = 0; y < img_height; y++){
+            row = map[y];
+	    for (x = 0; x < img_width; x++){
+                if(max_value < row[x]){
+                    max_value = row[x];
+                }
             }
         }
     }
     /*do the map */
     var imgd = ctx.getImageData(0, 0, img_width, img_height);
     var pixels = imgd.data;
-    var yend = img_height;// + radius;
-    var xend = img_width;// + radius;
     var pix = 3;
 
-    if (scale_radix == 0){
-        if (scale == undefined){
-            scale = $const.ARRAY_FUZZ_SCALE / max_value;
-        }
-        for (y = 0; y < yend; y++){
-            row = map[y];
-	    for (x = 0; x < xend; x++, pix += 4){
-                pixels[pix] = parseInt(row[x] * scale);
-            }
-        }
-    }
-    else if (scale_radix < 0){
-        //scale_radix is the exponent
-        scale_radix = -scale_radix;
-        if (scale == undefined){
-            scale = $const.ARRAY_FUZZ_SCALE / (Math.pow(max_value, scale_radix) - 0.5);
-        }
-        for (y = radius; y < yend; y++){
-            row = map[y];
-	    for (x = radius; x < xend; x++, pix += 4){
-                pixels[pix] = parseInt((Math.pow(row[x], scale_radix) - 0.5) * scale);
-            }
-        }
-    }
-    else{
-        //scale_radix is the radix
-        if (scale == undefined){
-            scale = $const.ARRAY_FUZZ_SCALE / (Math.pow(scale_radix, max_value));
-        }
-        /* we need to offset the results a bit, because
-         * {scale_radix ^ 0} == 1 which is multiplied by scale.
-         *
-         * So, to get that to zero, subtract scale, but to help
-         * {scale_radix ^ 1} == scale_radix round to 1, we subtract
-         * something a bit less.  Zero height pixels go to 0.95,
-         * which is truncated to zero.
-         */
-        var offset = scale - 0.95;
-        for (y = radius; y < yend; y++){
-            row = map[y];
-	    for (x = radius; x < xend; x++, pix += 4){
-                pixels[pix] = parseInt(Math.pow(scale_radix, row[x]) *
-                                       scale - offset);
-            }
+    var lut = get_fuzz_scale_lut(radix, max_value);
+    var scale = lut.scale;
+    for (y = 0; y < img_height; y++){
+        row = map[y];
+	for (x = 0; x < img_width; x++, pix += 4){
+            pixels[pix] = lut[parseInt(row[x] * lut.scale)];
         }
     }
     ctx.putImageData(imgd, 0, 0);
-    return scale;
+    return max_value;
+}
+
+function get_fuzz_scale_lut(radix, max_value){
+    var i;
+    var lut = [];
+    var len = $const.ARRAY_FUZZ_LUT_LENGTH;
+    var scale = (len - 0.1) / max_value;
+    lut.scale = scale;
+    var f;
+
+    if (radix == 0){
+        f = function(i){
+            return parseInt(i * 255.9 / len);
+        };
+    }
+    else if (radix < 0){
+        //radix is the exponent
+        radix = -radix;
+        var s = 255 / Math.pow(len, radix);
+        f = function(i){
+            return parseInt((Math.pow(i, radix) - 0.5) * s);
+        };
+    }
+    else{
+        /* clip a piece out of the normal curve.  The desired
+         * characteristics are: a flat start, a definite knee, and a
+         * limit to the eventual slope.
+         */
+        var rl = -3.5;
+        var rh = -0.4;
+        var range = Math.abs(rl - rh);
+        var top = Math.exp(rh);
+        var bottom = Math.exp(rl);
+        var s = 255.9 / (top - bottom);
+
+        f = function(i){
+            var p = rl + i / len  * range;
+            return parseInt((Math.exp(p)  - bottom) * s);
+        };
+    }
+
+    for (i = 0; i < len; i++){
+        lut.push(f(i));
+    }
+    //alert(lut);
+    return lut;
 }

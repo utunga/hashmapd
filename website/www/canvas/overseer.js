@@ -15,9 +15,10 @@ var $const = {
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
     ARRAY_FUZZ_SCALE: 255.99, /*highest peak is this high*/
+    ARRAY_FUZZ_LUT_LENGTH: 1000, /*granularity of height conversion LUT */
     ARRAY_FUZZ_CONSTANT: -0.013, /*concentration for array fuzz */
     ARRAY_FUZZ_RADIUS: 18, /*array fuzz goes this far. shouldn't exceed PADDING */
-    ARRAY_FUZZ_RADIX: 1.2, /*exponential scaling for hills */
+    ARRAY_FUZZ_RADIX: 1.003, /*exponential scaling for hills */
     ARRAY_FUZZ_DENSITY_RADIX: 0, /*0 means linear */
     ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concentration for array fuzz */
     ARRAY_FUZZ_DENSITY_RADIUS: 30, /*array fuzz goes this far */
@@ -27,7 +28,7 @@ var $const = {
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
-    REDRAW_HEIGHT_MAP: true, /*whether to redraw the height map on zoom */
+    REDRAW_HEIGHT_MAP: false, /*whether to redraw the height map on zoom */
 
     QUAD_TREE_COORDS: 15,
     COORD_MAX: 1 << 16,   /* exclusive maximum xy coordinates (1 << (QUAD_TREE_COORDS + 1)) */
