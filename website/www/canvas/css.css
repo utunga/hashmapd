@@ -18,6 +18,14 @@ canvas.overlay {
   position: absolute;
   top: 0;
   left: 300px;
+  z-index: 6;
+}
+
+#zoom-slider {
+  /*width: 20px;*/
+  height: 200px;
+  /*background: red;*/
+  /*border: 1px solid green;*/
 }
 
 #helpers {

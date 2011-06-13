@@ -137,8 +137,9 @@ function hm_setup(){
     }
     $.when($waiters.map_known, $waiters.hill_fuzz_ready).done(make_height_map);
     construct_form();
+    construct_ui();
 
-    $.when($waiters.map_known).done(make_density_map);
+    //$.when($waiters.map_known).done(make_density_map);
 }
 
 /** hm_draw_map draws the approriate map
@@ -680,4 +681,25 @@ function set_state(data){
         h.replaceState($state, "Hashmapd", url);
     }
     hm_draw_map();
+}
+
+function update_state(args){
+    //XXX very round about
+    for (var k in args){
+        $state[k] = args[k];
+    }
+    set_state($state);
+}
+
+function construct_ui(){
+    var slider = $("#zoom-slider");
+    $(slider).slider({ orientation: 'vertical',
+                       max: 6,
+                       min: 0,
+                       slide: function( event, ui ) {
+                           update_state({'zoom': ui.value});
+                       }
+                     });
+    slider.offset($($page.canvas).offset());
+
 }
