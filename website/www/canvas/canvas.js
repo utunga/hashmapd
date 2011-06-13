@@ -74,7 +74,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var target_imgd = target_ctx.getImageData(0, 0, width, height);
     var target_pixels = target_imgd.data;
     var stride = width * 4;
-    var colours = make_colour_range_mountains(115);
+    var colours = make_colour_range_mountains(135);
     var row = stride; /*start on row 1, not row 0 */
     for (var y = 1, yend = height - 1; y < yend; y++){
         for (var x = 4 + 3, xend = stride - 4; x < xend; x += 4){
@@ -100,9 +100,9 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
             if (cc == 1){ /* the sea shore has less shadow */
                 c = (0.5 + c) / 2;
             }
-            target_pixels[a - 3] = colour[0] + 140 * c;
-            target_pixels[a - 2] = colour[1] + 140 * c;
-            target_pixels[a - 1] = colour[2] + 130 * c;
+            target_pixels[a - 3] = colour[0] + 120 * c;
+            target_pixels[a - 2] = colour[1] + 120 * c;
+            target_pixels[a - 1] = colour[2] + 120 * c;
             target_pixels[a] = 255;
         }
         row += stride;
@@ -177,10 +177,10 @@ function make_colour_range_mountains(scale){
         [ 80,  90,  90,   0],
         [ 70,  90,  90,   1],
         [ 95,  90,  20,   2],
-        [ 60, 105,  10,  10],
-        [ 40,  60,  10,  60],
-        [ 45,  40,   0, 100],
-        [ 45,  45,  35, 150],
+        [ 60, 105,  10,   8],
+        [ 50,  70,  10,  60],
+        [ 55,  50,   0, 100],
+        [ 55,  55,  45, 150],
         [ 95,  95,  95, 160],
         [100, 100, 100, 255]
     ];
