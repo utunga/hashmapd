@@ -28,7 +28,7 @@ var $const = {
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
-    REDRAW_HEIGHT_MAP: false, /*whether to redraw the height map on zoom */
+    REDRAW_HEIGHT_MAP: true, /*whether to redraw the height map on zoom */
 
     QUAD_TREE_COORDS: 15,
     COORD_MAX: 1 << 16,   /* exclusive maximum xy coordinates (1 << (QUAD_TREE_COORDS + 1)) */
@@ -477,7 +477,7 @@ function paint_map(){
         var d = get_zoom_pixel_bounds(zoom, $state.x, $state.y);
         if ($const.REDRAW_HEIGHT_MAP){
             var r = $const.ARRAY_FUZZ_RADIUS * scale;
-            var k = $const.ARRAY_FUZZ_CONSTANT / scale;
+            var k = $const.ARRAY_FUZZ_CONSTANT / (scale * scale);
             var z = get_zoom_point_bounds(zoom, $state.x, $state.y);
             var x_padding = r / z.x_scale;
             var y_padding = r / z.y_scale;
