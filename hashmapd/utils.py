@@ -21,8 +21,10 @@ def tiled_array_image(A):
 
     """
  
-    # if kw:
-    #   warning(deprecated parameter)
+    # Turn [tiles, pixels] array 'A' into
+    # [X, Y] tiles each being [x,y] pixels.
+    # where X*Y = tiles and x*y = pixels
+    # in an [X*x, Y*y] image, plus padding.
     
     A = A.T
     (tiles, pixels) = A.shape
@@ -45,41 +47,18 @@ def tiled_array_image(A):
     A /= (A.max(axis=1)[:, numpy.newaxis] + 1e-8)
     
     # pad because pixels per tile may be not square
-    print A.shape, tiles, pixels, tile_shape, img_shape
     padded = numpy.zeros([A.shape[0], numpy.product(img_shape)], A.dtype)
     padded[:] = numpy.NaN
     padded[:, 0:A.shape[1]] = A
     A = padded
 
-    # The expression below can be re-written in a more C style as 
-    # follows : 
-    #
-    # out_shape    = [0,0]
-    # out_shape[0] = (img_shape[0]+tile_spacing[0])*tile_shape[0] -
-    #                tile_spacing[0]
-    # out_shape[1] = (img_shape[1]+tile_spacing[1])*tile_shape[1] -
-    #                tile_spacing[1]
-    out_shape = [(ishp + tsp) * tshp - tsp for ishp, tshp, tsp 
-                        in zip(img_shape, tile_shape, tile_spacing)]
-
-    H, W = img_shape
-    Hs, Ws = tile_spacing
-
-    # generate a matrix to store the output
-    out_array = numpy.zeros(out_shape, dtype=A.dtype)
+    (xp, yp) = x+pad, y+pad
+    out_array = numpy.zeros([X*xp-pad, Y*yp-pad], dtype=A.dtype)
     out_array[:] = numpy.NaN
 
-    for tile_row in xrange(tile_shape[0]):
-        for tile_col in xrange(tile_shape[1]):
-            if tile_row * tile_shape[1] + tile_col < A.shape[0]:
-                this_img = A[tile_row * tile_shape[1] + tile_col].reshape(img_shape)
-                # add the slice to the corresponding position in the 
-                # output array
-                out_array[
-                    tile_row * (H+Hs):tile_row*(H+Hs)+H,
-                    tile_col * (W+Ws):tile_col*(W+Ws)+W
-                    ] \
-                    = this_img
+    for tile in range(min(X*Y, tiles)):
+        (row, col) = divmod(tile, X)
+        out_array[row*xp:row*xp+x, col*yp:col*yp+y] = A[tile].reshape(img_shape)
 
     image = PIL.Image.fromarray(255*numpy.nan_to_num(out_array)).convert("L")
     mask = PIL.Image.fromarray(255-255*(numpy.isnan(out_array))).convert("L")
