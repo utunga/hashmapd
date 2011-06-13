@@ -67,9 +67,10 @@ def read_user_word_counts(cfg):
         if iter % 10000==0:  #MKT: presumably a nicer way to do this ?
             print 'reading row '+ str(iter) + '..'
         iter += 1
-        user_id = int(row['user_id'])-1
-        word_id = int(row['word_id'])-1
+        user_id = int(row['user_id'])
+        word_id = int(row['word_id'])
         count = int(row['count'])
+        assert user_id >= 0 and word_id >= 0 and count >= 0
         raw_counts[user_id,word_id] = count
     
     print 'done reading input'
