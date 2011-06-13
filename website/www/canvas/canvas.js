@@ -370,6 +370,11 @@ function zoom_in(src, dest, x, y, w, h){
         src = src.canvas;
     }
     if(1){
+        /* maybe the correct thing to do is:
+            dest.drawImage(src, parseInt(x), parseInt(y), parseInt(w), parseInt(h),
+                           0, 0, dest.canvas.width, dest.canvas.height);
+                                   }
+         */
         dest.drawImage(src, x, y, w, h, 0, 0, dest.canvas.width, dest.canvas.height);
     }
     else {
