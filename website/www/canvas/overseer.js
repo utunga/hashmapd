@@ -677,7 +677,7 @@ function set_state(data){
     var loc = window.location;
     var url = loc.href.split("?", 1)[0] + "?" + q;
     if (url != loc.href){
-        h.pushState($state, "Hashmapd", url);
+        h.replaceState($state, "Hashmapd", url);
     }
     hm_draw_map();
 }
