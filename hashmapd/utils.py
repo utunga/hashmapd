@@ -2,43 +2,54 @@
 in anyway to the networks presented in the tutorials, but rather help in 
 processing the outputs into a more understandable way. 
 
-For example ``tile_raster_images`` helps in generating a easy to grasp 
+For example ``tiled_array_image`` helps in generating a easy to grasp 
 image from a set of samples or weights.
 """
 
 
-import numpy
+import numpy, PIL.Image
 
 
-def tile_raster_images(X, img_shape, tile_shape,tile_spacing = (0,0)):
+def tiled_array_image(A):
     """
-    Transform an array with one flattened image per row, into an array in 
-    which images are reshaped and layed out like tiles on a floor.
+    Transform an array with one flattened image per row, into an image in 
+    which the rows are reshaped and layed out like tiles on a floor.
 
     This function is useful for visualizing datasets whose rows are images, 
     and also columns of matrices for transforming those rows 
     (such as the first layer of a neural net).
 
-    :type X: a 2-D ndarray or a tuple of 4 channels, elements of which can 
-    be 2-D ndarrays or None;
-    :param X: a 2-D array in which every row is a flattened image.
-
-    :type img_shape: tuple; (height, width)
-    :param img_shape: the original shape of each image
-
-    :type tile_shape: tuple; (rows, cols)
-    :param tile_shape: the number of images to tile (rows, cols)
-    
-    :returns: array suitable for viewing as an image.  
-    (See:`PIL.Image.fromarray`.)
-    :rtype: a 2-d array with same dtype as X.
-
     """
  
-    assert len(img_shape) == 2
-    assert len(tile_shape) == 2
-    assert len(tile_spacing) == 2
-    print tile_spacing
+    # if kw:
+    #   warning(deprecated parameter)
+    
+    A = A.T
+    (tiles, pixels) = A.shape
+    if tiles >= pixels:
+        A = A.T
+        (tiles, pixels) = (pixels, tiles)
+    x = int(numpy.sqrt(pixels))
+    y = (pixels-1) // x + 1
+    img_shape = (x, y)
+    pad = 1 if max(x,y) < 4 else 2
+    tile_spacing = (pad, pad)
+    (x1, y1) = [d+s for (d,s) in zip(img_shape, tile_spacing)]
+    X = min((300 // x1) + 1, int(numpy.sqrt(tiles))+1)
+    Y = min((300 // y1) + 1, (tiles-1) // X + 1)
+    tile_shape = (X, Y)
+
+    # scale_rows_to_unit_interval
+    A = A.copy()
+    A -= A.min(axis=1)[:, numpy.newaxis]
+    A /= (A.max(axis=1)[:, numpy.newaxis] + 1e-8)
+    
+    # pad because pixels per tile may be not square
+    print A.shape, tiles, pixels, tile_shape, img_shape
+    padded = numpy.zeros([A.shape[0], numpy.product(img_shape)], A.dtype)
+    padded[:] = numpy.NaN
+    padded[:, 0:A.shape[1]] = A
+    A = padded
 
     # The expression below can be re-written in a more C style as 
     # follows : 
@@ -51,18 +62,17 @@ def tile_raster_images(X, img_shape, tile_shape,tile_spacing = (0,0)):
     out_shape = [(ishp + tsp) * tshp - tsp for ishp, tshp, tsp 
                         in zip(img_shape, tile_shape, tile_spacing)]
 
-    # if we are dealing with only one channel 
     H, W = img_shape
     Hs, Ws = tile_spacing
 
     # generate a matrix to store the output
-    out_array = numpy.zeros(out_shape, dtype=X.dtype)
+    out_array = numpy.zeros(out_shape, dtype=A.dtype)
     out_array[:] = numpy.NaN
 
     for tile_row in xrange(tile_shape[0]):
         for tile_col in xrange(tile_shape[1]):
-            if tile_row * tile_shape[1] + tile_col < X.shape[0]:
-                this_img = X[tile_row * tile_shape[1] + tile_col].reshape(img_shape)
+            if tile_row * tile_shape[1] + tile_col < A.shape[0]:
+                this_img = A[tile_row * tile_shape[1] + tile_col].reshape(img_shape)
                 # add the slice to the corresponding position in the 
                 # output array
                 out_array[
@@ -70,7 +80,16 @@ def tile_raster_images(X, img_shape, tile_shape,tile_spacing = (0,0)):
                     tile_col * (W+Ws):tile_col*(W+Ws)+W
                     ] \
                     = this_img
-    return out_array
+
+    image = PIL.Image.fromarray(255*numpy.nan_to_num(out_array)).convert("L")
+    mask = PIL.Image.fromarray(255-255*(numpy.isnan(out_array))).convert("L")
+    image.putalpha(mask)
+    scale = 300 // max(image.size)
+    if scale > 1:
+        scale = min(scale, 10)
+        image = image.resize([scale*d for d in image.size])
+
+    return image
 
 
 

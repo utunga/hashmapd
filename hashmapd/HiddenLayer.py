@@ -2,8 +2,7 @@ import numpy, time, cPickle, gzip, sys, os
 
 import theano
 import theano.tensor as T
-import PIL.Image
-from utils import tile_raster_images
+from utils import tiled_array_image
 from logistic_sgd import LogisticRegression
 
 class HiddenLayer(object):
@@ -66,21 +65,6 @@ class HiddenLayer(object):
         self.output = activation(T.dot(self.input, self.W) + self.b)
         # parameters of the model
         self.params = [self.W, self.b]
-        
-        (pixels, tiles) = (self.n_in, self.n_out)
-        self.trace_transpose_weights_file = pixels >= tiles
-        if not self.trace_transpose_weights_file:
-            (tiles, pixels) = (pixels, tiles)
-        x = int(numpy.sqrt(pixels))
-        y = (pixels-1) // x + 1
-        self.trace_img_shape = (x, y)
-        pad = 1 if max(x,y) < 4 else 2
-        self.trace_tile_spacing = (pad, pad)
-        (x1, y1) = [d+s for (d,s) in zip(self.trace_img_shape, self.trace_tile_spacing)]
-        X = min((300 // x1) + 1, int(numpy.sqrt(tiles))+1)
-        Y = min((300 // y1) + 1, (tiles-1) // X + 1)
-        self.trace_tile_shape = (X, Y)
-        print (pixels, x, y, X, Y, pad)
     
     #added MKT
     def export_model(self):
@@ -95,28 +79,6 @@ class HiddenLayer(object):
         self.b.value=inpt_params[1].value
         
     def export_weights_image(self, file_name):
-        # Construct image from the weight matrix
-        
-        x = self.W.value
-        if (self.trace_transpose_weights_file):
-            x = x.T
-        
-        # scale_rows_to_unit_interval
-        x = x.copy()
-        x -= x.min(axis=1)[:, numpy.newaxis]
-        x /= (x.max(axis=1)[:, numpy.newaxis] + 1e-8)
-        
-        x_padded = numpy.zeros([x.shape[0], numpy.product(self.trace_img_shape)], x.dtype)
-        x_padded[:] = numpy.NaN
-        x_padded[:, 0:x.shape[1]] = x
-        img_array = tile_raster_images( x_padded,
-            img_shape = self.trace_img_shape,tile_shape = self.trace_tile_shape, 
-            tile_spacing=self.trace_tile_spacing)
-        image = PIL.Image.fromarray(255*numpy.nan_to_num(img_array)).convert("L")
-        mask = PIL.Image.fromarray(255-255*(numpy.isnan(img_array))).convert("L")
-        image.putalpha(mask)
-        scale = 300 // max(image.size)
-        if scale > 1:
-            scale = min(scale, 10)
-            image = image.resize([scale*d for d in image.size])
+        # Construct image from the weight matrix        
+        image = tiled_array_image(self.W.value)
         image.save(file_name)
