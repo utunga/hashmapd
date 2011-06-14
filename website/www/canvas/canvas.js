@@ -38,17 +38,18 @@ function named_canvas(name, blank, p){
     var canvas = $page.canvases[name];
     if (canvas === undefined){
         canvas = scaled_canvas(p);
-        $page[name] = canvas;
-        if (blank){
-            var ctx = canvas.getContext("2d");
-            if (typeof(blank) == 'string'){
-                ctx.fillStyle = blank;
-                ctx.globalCompositeOperation = 'copy';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
-            else {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
+        $page.canvases[name] = canvas;
+    }
+    if (blank){
+        var ctx = canvas.getContext("2d");
+        if (typeof(blank) == 'string'){
+            /* this doesn't work on all browsers */
+            ctx.fillStyle = blank;
+            ctx.globalCompositeOperation = 'copy';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
     }
     return canvas;
