@@ -467,10 +467,8 @@ function get_zoom_point_bounds(zoom, centre_x, centre_y, width, height){
     var out_y = $page.range_y - size_y;
     var left = Math.max($page.min_x, centre_x - size_x / 2);
     var top = Math.max($page.min_y, centre_y - size_y / 2);
-
-    var min_x = Math.min(left, out_x);
-    var min_y = Math.min(top, out_y);
-
+    var min_x = Math.min(left, $page.min_x + out_x);
+    var min_y = Math.min(top, $page.min_y + out_y);
     var x_scale = width / size_x;
     var y_scale = height / size_y;
 
@@ -573,12 +571,6 @@ function paint_token_density(){
         return;
     }
     var points = $page.token_data[token];
-    /*
-    points = bound_points(points,
-                          $page.min_x, $page.max_x,
-                          $page.min_y, $page.max_y);
-     */
-    var zoom = $state.zoom;
     var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
 
