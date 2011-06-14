@@ -359,7 +359,7 @@ function paint_density_array(ctx, points){
         $page.x_scale  * 0.25, $page.y_scale * 0.25);
     paste_fuzz_array(ctx, map,
                      $const.ARRAY_FUZZ_DENSITY_RADIUS,
-                     $const.ARRAY_FUZZ_DENSITY_RADIX
+                     $const.ARRAY_FUZZ_DENSITY_SCALE_ARGS
                     );
 }
 

@@ -266,7 +266,7 @@ function make_fuzz_array(points, radius, k,
  * small for <k>, the image will show clipped square cliffs.  If it is
  * too large, it wastes time making infinitesimal changes.
 */
-function paste_fuzz_array(ctx, map, radius, radix, max_value){
+function paste_fuzz_array(ctx, map, radius, scale_args, max_value){
     var img_width = ctx.canvas.width;
     var img_height = ctx.canvas.height;
     var img_height = map.length;
@@ -290,8 +290,10 @@ function paste_fuzz_array(ctx, map, radius, radix, max_value){
     var imgd = ctx.getImageData(0, 0, img_width, img_height);
     var pixels = imgd.data;
     var pix = 3;
-
-    var lut = get_fuzz_scale_lut(radix, max_value);
+    /*concat rather than unshift, else scale_args will grow. */
+    var args = [max_value].concat(scale_args);
+    log(args);
+    var lut = get_fuzz_scale_lut.apply(undefined, args);
     var scale = lut.scale;
     for (y = 0; y < img_height; y++){
         row = map[y];
@@ -303,48 +305,58 @@ function paste_fuzz_array(ctx, map, radius, radix, max_value){
     return max_value;
 }
 
-function get_fuzz_scale_lut(radix, max_value){
+function get_fuzz_scale_lut(max_value, mode){
     var i;
     var lut = [];
     var len = $const.ARRAY_FUZZ_LUT_LENGTH;
     var scale = (len - 0.1) / max_value;
     lut.scale = scale;
     var f;
+    var max_out = $const.ARRAY_FUZZ_SCALE;
 
-    if (radix == 0){
+    if (mode == 'linear'){
         f = function(i){
-            return parseInt(i * 255.9 / len);
+            return parseInt(i * max_out / len);
         };
     }
-    else if (radix < 0){
+    else if (mode == 'base'){
         //radix is the exponent
-        radix = -radix;
-        var s = 255 / Math.pow(len, radix);
+        var radix = arguments[2];
+        var s = max_out / Math.pow(len, radix);
         f = function(i){
             return parseInt((Math.pow(i, radix) - 0.5) * s);
         };
     }
-    else{
+    else if (mode == 'clipped_gaussian'){
         /* clip a piece out of the normal curve.  The desired
          * characteristics are: a flat start, a definite knee, and a
          * limit to the eventual slope.
          */
-        var rl = -3.5;
-        var rh = -0.4;
+        var rl = arguments[2];
+        var rh = arguments[3];
         var range = Math.abs(rl - rh);
         var top = Math.exp(rh);
         var bottom = Math.exp(rl);
-        var s = 255.9 / (top - bottom);
+        var s = max_out / (top - bottom);
 
         f = function(i){
             var p = rl + i / len  * range;
             return parseInt((Math.exp(p)  - bottom) * s);
         };
     }
+    else{
+        log('unknown mode in get_fuzz_scale_lut:', mode);
+    }
 
     for (i = 0; i < len; i++){
         lut.push(f(i));
     }
+    /*add on a whole lot of head room (flat). Clipping is better than NaN-ing*/
+    var k = f(len - 1);
+    for (i = 0; i < len; i++){
+        lut.push(k);
+    }
+
     //alert(lut);
     return lut;
 }

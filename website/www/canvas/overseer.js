@@ -14,12 +14,13 @@ var $const = {
                   'http://hashmapd.halo.gen.nz:5984/frontend_dev/_design/user/_view/'),
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
-    ARRAY_FUZZ_SCALE: 255.99, /*highest peak is this high*/
-    ARRAY_FUZZ_LUT_LENGTH: 1000, /*granularity of height conversion LUT */
+    ARRAY_FUZZ_SCALE: 255, /*highest peak is this high*/
+    ARRAY_FUZZ_LUT_LENGTH: 2000, /*granularity of height conversion LUT */
     ARRAY_FUZZ_CONSTANT: -0.013, /*concentration for array fuzz */
     ARRAY_FUZZ_RADIUS: 18, /*array fuzz goes this far. shouldn't exceed PADDING */
-    ARRAY_FUZZ_RADIX: 1.003, /*exponential scaling for hills */
-    ARRAY_FUZZ_DENSITY_RADIX: 0, /*0 means linear */
+    /* *_SCALE_ARGS, out of ['linear'], ['clipped_gaussian', low, high], ['base', base] */
+    ARRAY_FUZZ_SCALE_ARGS: ['clipped_gaussian', -3.5, -0.4],
+    ARRAY_FUZZ_DENSITY_SCALE_ARGS: ['linear'],
     ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concentration for array fuzz */
     ARRAY_FUZZ_DENSITY_RADIUS: 30, /*array fuzz goes this far */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
@@ -404,7 +405,7 @@ function make_height_map(){
                                   $page.x_scale, $page.y_scale);
         $page.max_height = paste_fuzz_array(ctx, map,
                                             $const.ARRAY_FUZZ_RADIUS,
-                                            $const.ARRAY_FUZZ_RADIX);
+                                            $const.ARRAY_FUZZ_SCALE_ARGS);
     }
     else{
         paste_fuzz(ctx, points, $page.hill_fuzz);
@@ -488,7 +489,7 @@ function paint_map(){
                                       z.min_x, z.min_y,
                                       z.x_scale, z.y_scale);
             $timestamp("made map");
-            paste_fuzz_array(height_ctx, map, r, $const.ARRAY_FUZZ_RADIX,
+            paste_fuzz_array(height_ctx, map, r, $const.ARRAY_FUZZ_SCALE_ARGS,
                              $page.max_height);
             $timestamp("pasted map");
         }
