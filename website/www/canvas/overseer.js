@@ -17,7 +17,7 @@ var $const = {
     ARRAY_FUZZ_SCALE: 255, /*highest peak is this high*/
     ARRAY_FUZZ_LUT_LENGTH: 2000, /*granularity of height conversion LUT */
     ARRAY_FUZZ_CONSTANT: -0.013, /*concentration for array fuzz */
-    ARRAY_FUZZ_RADIUS: 18, /*array fuzz goes this far. shouldn't exceed PADDING */
+    ARRAY_FUZZ_RADIUS: 25, /*array fuzz goes this far. shouldn't exceed PADDING */
     /* *_SCALE_ARGS, out of ['linear'], ['clipped_gaussian', low, high], ['base', base] */
     ARRAY_FUZZ_SCALE_ARGS: ['clipped_gaussian', -3.5, -0.4],
     ARRAY_FUZZ_DENSITY_SCALE_ARGS: ['linear'],
