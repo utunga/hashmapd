@@ -13,7 +13,7 @@ h1 {
 }
 
 h1:before {
-  content: url(birds-30.png);
+  content: url(birds-30.PNG);
 }
 
 #ui p {
