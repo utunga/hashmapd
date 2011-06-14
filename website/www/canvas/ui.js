@@ -164,12 +164,19 @@ function construct_ui(){
                            set_state({'zoom': ui.value});
                        }
                      });
+    /*ui_grabber is a div that floats above everything, grabbing mouse moves.
+     * The point is to not worry about which canvas is on top.
+     */
+    var ui_grabber = $("#ui-grabber");
     var offset = $($page.canvas).offset();
+    ui_grabber.offset(offset);
+    ui_grabber.offset(offset);
+    ui_grabber.width($const.width);
+    ui_grabber.height($const.height);
     offset.left -= 20;
     slider.offset(offset);
-    var canvas = $($page.canvas);
     var x, y;
-    canvas.mousedown(function(e){
+    ui_grabber.mousedown(function(e){
         x = e.pageX;
         y = e.pageY;
     });
@@ -180,8 +187,8 @@ function construct_ui(){
         x = undefined;
         y = undefined;
     };
-    canvas.mouseup(finish);
-    canvas.mouseout(finish);
+    ui_grabber.mouseup(finish);
+    ui_grabber.mouseout(finish);
 }
 
 /** pan_pixel_delta moves the view window, if possible
