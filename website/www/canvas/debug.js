@@ -43,7 +43,8 @@ function dump_object(o){
     for (x in o){
         s += x + ':' + o[x] + ', ';
     }
-    alert(s);
+    //alert(s);
+    log(s);
 }
 
 function loading_screen(){

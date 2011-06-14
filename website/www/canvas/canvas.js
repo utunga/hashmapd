@@ -35,7 +35,7 @@ function scaled_canvas(p){
 /* get a particular canvas that is a member of $page, or if it doesn't
  * exist, make it up and store it */
 function named_canvas(name, blank, p){
-    var canvas = $page[name];
+    var canvas = $page.canvases[name];
     if (canvas === undefined){
         canvas = scaled_canvas(p);
         $page[name] = canvas;
@@ -326,7 +326,6 @@ function apply_density_map(ctx){
     var ctx2 = canvas2.getContext("2d");
     var width = canvas2.width;
     var height = canvas2.height;
-    //subtract(ctx, $page.density_canvas.getContext("2d"), 0.99);
     ctx2.drawImage(ctx.canvas, 0, 0, width, height);
 
     var imgd = ctx2.getImageData(0, 0, width, height);
