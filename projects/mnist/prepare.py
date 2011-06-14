@@ -14,7 +14,7 @@ def get_git_home():
 HOME = get_git_home()
 sys.path.append(HOME)
 
-from hashmapd.utils import tile_raster_images
+from hashmapd.utils import tiled_array_image
 from hashmapd.load_config import LoadConfig, DefaultConfig, dict_to_cfg
 
 TRAINING_FILE = "training_data"
@@ -95,9 +95,7 @@ def test_truncated_mnist(data_folder):
     # Plot filters after each training epoch
     
     # Construct image from the weight matrix 
-    image = PIL.Image.fromarray(tile_raster_images( train_set,
-             img_shape = (28,28),tile_shape = (30,30), 
-             tile_spacing=(1,1)))
+    image = tiled_array_image( train_set)
     image.save('trace/truncated_input.png')
     
 if __name__ == '__main__':

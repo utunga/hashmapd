@@ -7,9 +7,9 @@ import csv
 import cPickle
 import gzip
 import theano
-import time, PIL.Image
+import time
 
-from utils import tile_raster_images
+from utils import tiled_array_image
 # Some fileconstants
 
 ##real data
@@ -148,9 +148,7 @@ def test_normalize():
     # Plot filters after each training epoch
     
     # Construct image from the weight matrix 
-    image = PIL.Image.fromarray(tile_raster_images( train_set[0],
-             img_shape = (28,28),tile_shape = (30,30), 
-             tile_spacing=(1,1)))
+    image = tiled_array_image( train_set[0])
     image.save('truncated_normalized_input.png')
   
     print train_set[0][3].sum()
@@ -167,9 +165,7 @@ def test_normalize():
     # Plot filters after each training epoch
     
     # Construct image from the weight matrix 
-    image = PIL.Image.fromarray(tile_raster_images( train_set[0],
-             img_shape = (28,28),tile_shape = (30,30), 
-             tile_spacing=(1,1)))
+    image = tiled_array_image( train_set[0])
     image.save('truncated_input.png')
     
     print train_set[0][3].sum()

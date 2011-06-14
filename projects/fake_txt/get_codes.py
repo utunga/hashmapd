@@ -115,14 +115,10 @@ def output_trace(smh, data_x, prefix="run", skip_trace_images=True):
     output_y = smh.output_given_x(data_x.value);
     
     # Plot image and reconstrution 
-    image = PIL.Image.fromarray(tile_raster_images( X = data_x.value,
-             img_shape = (28,28),tile_shape = (10,10), 
-             tile_spacing=(1,1)))
+    image = tiled_array_image(data_x.value)
     image.save('trace/%s_input.png'%prefix)
     
-    image = PIL.Image.fromarray(tile_raster_images( X = output_y,
-             img_shape = (28,28),tile_shape = (10,10), 
-             tile_spacing=(1,1)))
+    image = tiled_array_image(output_y)
     image.save('trace/%s_reconstruction.png'%prefix)
 
 def get_output_codes(smh, data_x):
