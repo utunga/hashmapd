@@ -21,7 +21,8 @@ h1:before {
 }
 
 canvas{
-  background: #000;
+/*  background: #000;*/
+  background: #fff;
   display: block;
   margin: 10px auto 0 auto;
   cursor:move;

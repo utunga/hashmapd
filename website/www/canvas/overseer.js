@@ -139,8 +139,7 @@ function hm_setup(){
     $.when($waiters.map_known, $waiters.hill_fuzz_ready).done(make_height_map);
     construct_form();
     construct_ui();
-
-    //$.when($waiters.map_known).done(make_density_map);
+    $.when($waiters.map_known).done(make_density_map);
 }
 
 /** hm_draw_map draws the approriate map
@@ -152,7 +151,7 @@ function hm_draw_map(){
     interpret_query($state);
     set_ui($state);
     //$waiters.have_density = get_json('token_density', $state.density_resolution, hm_on_token_density);
-    //$waiters.have_density = $.getJSON('tokens-gonna.json', hm_on_token_density);
+    $waiters.have_density = $.getJSON('tokens/LOL_16.json', hm_on_token_density);
     //$waiters.have_density = $.getJSON('tokens-check.json', hm_on_token_density);
     $timestamp("start hm_draw_map", true);
     if ($state.labels){
@@ -534,7 +533,8 @@ function hm_on_token_density(data){
 }
 
 function paint_token_density(points){
-    var canvas = scaled_canvas(0.25);
+    //var canvas = scaled_canvas(0.25);
+    var canvas = named_canvas("density_map2", true, 0.25);
     var ctx = canvas.getContext("2d");
     points = bound_points(points,
                           $page.min_x, $page.max_x,

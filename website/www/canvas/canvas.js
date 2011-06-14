@@ -326,7 +326,7 @@ function apply_density_map(ctx){
     var ctx2 = canvas2.getContext("2d");
     var width = canvas2.width;
     var height = canvas2.height;
-    subtract(ctx, $page.density_canvas.getContext("2d"), 0.99);
+    //subtract(ctx, $page.density_canvas.getContext("2d"), 0.99);
     ctx2.drawImage(ctx.canvas, 0, 0, width, height);
 
     var imgd = ctx2.getImageData(0, 0, width, height);
@@ -349,12 +349,17 @@ function apply_density_map(ctx){
     return canvas2;
 }
 
-function paint_density_array(token_ctx, points){
-    token_ctx.fillStyle = "#f00";
-    token_ctx.fillRect(0, 0, token_ctx.canvas.width, token_ctx.canvas.height);
-    paste_fuzz_array(token_ctx, points,
+function paint_density_array(ctx, points){
+    //token_ctx.fillStyle = "#f00";
+    //token_ctx.fillRect(0, 0, token_ctx.canvas.width, token_ctx.canvas.height);
+    var map = make_fuzz_array(points,
+        $const.ARRAY_FUZZ_DENSITY_RADIUS,
+        $const.ARRAY_FUZZ_DENSITY_CONSTANT,
+        ctx.canvas.width, ctx.canvas.height,
+        $page.min_x, $page.min_y,
+        $page.x_scale  * 0.25, $page.y_scale * 0.25);
+    paste_fuzz_array(ctx, map,
                      $const.ARRAY_FUZZ_DENSITY_RADIUS,
-                     $const.ARRAY_FUZZ_DENSITY_CONSTANT,
                      $const.ARRAY_FUZZ_DENSITY_RADIX
                     );
 }
