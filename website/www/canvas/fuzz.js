@@ -153,6 +153,39 @@ function paste_fuzz(ctx, points, images){
     }
 }
 
+/** zeroed_2d_array makes a 2d array suitable for floating point stuff
+ *
+ * If $const.ARRAY_FUZZ_TYPED_ARRAY is set, Float32Array()s are used.
+ * This is faster on some browsers and slightly slower on others.  (It
+ * would be possible, with marginal benefit, to test this dynamically
+ * and use the right array in every browser).
+ *
+ * @param w
+ * @param h
+ *
+ * @return an Array of either Arrays or Float32Arrays, filled with zeros.
+ * */
+
+function zeroed_2d_array(w, h){
+    var x, y;
+    var map = [];
+    if ($const.ARRAY_FUZZ_TYPED_ARRAY){
+        for (y = 0 ; y < h; y++){
+            map[y] = new Float32Array(w);
+        }
+    }
+    else {
+        for (y = 0 ; y < h; y++){
+            var row = map[y] = [];
+            for (x = 0; x < w; x++){
+                row[x] = 0.0;
+            }
+        }
+    }
+    return map;
+}
+
+
 /** make_fuzz_array uses a gaussian kernel function to blur points
  *
  * The 2d gaussian is decomposed into 2 1d gaussians.  The first step
@@ -164,40 +197,20 @@ function paste_fuzz(ctx, points, images){
  *
  */
 function make_fuzz_array(points, radius, k,
-                         img_width, img_height,
+                         width, height,
                          min_x, min_y,
                          x_scale, y_scale
                         ){
     var lut = make_fuzz_table_1d(radius, k);
     var len = lut.length;
     var x, y, i;
-
-    /*we need 2 2D zeroed arrays.  If $const.ARRAY_FUZZ_TYPED_ARRAY is
-     *set, Float32Array()s are used.  This is faster on some browsers
-     *and slightly slower on others.  (It would be possible, with
-     *marginal benefit, to test this dynamically and use the right
-     *array in every browser).
-     */
-    var map = [];
-    var row1, row;
-    if ($const.ARRAY_FUZZ_TYPED_ARRAY){
-        for (y = 0 ; y < img_height; y++){
-            map[y] = new Float32Array(img_width);
-        }
-    }
-    else {
-        for (y = 0 ; y < img_height; y++){
-            map[y] = row = [];
-            for (x = 0; x < img_width; x++){
-                row[x] = 0;
-            }
-        }
-    }
+    var map = zeroed_2d_array(width, height);
+    var row;
 
     /* first pass: vertical spread from each point */
     var columns = {};
     /* extrema for simple pasting in-array */
-    var max_oy = img_height - len;
+    var max_oy = height - len;
     var min_oy = 0;
     for (i = 0; i < points.length; i++){
         var p = points[i];
@@ -207,8 +220,8 @@ function make_fuzz_array(points, radius, k,
         var oy = py - radius;
         var s = 0;
         var e = len;
-        if (oy + e > img_height){
-            e = img_height - oy;
+        if (oy + e > height){
+            e = height - oy;
         }
         if (oy < 0){
             s = -oy;
@@ -217,7 +230,7 @@ function make_fuzz_array(points, radius, k,
         var col = columns[px];
         if (col == undefined){
             col = [];
-            for (var j = 0; j < img_height; j++){
+            for (var j = 0; j < height; j++){
                 col[j] = 0.0;
             }
             columns[px] = col;
@@ -227,21 +240,21 @@ function make_fuzz_array(points, radius, k,
         }
     }
     /* second pass: horizontal spread from all pixels */
-    var count = 0;
+    var count = 0; /*counts additions */
+    var cols = 0; /*for counting columns*/
 
     for (x in columns){
-        for (y = 0; y < img_height; y++){
+        for (y = 0; y < height; y++){
             row = map[y];
             var v = columns[x][y];
             if (v < 0.001){
                 continue;
             }
-            count ++;
             var ox = x - radius;
             var s = 0;
             var e = len;
-            if (ox + e > img_width){
-                e = img_width - ox;
+            if (ox + e > width){
+                e = width - ox;
             }
             if (ox < 0){
                 s = -ox;
@@ -249,37 +262,35 @@ function make_fuzz_array(points, radius, k,
             for (i = s; i < e; i++){
                 row[ox + i] += v * lut[i];
             }
+            count += e - s;
         }
+        cols += 1;
     }
-    log(count, "expansions");
+    log(count, "expansions;", cols, "columns;", width, "width");
     return map;
 }
 
 /** paste_fuzz_array gaussian kernel using arrays
  *
  * @param ctx a canvas 2d context to paint on
- * @param points the array of points
- * @param radius how far the influence of a point reaches
- * @param k a constant defining the shape of the gaussian
+ * @param map a 2d array of floating point values
+ * @param scale_args array determining scaling of map values
+ * @param max_value considered highest value in map (undefined for auto)
  *
- * <k> and <radius> should agree with each other: if <radius> is too
- * small for <k>, the image will show clipped square cliffs.  If it is
- * too large, it wastes time making infinitesimal changes.
+ * @return the given or discovered max_value.
 */
-function paste_fuzz_array(ctx, map, radius, scale_args, max_value){
-    var img_width = ctx.canvas.width;
-    var img_height = ctx.canvas.height;
-    var img_height = map.length;
-    var img_width = map[0].length;
+function paste_fuzz_array(ctx, map, scale_args, max_value){
+    var height = map.length;
+    var width = map[0].length;
     var row;
     var x, y;
 
     if (max_value === undefined){
         max_value = 0;
         /*find the maximum to calculate a good scale */
-        for (y = 0; y < img_height; y++){
+        for (y = 0; y < height; y++){
             row = map[y];
-	    for (x = 0; x < img_width; x++){
+	    for (x = 0; x < width; x++){
                 if(max_value < row[x]){
                     max_value = row[x];
                 }
@@ -287,17 +298,16 @@ function paste_fuzz_array(ctx, map, radius, scale_args, max_value){
         }
     }
     /*do the map */
-    var imgd = ctx.getImageData(0, 0, img_width, img_height);
+    var imgd = ctx.getImageData(0, 0, width, height);
     var pixels = imgd.data;
     var pix = 3;
-    /*concat rather than unshift, else scale_args will grow. */
+    /*concat rather than unshift, lest scale_args grow over time. */
     var args = [max_value].concat(scale_args);
-    log(args);
     var lut = get_fuzz_scale_lut.apply(undefined, args);
     var scale = lut.scale;
-    for (y = 0; y < img_height; y++){
+    for (y = 0; y < height; y++){
         row = map[y];
-	for (x = 0; x < img_width; x++, pix += 4){
+	for (x = 0; x < width; x++, pix += 4){
             pixels[pix] = lut[parseInt(row[x] * lut.scale)];
         }
     }

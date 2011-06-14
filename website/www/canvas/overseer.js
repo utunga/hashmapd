@@ -404,7 +404,6 @@ function make_height_map(){
                                   $page.min_x, $page.min_y,
                                   $page.x_scale, $page.y_scale);
         $page.max_height = paste_fuzz_array(ctx, map,
-                                            $const.ARRAY_FUZZ_RADIUS,
                                             $const.ARRAY_FUZZ_SCALE_ARGS);
     }
     else{
