@@ -39,10 +39,11 @@ function log(){
 };
 
 function dump_object(o){
-    var s = '';
+    var s = '{\n';
     for (x in o){
-        s += x + ':' + o[x] + ', ';
+        s += '  ' + x + ':' + o[x] + ',\n';
     }
+    s += '}';
     //alert(s);
     log(s);
 }
