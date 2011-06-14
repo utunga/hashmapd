@@ -164,7 +164,9 @@ function construct_ui(){
                            set_state({'zoom': ui.value});
                        }
                      });
-    slider.offset($($page.canvas).offset());
+    var offset = $($page.canvas).offset();
+    offset.left -= 20;
+    slider.offset(offset);
     var canvas = $($page.canvas);
     var x, y;
     canvas.mousedown(function(e){
