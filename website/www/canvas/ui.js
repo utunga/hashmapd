@@ -182,14 +182,32 @@ function construct_ui(){
     canvas.mouseout(finish);
 }
 
+/** pan_pixel_delta moves the view window, if possible
+ *
+ * If the view bangs into the edge of the map, it stops moving in that
+ * direction.
+ *
+ * @param dx
+ * @param dy
+ *
+ */
+
 function pan_pixel_delta(dx, dy){
-    var scale_x = $page.x_scale * (1 << $state.zoom);
-    var scale_y = $page.y_scale * (1 << $state.zoom);
+    var z = (1 << $state.zoom);
+    var scale_x = $page.x_scale * z;
+    var scale_y = $page.y_scale * z;
     var px = dx / scale_x;
     var py = dy / scale_y;
     var x = parseInt($state.x - px);
     var y = parseInt($state.y - py);
-    x = Math.max($page.min_x, Math.min($page.max_x, x));
-    y = Math.max($page.min_y, Math.min($page.max_y, y));
-    set_state({x: x, y: y});
+    /* because x and y are centre points, they need to be constrained
+     * according to the zoom.
+     */
+    var range_x = $page.max_x - $page.min_x;
+    var range_y = $page.max_y - $page.min_y;
+    var pad_x = range_x / (z * 2);
+    var pad_y = range_y / (z * 2);
+    x = Math.max($page.min_x + pad_x, Math.min($page.max_x - pad_x, x));
+    y = Math.max($page.min_y + pad_y, Math.min($page.max_y - pad_y, y));
+    set_state({x: parseInt(x), y: parseInt(y)});
 }
