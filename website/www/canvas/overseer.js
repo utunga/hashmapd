@@ -338,7 +338,6 @@ function bound_points(points, xmin, xmax, ymin, ymax){
  *
  * It coordinates the actual drawing.
  *
- * @param canvas the html5 canvas
  * @param data is parsed but otherwise unprocessed JSON data.
  */
 

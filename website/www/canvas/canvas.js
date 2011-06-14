@@ -329,14 +329,13 @@ function apply_density_map(src_ctx){
             pixels[i - 3] = (map_pixels[i - 2] * 2 - map_pixels[i - 1]);
             pixels[i - 2] = (map_pixels[i - 1] * 2 - map_pixels[i - 3]);
             pixels[i - 1] = (map_pixels[i - 3] * 2 - map_pixels[i - 2]);
-            //pixels[i] *= 0.65;
         }
         else{
             pixels[i] = 0;
         }
     }
-    ctx2.putImageData(imgd, 0, 0);
-    return canvas2;
+    ctx.putImageData(imgd, 0, 0);
+    return canvas;
 }
 
 function paint_density_array(ctx, points){

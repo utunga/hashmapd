@@ -30,6 +30,7 @@ h1:before {
 
 canvas{
 /*  background: #000;*/
+  border: 1px solid #ccc;
   background: #fff;
   display: block;
   margin: 10px auto 0 auto;

@@ -136,7 +136,7 @@ function set_state(data){
     log("$state unchanged by set_state");
 }
 
-/** set_sets the UI elements to match the given state
+/** set_ui sets the UI elements to match the given state
  *
  * @param state takes the form of the global $state.
  */
@@ -154,6 +154,9 @@ function set_ui(state){
         }
     );
 }
+
+/** construct_ui makes a zoom slider and sets up mouse dragging.
+ */
 
 function construct_ui(){
     var slider = $("#zoom-slider");
