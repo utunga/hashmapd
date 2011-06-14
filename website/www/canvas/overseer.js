@@ -45,7 +45,7 @@ var $const = {
     height: 800,  /* canvas padded pixel height */
 
     array_fuzz: true,
-    HILL_LUT_CENTRE: 300,
+    HILL_LUT_CENTRE: 400,
     HILL_SHADE_FLATNESS: 16.0, /*8 is standard, higher means flatter hills */
     views : {  /* helps in interpreting various views. */
         locations: {},

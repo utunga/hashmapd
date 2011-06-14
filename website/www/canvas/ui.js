@@ -112,7 +112,7 @@ function set_state(data){
     if (typeof(data) == 'string'){
         data = parse_query(data);
     }
-    
+
     var copy = {};
     for (k in $state){
         copy[k] = $state[k];
@@ -145,12 +145,9 @@ function set_ui(state){
     var slider = $("#zoom-slider");
     slider.slider("value", state.zoom);
     /*debug form */
-    log("set_ui", slider.slider("value"));
     $("#state input").each(
         function(i) {
-            //dump_object(this);
             var k = this.name;
-            log(this, k, i);
             if (state[k] !== undefined){
                 this.value = state[k];
             }
