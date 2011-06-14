@@ -300,26 +300,6 @@ function add_label(ctx, text, x, y, size, colour, shadow){
     ctx.fillText(text, x, y);
 }
 
-function subtract(ctx, ctx2, degree){
-    var width = ctx.canvas.width;
-    var height = ctx.canvas.height;
-    var imgd = ctx.getImageData(0, 0, width, height);
-    var pixels = imgd.data;
-    var pixels2 = ctx.getImageData(0, 0, width, height).data;
-    var max_pixel = 0;
-    for (var i = 3, end = width * height * 4; i < end; i += 4){
-        var p = pixels[i] - pixels2[i] * degree;
-        if (p > max_pixel)
-            max_pixel = p;
-        pixels[i] = p;
-    }
-    var scale = 255 / max_pixel;
-    for (var i = 3, end = width * height * 4; i < end; i += 4){
-        pixels[i] *= scale;
-    }
-    ctx.putImageData(imgd, 0, 0);
-}
-
 
 function apply_density_map(ctx){
     var canvas2 = scaled_canvas();

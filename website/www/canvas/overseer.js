@@ -511,13 +511,6 @@ function paint_map(){
 }
 
 
-function make_density_map(){
-    var canvas = named_canvas("user_density_map", true, 0.25);
-    var ctx = canvas.getContext("2d");
-    paint_density_array(ctx, $page.tweeters);
-    $timestamp("end make_density_map", true);
-}
-
 function hm_on_token_density(data){
     log("in hm_on_token_density");
     var points = decode_points(data.rows);
