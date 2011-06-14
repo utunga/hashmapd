@@ -80,7 +80,13 @@ var $page = {
     max_x:  undefined,
     max_y:  undefined,
     hillshade_luts: {},
-
+    /*token_data is a cache of token density data, with a list of points for each
+     * known token. Like so:
+     * {'LOL': [[x, y, value, precision], [x, y, value, precision], ...],
+     *  'Orange': [...],
+     * ...}
+     *  */
+    token_data: {},
     tweeters: undefined, /*the parsed user data that makes the main map. */
 
     trailing_commas_are_GOOD: true
@@ -93,6 +99,7 @@ var $waiters = {
     height_map_drawn: undefined,
     hill_fuzz_ready: undefined,
     have_density: undefined,
+    density_drawn: undefined,
 
     trailing_commas_are_GOOD: true
 };
@@ -144,6 +151,10 @@ function hm_setup(){
     $.when($waiters.map_known, $waiters.hill_fuzz_ready).done(make_height_map);
     construct_form();
     construct_ui();
+
+    /* move this here FOR NOW*/
+    $state.token = 'LOL';
+    $waiters.have_density = $.getJSON('tokens/LOL_16.json', hm_on_token_density);
 }
 
 /** hm_draw_map draws the approriate map
@@ -155,7 +166,6 @@ function hm_draw_map(){
     interpret_query($state);
     set_ui($state);
     //$waiters.have_density = get_json('token_density', $const.DENSITY_RESOLUTION, hm_on_token_density);
-    $waiters.have_density = $.getJSON('tokens/LOL_16.json', hm_on_token_density);
     $timestamp("start hm_draw_map", true);
     if ($state.labels){
         $waiters.have_labels = get_json('tokens', 7, hm_on_labels);
@@ -165,6 +175,11 @@ function hm_draw_map(){
 
     $.when($waiters.map_known,
            $waiters.hill_fuzz_ready).done(paint_map);
+
+    $.when($waiters.map_known,
+           $waiters.hill_fuzz_ready,
+           $waiters.have_density)
+                   .done(paint_token_density);
 }
 
 
@@ -229,11 +244,16 @@ function start_fuzz_creation(deferred){
  * The quad tree coordinates are converted to X, Y coordinates.  The
  * final result is an array of arrays, structured thus:
  *
- *  [ [x_coord, y_coord, value],
- *    [x_coord, y_coord, value],
+ *  [ [x_coord, y_coord, value, precision, extra],
+ *    [x_coord, y_coord, value, precision, extra],
  *  ...]
  *
- * The value is untouched.
+ * where precision indicates the number of quadtree coordinates found,
+ * and extra is any string data that preceded the quadtree coordinates
+ * (usually a token name).
+ *
+ * The value is untouched.  In practice it is usually an integer
+ * count, but could be anything encodable in json.
  *
  * @param raw  the json data (as parsed by JSON or jquery objects)
  *
@@ -435,20 +455,25 @@ function get_zoom_pixel_bounds(zoom, centre_x, centre_y){
     };
 }
 
-function get_zoom_point_bounds(zoom, centre_x, centre_y){
+function get_zoom_point_bounds(zoom, centre_x, centre_y, width, height){
+    if (width === undefined)
+        width = $const.width;
+    if (height === undefined)
+        height = $const.height;
+
     var scale = 1.0 / (1 << zoom);
     var size_x = $page.range_x * scale;
     var size_y = $page.range_y * scale;
     var out_x = $page.range_x - size_x;
     var out_y = $page.range_y - size_y;
-    var left = Math.max(0, centre_x - size_x / 2);
-    var top = Math.max(0, centre_y - size_y / 2);
+    var left = Math.max($page.min_x, centre_x - size_x / 2);
+    var top = Math.max($page.min_y, centre_y - size_y / 2);
 
     var min_x = Math.min(left, out_x);
     var min_y = Math.min(top, out_y);
 
-    var x_scale = $const.width / size_x;
-    var y_scale = $const.height / size_y;
+    var x_scale = width / size_x;
+    var y_scale = height / size_y;
 
     var z = {
         min_x: min_x,
@@ -461,6 +486,30 @@ function get_zoom_point_bounds(zoom, centre_x, centre_y){
     return z;
 }
 
+function zoomed_paint(ctx, points, zoom, r, k, scale_args, max_height){
+    var scale = 1 << zoom;
+    var w = ctx.canvas.width;
+    var h = ctx.canvas.height;
+    r *= scale;
+    k /= (scale * scale);
+    var z = get_zoom_point_bounds(zoom, $state.x, $state.y, w, h);
+    var x_padding = r / z.x_scale;
+    var y_padding = r / z.y_scale;
+    points = bound_points(points, z.min_x - x_padding,
+                          z.max_x + x_padding,
+                          z.min_y - y_padding,
+                          z.max_y + y_padding);
+    $timestamp("start zoomed paint");
+    var map = make_fuzz_array(points, r, k, w, h,
+                              z.min_x, z.min_y,
+                              z.x_scale, z.y_scale);
+    $timestamp("made zoomed map");
+    max_height = paste_fuzz_array(ctx, map, scale_args, max_height);
+    $timestamp("pasted zoomed map");
+    return max_height;
+}
+
+
 function paint_map(){
     $timestamp("start paint_map");
     var points = $page.tweeters;
@@ -468,31 +517,17 @@ function paint_map(){
     var zoom = $state.zoom;
     if (zoom){
         var scale = 1 << zoom;
-        height_map = named_canvas("zoomed_height_map", 'rgba(255,255,0,0)', 1);
+        height_map = named_canvas("zoomed_height_map", true, 1);
         var height_ctx = height_map.getContext("2d");
-        var d = get_zoom_pixel_bounds(zoom, $state.x, $state.y);
         if ($const.REDRAW_HEIGHT_MAP){
-            var r = $const.ARRAY_FUZZ_RADIUS * scale;
-            var k = $const.ARRAY_FUZZ_CONSTANT / (scale * scale);
-            var z = get_zoom_point_bounds(zoom, $state.x, $state.y);
-            var x_padding = r / z.x_scale;
-            var y_padding = r / z.y_scale;
-
-            points = bound_points(points, z.min_x - x_padding,
-                                  z.max_x + x_padding,
-                                  z.min_y - y_padding,
-                                  z.max_y + y_padding);
-            $timestamp("start map");
-            var map = make_fuzz_array(points, r, k,
-                                      $const.width, $const.height,
-                                      z.min_x, z.min_y,
-                                      z.x_scale, z.y_scale);
-            $timestamp("made map");
-            paste_fuzz_array(height_ctx, map, r, $const.ARRAY_FUZZ_SCALE_ARGS,
-                             $page.max_height);
-            $timestamp("pasted map");
+            var height = zoomed_paint(height_ctx, points, zoom,
+                                  $const.ARRAY_FUZZ_RADIUS,
+                                  $const.ARRAY_FUZZ_CONSTANT,
+                                  $const.ARRAY_FUZZ_SCALE_ARGS,
+                                  undefined);
         }
         else {
+            var d = get_zoom_pixel_bounds(zoom, $state.x, $state.y);
             zoom_in($page.height_canvas, height_ctx, d.x, d.y, d.width, d.height);
         }
     }
@@ -513,28 +548,48 @@ function paint_map(){
 function hm_on_token_density(data){
     log("in hm_on_token_density");
     var points = decode_points(data.rows);
-    $.when($waiters.map_known, $waiters.hill_fuzz_ready).done(
-        function(){
-            paint_token_density(points);
-        });
+    var i, p;
+    var cache = $page.token_data;
+    for (i = 0; i < points.length; i++){
+        p = points[i];
+        var token = p.pop();
+        if (! (token in cache)){
+            log("starting density cache for", token);
+            cache[token] = [];
+        }
+        /*XXX need to look at replacing less precise values*/
+        cache[token].push(p);
+    }
 }
 
-function paint_token_density(points){
-    var canvas = named_canvas("density_map", true, 0.25);
-    var ctx = canvas.getContext("2d");
+function paint_token_density(){
+    var token = $state.token;
+    if (token === undefined){
+        log("no token density to draw! phew!");
+        return;
+    }
+    if (! (token in $page.token_data)){
+        /*what to do? fire off another request? */
+        log("no token data for ", token, "in paint_token_density");
+        return;
+    }
+    var points = $page.token_data[token];
+    /*
     points = bound_points(points,
                           $page.min_x, $page.max_x,
                           $page.min_y, $page.max_y);
-    $timestamp("pre density map");
+     */
+    var zoom = $state.zoom;
+    var canvas = named_canvas("density_map", true, 0.25);
+    var ctx = canvas.getContext("2d");
 
-    if ($const.array_fuzz){
-        paint_density_array(ctx, points);
-    }
-    else{
-        paste_fuzz(ctx, points, $page.hill_fuzz);
-    }
+    var height = zoomed_paint(ctx, points, $state.zoom,
+                              $const.ARRAY_FUZZ_DENSITY_RADIUS,
+                              $const.ARRAY_FUZZ_DENSITY_CONSTANT,
+                              $const.ARRAY_FUZZ_DENSITY_SCALE_ARGS,
+                              undefined);
+
     $timestamp("applying density map");
-
     var canvas2 = apply_density_map(ctx);
     $timestamp("post density map");
     $(canvas2).addClass("overlay").offset($($page.canvas).offset());

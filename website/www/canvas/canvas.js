@@ -302,16 +302,26 @@ function add_label(ctx, text, x, y, size, colour, shadow){
 }
 
 
-function apply_density_map(ctx){
-    var canvas2 = scaled_canvas();
-    var ctx2 = canvas2.getContext("2d");
-    var width = canvas2.width;
-    var height = canvas2.height;
-    ctx2.drawImage(ctx.canvas, 0, 0, width, height);
+function apply_density_map(src_ctx){
+    var canvas = named_canvas("density_overlay", true);
+    var ctx = canvas.getContext("2d");
+    var width = canvas.width;
+    var height = canvas.height;
+    /* paste the raw image on the canvas */
+    ctx.drawImage(src_ctx.canvas, 0, 0, width, height);
 
-    var imgd = ctx2.getImageData(0, 0, width, height);
+    var imgd = ctx.getImageData(0, 0, width, height);
     var pixels = imgd.data;
-    var height_pixels = $page.height_canvas.getContext("2d").getImageData(0, 0, width, height).data;
+    /* two possible height references, depending on whether zoom is zero */
+    var hctx;
+    if ($state.zoom == 0){
+        hctx = $page.height_canvas.getContext("2d");
+    }
+    else {
+        hctx = named_canvas("zoomed_height_map").getContext("2d");
+    }
+
+    var height_pixels = hctx.getImageData(0, 0, width, height).data;
     var map_pixels = $page.canvas.getContext("2d").getImageData(0, 0, width, height).data;
     for (var i = 3, end = width * height * 4; i < end; i += 4){
         var x = pixels[i] * height_pixels[i];
