@@ -115,6 +115,7 @@ var $timestamp;
 
 function hm_setup(){
     $timestamp = get_timer();
+    interpret_query($const);
     interpret_query($state);
     $page.loading = loading_screen();
     $page.loading.show("Loading...");
