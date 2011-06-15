@@ -1,3 +1,13 @@
+/*z-indexes
+most stuff, including the main canvas, are a 0 */
+canvas.overlay        {z-index:   2}
+#canvas-temp          {z-index:   4}
+#ui                   {z-index:   6}
+#loading              {z-index:   9}
+#debug                {z-index:  99}
+#ui-grabber           {z-index: 999}
+
+
 body{
   background: #fff;
   color: #333;
@@ -22,14 +32,19 @@ h1:before {
 
 canvas{
 /*  background: #000;*/
+  border: 1px solid #ccc;
   background: #fff;
   display: block;
   margin: 10px auto 0 auto;
-  cursor:move;
 }
 
 canvas.overlay {
   background: none;
+}
+
+#ui-grabber {
+  cursor:move;
+  position:absolute;
 }
 
 #content{
@@ -40,7 +55,6 @@ canvas.overlay {
   position: absolute;
   top: 0;
   left: 0px;
-  z-index: 6;
 }
 
 #zoom-slider {
@@ -61,15 +75,15 @@ canvas.overlay {
   position: absolute;
   right: 0;
   top: 0;
-  background: #aaa;
-  z-index: 99;
-
+  padding: 1px;
+  border: #ccc 1px solid;
   /*stop annoying selection interaction with drag */
   -webkit-user-select: none;
   -khtml-user-select: none;
   -moz-user-select: none;
   -o-user-select: none;
   user-select: none;
+  white-space: pre;
 }
 
 #loading {
@@ -86,7 +100,6 @@ canvas.overlay {
   background: #fff;
   padding: 100px;
   cursor: progress;
-  z-index: 9;
 }
 
 #loading div{

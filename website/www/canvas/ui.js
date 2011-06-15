@@ -136,7 +136,7 @@ function set_state(data){
     log("$state unchanged by set_state");
 }
 
-/** set_sets the UI elements to match the given state
+/** set_ui sets the UI elements to match the given state
  *
  * @param state takes the form of the global $state.
  */
@@ -155,6 +155,9 @@ function set_ui(state){
     );
 }
 
+/** construct_ui makes a zoom slider
+ */
+
 function construct_ui(){
     var slider = $("#zoom-slider");
     $(slider).slider({ orientation: 'vertical',
@@ -167,21 +170,86 @@ function construct_ui(){
     var offset = $($page.canvas).offset();
     offset.left -= 20;
     slider.offset(offset);
-    var canvas = $($page.canvas);
+}
+
+/** enable_drag sets up mouse dragging.
+ *
+ * It encloses a few event handlers which want to share state.
+ */
+function enable_drag(){
     var x, y;
-    canvas.mousedown(function(e){
+    var drag_x, drag_y;
+    var p = $page; /*local reference purely to make emacs js2-mode happy */
+
+    /*ui_grabber is a div that floats above everything, grabbing mouse moves.
+     * The point is to not worry about which canvas is on top.
+     */
+    var ui_grabber = $("#ui-grabber");
+    var offset = $($page.canvas).offset();
+    ui_grabber.offset(offset);
+    ui_grabber.width($const.width);
+    ui_grabber.height($const.height);
+
+    var drag = function(e){
+        p.mouse_dx = e.pageX - x;
+        p.mouse_dy = e.pageY - y;
+    };
+
+    var start = function(e){
         x = e.pageX;
         y = e.pageY;
-    });
+        ui_grabber.mousemove(drag);
+    };
+
     var finish = function(e){
         if (x !== undefined && y !== undefined){
             pan_pixel_delta(e.pageX - x, e.pageY - y);
         }
         x = undefined;
         y = undefined;
+        drag_x = undefined;
+        drag_y = undefined;
+        p.mouse_dx = 0;
+        p.mouse_dy = 0;
+        ui_grabber.mousemove(undefined);
     };
-    canvas.mouseup(finish);
-    canvas.mouseout(finish);
+
+    var dblclick = function(e){
+        var dx =  e.pageX - offset.left - ($const.width / 2);
+        var dy =  e.pageY - offset.top  - ($const.height / 2);
+        log(dx, dy);
+        pan_pixel_delta(-dx, -dy, 1);
+    };
+
+    ui_grabber.mousedown(start);
+    ui_grabber.mouseup(finish);
+    ui_grabber.mouseout(finish);
+    ui_grabber.dblclick(dblclick);
+}
+
+
+function temp_pan_delta(dx, dy){
+    log("mouse_move", dx, dy);
+
+}
+
+function hm_tick(){
+    if ($page.mouse_dx && $page.mouse_dy){
+        /* redraw the canvas on the temp canvas. */
+        var z = (1 << $state.zoom);
+        var dx = - $page.mouse_dx / ($page.x_scale * z);
+        var dy = - $page.mouse_dy / ($page.y_scale * z);
+        var d = get_zoom_pixel_bounds($state.zoom, $state.x + dx, $state.y + dy);
+        var d2 = get_zoom_pixel_bounds($state.zoom, $state.x + dx, $state.y + dy);
+        if (d.top != d2.top ||
+            d.left != d2.left ||
+            d.width != d2.width ||
+            d.height != d2.height){
+            var tc = named_canvas('temp');
+            zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
+            $(tc).offset($($page.canvas).offset()).css('visibility', 'visible');
+        }
+    }
 }
 
 /** pan_pixel_delta moves the view window, if possible
@@ -193,8 +261,7 @@ function construct_ui(){
  * @param dy
  *
  */
-
-function pan_pixel_delta(dx, dy){
+function pan_pixel_delta(dx, dy, dz){
     var z = (1 << $state.zoom);
     var scale_x = $page.x_scale * z;
     var scale_y = $page.y_scale * z;
@@ -205,11 +272,9 @@ function pan_pixel_delta(dx, dy){
     /* because x and y are centre points, they need to be constrained
      * according to the zoom.
      */
-    var range_x = $page.max_x - $page.min_x;
-    var range_y = $page.max_y - $page.min_y;
-    var pad_x = range_x / (z * 2);
-    var pad_y = range_y / (z * 2);
+    var pad_x = $page.range_x / (z * 2);
+    var pad_y = $page.range_y / (z * 2);
     x = Math.max($page.min_x + pad_x, Math.min($page.max_x - pad_x, x));
     y = Math.max($page.min_y + pad_y, Math.min($page.max_y - pad_y, y));
-    set_state({x: parseInt(x), y: parseInt(y)});
+    set_state({x: parseInt(x), y: parseInt(y), zoom: $state.zoom + dz});
 }

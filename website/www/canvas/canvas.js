@@ -23,11 +23,11 @@ function new_canvas(width, height, id){
  *
  * In development it pastes the canvas onto the webpage/
  */
-function scaled_canvas(p){
+function scaled_canvas(p, id){
     p = p || 1;
     var w = $const.width * p;
     var h = $const.height * p;
-    var canvas = new_canvas(w, h);
+    var canvas = new_canvas(w, h, id);
     document.getElementById("content").appendChild(canvas);
     return canvas;
 }
@@ -35,20 +35,21 @@ function scaled_canvas(p){
 /* get a particular canvas that is a member of $page, or if it doesn't
  * exist, make it up and store it */
 function named_canvas(name, blank, p){
-    var canvas = $page[name];
+    var canvas = $page.canvases[name];
     if (canvas === undefined){
-        canvas = scaled_canvas(p);
-        $page[name] = canvas;
-        if (blank){
-            var ctx = canvas.getContext("2d");
-            if (typeof(blank) == 'string'){
-                ctx.fillStyle = blank;
-                ctx.globalCompositeOperation = 'copy';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
-            else {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
+        canvas = scaled_canvas(p, "canvas-" + name);
+        $page.canvases[name] = canvas;
+    }
+    if (blank){
+        var ctx = canvas.getContext("2d");
+        if (typeof(blank) == 'string'){
+            /* this doesn't work on all browsers */
+            ctx.fillStyle = blank;
+            ctx.globalCompositeOperation = 'copy';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
     }
     return canvas;
@@ -66,19 +67,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var map_pixels = map_imgd.data;
     $timestamp("start lut");
     var padding = 1;
-    if (0){
-        var _hill_slope = _hill_slope_wide_big;
-        padding = 2;
-        scale /= 4;
-
-    }
-    else if (0){
-        var _hill_slope = _hill_slope_wide_small;
-        padding = 2;
-        scale /= 4;
-
-    }
-    else if (1){
+    if (1){
         var _hill_slope = _hill_slope_big;
     }
     else {
@@ -145,40 +134,6 @@ function _hill_slope_big(map_pixels, a, stride, lut, lut_offset){
     var _dy = ((bl + 2 * bc + br) - (tl + 2 * tc + tr));
     return lut[lut_offset + _dy][lut_offset + _dx];
 }
-
-function _hill_slope_wide_small(map_pixels, a, stride, lut, lut_offset){
-    stride *= 2;
-    var tc = map_pixels[a - stride];
-    var cl = map_pixels[a - 8];
-    var cr = map_pixels[a + 8];
-    var bc = map_pixels[a + stride];
-    var _dx = ((cl) - (cr));
-    var _dy = ((bc) - (tc));
-
-    return lut[lut_offset + _dy][lut_offset + _dx];
-}
-
-function _hill_slope_wide_big(map_pixels, a, stride, lut, lut_offset){
-    stride *= 2;
-    var tc = map_pixels[a - stride];
-    var tl = map_pixels[a - stride - 8];
-    var tr = map_pixels[a - stride + 8];
-    var cl = map_pixels[a - 8];
-    var cr = map_pixels[a + 8];
-    var bc = map_pixels[a + stride];
-    var bl = map_pixels[a + stride - 8];
-    var br = map_pixels[a + stride + 8];
-
-    var _dx = ((tl + 2 * cl + bl) - (tr + 2 * cr + br));
-    var _dy = ((bl + 2 * bc + br) - (tl + 2 * tc + tr));
-    _dx = parseInt(0.25 * _dx);
-    _dy = parseInt(0.25 * _dy);
-    if (isNaN(_dx + _dy)){
-        log(a, lut_offset, _dx, _dy, tl, tc, tr, cl,  cr, bl, bc, br);
-    }
-    return lut[lut_offset + _dy][lut_offset + _dx];
-}
-
 
 
 /*make hillshading LUT*/
@@ -300,54 +255,69 @@ function add_label(ctx, text, x, y, size, colour, shadow){
     ctx.fillText(text, x, y);
 }
 
-function subtract(ctx, ctx2, degree){
-    var width = ctx.canvas.width;
-    var height = ctx.canvas.height;
+
+function apply_density_map(src_ctx){
+    var canvas = named_canvas("density_overlay", true);
+    var ctx = canvas.getContext("2d");
+    var width = canvas.width;
+    var height = canvas.height;
+    /* paste the raw image on the canvas */
+    ctx.drawImage(src_ctx.canvas, 0, 0, width, height);
     var imgd = ctx.getImageData(0, 0, width, height);
     var pixels = imgd.data;
-    var pixels2 = ctx.getImageData(0, 0, width, height).data;
-    var max_pixel = 0;
-    for (var i = 3, end = width * height * 4; i < end; i += 4){
-        var p = pixels[i] - pixels2[i] * degree;
-        if (p > max_pixel)
-            max_pixel = p;
-        pixels[i] = p;
+    var map_pixels = $page.canvas.getContext("2d").getImageData(0, 0, width, height).data;
+    /* two possible height references, depending on whether zoom is zero */
+    var hctx;
+    if ($state.zoom == 0){
+        hctx = $page.height_canvas.getContext("2d");
     }
-    var scale = 255 / max_pixel;
-    for (var i = 3, end = width * height * 4; i < end; i += 4){
-        pixels[i] *= scale;
+    else {
+        hctx = named_canvas("zoomed_height_map").getContext("2d");
     }
+    var height_pixels = hctx.getImageData(0, 0, width, height).data;
+
+    var func = {
+        colour_cycle: colour_cycle,
+        grey_outside: grey_outside
+    }[$const.DENSITY_MAP_STYLE];
+
+    func(pixels, map_pixels, height_pixels);
+
     ctx.putImageData(imgd, 0, 0);
+    return canvas;
 }
 
-
-function apply_density_map(ctx){
-    var canvas2 = scaled_canvas();
-    var ctx2 = canvas2.getContext("2d");
-    var width = canvas2.width;
-    var height = canvas2.height;
-    //subtract(ctx, $page.density_canvas.getContext("2d"), 0.99);
-    ctx2.drawImage(ctx.canvas, 0, 0, width, height);
-
-    var imgd = ctx2.getImageData(0, 0, width, height);
-    var pixels = imgd.data;
-    var height_pixels = $page.height_canvas.getContext("2d").getImageData(0, 0, width, height).data;
-    var map_pixels = $page.canvas.getContext("2d").getImageData(0, 0, width, height).data;
-    for (var i = 3, end = width * height * 4; i < end; i += 4){
-        var x = pixels[i] * height_pixels[i];
+function colour_cycle(pix, map_pix, height_pix){
+    for (var i = 3, end = pix.length; i < end; i += 4){
+        var x = pix[i] * height_pix[i];
         if(x){
-            pixels[i - 3] = (map_pixels[i - 2] * 2 - map_pixels[i - 1]);
-            pixels[i - 2] = (map_pixels[i - 1] * 2 - map_pixels[i - 3]);
-            pixels[i - 1] = (map_pixels[i - 3] * 2 - map_pixels[i - 2]);
-            //pixels[i] *= 0.65;
+            pix[i - 3] = (map_pix[i - 2] * 2 - map_pix[i - 1]);
+            pix[i - 2] = (map_pix[i - 1] * 2 - map_pix[i - 3]);
+            pix[i - 1] = (map_pix[i - 3] * 2 - map_pix[i - 2]);
         }
         else{
-            pixels[i] = 0;
+            pix[i] = 0;
         }
     }
-    ctx2.putImageData(imgd, 0, 0);
-    return canvas2;
+    return pix;
 }
+
+function grey_outside(pix, map_pix, height_pix){
+    for (var i = 3, end = pix.length; i < end; i += 4){
+        pix[i] = 255 - pix[i];
+        var r = map_pix[i - 3];
+        var g = map_pix[i - 2];
+        var b = map_pix[i - 1];
+        var grey = (r * 2 + g * 5 + b) >> 3;
+        pix[i - 3] = grey;
+        pix[i - 2] = grey;
+        pix[i - 1] = grey;
+    }
+    return pix;
+}
+
+
+
 
 function paint_density_array(ctx, points){
     //token_ctx.fillStyle = "#f00";
@@ -359,37 +329,34 @@ function paint_density_array(ctx, points){
         $page.min_x, $page.min_y,
         $page.x_scale  * 0.25, $page.y_scale * 0.25);
     paste_fuzz_array(ctx, map,
-                     $const.ARRAY_FUZZ_DENSITY_RADIUS,
-                     $const.ARRAY_FUZZ_DENSITY_RADIX
+                     $const.ARRAY_FUZZ_DENSITY_SCALE_ARGS
                     );
 }
 
 
-/** zoom_in puts a bit of the src canvas all over the dest canvas */
+/** zoom_in puts a bit of the src canvas all over the dest canvas,
+ *
+ *  This uses the built-in canvas blit, and is very very quick.
+ *
+ * @param src a canvas or 2d context to copy from
+ * @param dest a canvas or 2d context to paste to
+ * @param x
+ * @param y
+ * @param w
+ * @param h define the rectangle to copy from.
+ *
+ */
 function zoom_in(src, dest, x, y, w, h){
-    $timestamp("zooming");
     if (dest.getContext){
         dest = dest.getContext("2d");
     }
     if (src.canvas){
         src = src.canvas;
     }
-    if(1){
-        /* maybe the correct thing to do is:
-            dest.drawImage(src, parseInt(x), parseInt(y), parseInt(w), parseInt(h),
-                           0, 0, dest.canvas.width, dest.canvas.height);
-                                   }
-         */
-        dest.drawImage(src, x, y, w, h, 0, 0, dest.canvas.width, dest.canvas.height);
-    }
-    else {
-        var sx = dest.canvas.width / w;
-        var sy = dest.canvas.width / h;
-
-        dest.save();
-        dest.scale(sx, sy);
-        dest.drawImage(src, x, y, w, h, 0, 0, w, h);
-        dest.restore();
-    }
-    $timestamp("end zoom");
+    /* maybe the correct thing to do is:
+     dest.drawImage(src, parseInt(x), parseInt(y), parseInt(w), parseInt(h),
+     0, 0, dest.canvas.width, dest.canvas.height);
+     }
+     */
+    dest.drawImage(src, x, y, w, h, 0, 0, dest.canvas.width, dest.canvas.height);
 }
