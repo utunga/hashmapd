@@ -67,19 +67,7 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     var map_pixels = map_imgd.data;
     $timestamp("start lut");
     var padding = 1;
-    if (0){
-        var _hill_slope = _hill_slope_wide_big;
-        padding = 2;
-        scale /= 4;
-
-    }
-    else if (0){
-        var _hill_slope = _hill_slope_wide_small;
-        padding = 2;
-        scale /= 4;
-
-    }
-    else if (1){
+    if (1){
         var _hill_slope = _hill_slope_big;
     }
     else {
@@ -146,40 +134,6 @@ function _hill_slope_big(map_pixels, a, stride, lut, lut_offset){
     var _dy = ((bl + 2 * bc + br) - (tl + 2 * tc + tr));
     return lut[lut_offset + _dy][lut_offset + _dx];
 }
-
-function _hill_slope_wide_small(map_pixels, a, stride, lut, lut_offset){
-    stride *= 2;
-    var tc = map_pixels[a - stride];
-    var cl = map_pixels[a - 8];
-    var cr = map_pixels[a + 8];
-    var bc = map_pixels[a + stride];
-    var _dx = ((cl) - (cr));
-    var _dy = ((bc) - (tc));
-
-    return lut[lut_offset + _dy][lut_offset + _dx];
-}
-
-function _hill_slope_wide_big(map_pixels, a, stride, lut, lut_offset){
-    stride *= 2;
-    var tc = map_pixels[a - stride];
-    var tl = map_pixels[a - stride - 8];
-    var tr = map_pixels[a - stride + 8];
-    var cl = map_pixels[a - 8];
-    var cr = map_pixels[a + 8];
-    var bc = map_pixels[a + stride];
-    var bl = map_pixels[a + stride - 8];
-    var br = map_pixels[a + stride + 8];
-
-    var _dx = ((tl + 2 * cl + bl) - (tr + 2 * cr + br));
-    var _dy = ((bl + 2 * bc + br) - (tl + 2 * tc + tr));
-    _dx = parseInt(0.25 * _dx);
-    _dy = parseInt(0.25 * _dy);
-    if (isNaN(_dx + _dy)){
-        log(a, lut_offset, _dx, _dy, tl, tc, tr, cl,  cr, bl, bc, br);
-    }
-    return lut[lut_offset + _dy][lut_offset + _dx];
-}
-
 
 
 /*make hillshading LUT*/
