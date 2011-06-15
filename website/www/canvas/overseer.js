@@ -30,7 +30,7 @@ var $const = {
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
-    REDRAW_HEIGHT_MAP: true, /*whether to redraw the height map on zoom */
+    REDRAW_HEIGHT_MAP: false, /*whether to redraw the height map on zoom */
     MAP_RESOLUTION: 9,       /*initial requested resolution for overall map*/
     DENSITY_RESOLUTION: 7,   /*initial requested resolution for density maps*/
 
@@ -49,7 +49,7 @@ var $const = {
     height: 800,  /* canvas padded pixel height */
 
     array_fuzz: true,
-    HILL_LUT_CENTRE: 400,
+    HILL_LUT_CENTRE: 300,
     HILL_SHADE_FLATNESS: 16.0, /*8 is standard, higher means flatter hills */
     views : {  /* helps in interpreting various views. */
         locations: {},
