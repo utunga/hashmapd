@@ -353,31 +353,29 @@ function paint_density_array(ctx, points){
 }
 
 
-/** zoom_in puts a bit of the src canvas all over the dest canvas */
+/** zoom_in puts a bit of the src canvas all over the dest canvas,
+ *
+ *  This uses the built-in canvas blit, and is very very quick.
+ *
+ * @param src a canvas or 2d context to copy from
+ * @param dest a canvas or 2d context to paste to
+ * @param x
+ * @param y
+ * @param w
+ * @param h define the rectangle to copy from.
+ *
+ */
 function zoom_in(src, dest, x, y, w, h){
-    $timestamp("zooming");
     if (dest.getContext){
         dest = dest.getContext("2d");
     }
     if (src.canvas){
         src = src.canvas;
     }
-    if(1){
-        /* maybe the correct thing to do is:
-            dest.drawImage(src, parseInt(x), parseInt(y), parseInt(w), parseInt(h),
-                           0, 0, dest.canvas.width, dest.canvas.height);
-                                   }
-         */
-        dest.drawImage(src, x, y, w, h, 0, 0, dest.canvas.width, dest.canvas.height);
-    }
-    else {
-        var sx = dest.canvas.width / w;
-        var sy = dest.canvas.width / h;
-
-        dest.save();
-        dest.scale(sx, sy);
-        dest.drawImage(src, x, y, w, h, 0, 0, w, h);
-        dest.restore();
-    }
-    $timestamp("end zoom");
+    /* maybe the correct thing to do is:
+     dest.drawImage(src, parseInt(x), parseInt(y), parseInt(w), parseInt(h),
+     0, 0, dest.canvas.width, dest.canvas.height);
+     }
+     */
+    dest.drawImage(src, x, y, w, h, 0, 0, dest.canvas.width, dest.canvas.height);
 }
