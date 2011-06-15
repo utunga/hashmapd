@@ -16,28 +16,16 @@ function get_timer(){
              '<td><td>time<td>delta</table>');
     $("#debug").append(s);
     var table = $("#hm_timer");
-    var checkpoint = function(label){
+    return function(label, reset){
         var now = Date.now();
+        if (reset){
+            start = now;
+        }
         var t = now - start;
         var d = now - previous;
         table.append("<tr><td>" + label + "<td>" + t +
                      "<td><b>" + d + "</b></tr>");
         previous = now;
-    };
-    return {
-        checkpoint: checkpoint,
-        time_func: function(func){
-            /*arguments is not real array, no .slice or .shift, so you
-             *need to slice by copying.*/
-            var args = [];
-            for (var i = 1; i < arguments.length; i++){
-                args.push(arguments[i]);
-            }
-            checkpoint("start " + func.name);
-            var r = func.apply(undefined, args);
-            checkpoint("finish " + func.name);
-            return r;
-        }
     };
 }
 
@@ -49,3 +37,38 @@ function log(){
     s += "</div>";
     $("#debug").append(s);
 };
+
+function dump_object(o){
+    var s = '{\n';
+    for (x in o){
+        s += '  ' + x + ':' + o[x] + ',\n';
+    }
+    s += '}';
+    //alert(s);
+    log(s);
+}
+
+function loading_screen(){
+    var outer = $("#loading");
+    outer.css("display", "block");
+    outer.css("visibility", "visible");
+    outer.css("z-index", "2");
+
+    var div = outer.append("<div>wheee</div>");
+
+    return {
+        show: function(text){
+            div.html(text);
+            log("set loader to " + div.html());
+        },
+        done: function(text){
+            outer.css("display", "none");
+            outer.css("visibility", "hidden");
+        },
+        tick: function(){
+            div.html(div.html() + ".");
+            log("set loader to " + div.html());
+        }
+
+    };
+}

@@ -1,19 +1,73 @@
+/*z-indexes
+most stuff, including the main canvas, are a 0 */
+canvas.overlay        {z-index:   2}
+#canvas-temp          {z-index:   4}
+#ui                   {z-index:   6}
+#loading              {z-index:   9}
+#debug                {z-index:  99}
+#ui-grabber           {z-index: 999}
+
+
 body{
-  background: #333;
+  background: #fff;
+  color: #333;
+  font-family: 'Helvetica Neue', Arial, 'Liberation Sans', FreeSans, sans-serif;
 }
+
+h1 {
+  margin: 0;
+  font-size: 36px;
+  /*position: absolute;
+  top: 2px;
+  left: 42px;*/
+}
+
+h1:before {
+  content: url(birds-30.PNG);
+}
+
+#ui p {
+  margin: 0 0 0 40px;
+}
+
 canvas{
-  background: #000;
+/*  background: #000;*/
+  border: 1px solid #ccc;
+  background: #fff;
   display: block;
-  margin: 20px auto 0 auto;
+  margin: 10px auto 0 auto;
 }
+
 canvas.overlay {
   background: none;
+}
+
+#ui-grabber {
+  cursor:move;
+  position:absolute;
+}
+
+#content{
+  margin: 30px auto 0 auto;
+}
+
+#ui {
+  position: absolute;
+  top: 0;
+  left: 0px;
+}
+
+#zoom-slider {
+  height: 200px;
 }
 
 #helpers {
   position: absolute;
   left: 0;
-  top: 0;
+  top: 300px;
+  width: 200px;
+  font: normal 11px sans-serif;
+  color: #ccc;
 }
 
 #debug {
@@ -21,10 +75,34 @@ canvas.overlay {
   position: absolute;
   right: 0;
   top: 0;
-  background: #aaa;
+  padding: 1px;
+  border: #ccc 1px solid;
+  /*stop annoying selection interaction with drag */
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  white-space: pre;
 }
 
-#helpers img {
-  display: block;
+#loading {
+  text-align: center;
+  position:absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+  color: #333;
+  font-size: 40px;
+  font-weight: bold;
+  background: #fff;
+  padding: 100px;
+  cursor: progress;
 }
 
+#loading div{
+  text-align: center;
+  margin: 100px auto 0 auto;
+}

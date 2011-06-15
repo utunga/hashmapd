@@ -17,12 +17,12 @@ from couchdb import Server
 
 class QueryCouch(object):
         
-        def __init__(self, cfg):
-                couch = Server(cfg.couchdb.server_url)
-                self.db = couch[cfg.couchdb.database]
-        
+        def __init__(self, couchdb_server_url=None, couchdb=None):
+                couch = Server(couchdb_server_url)
+                self.db = couch[couchdb]
+                
         def tokens_for_square(self, coord_x, coord_y):
-            view = self.db.view('couchapp/token_per_square', reduce=False)
+            view = self.db.view('couchapp/token_per_square', reduce=False, stale="OK")
                 
             results = []
             rows = view[[coord_x,coord_y]:[coord_x,coord_y+1]]
@@ -41,7 +41,7 @@ class QueryCouch(object):
             return (x_coord,y_coord)
             
         def squares_for_token(self, token):
-            view = self.db.view('couchapp/square_per_token', reduce=False)
+            view = self.db.view('couchapp/square_per_token', reduce=False, stale="OK")
                 
             results = []
             rows = view[[token]:[token+' ']]
@@ -62,7 +62,7 @@ class QueryCouch(object):
         
         def non_english_screennames(self):
                 
-            view = self.db.view('non_english/non_english', reduce=True, group_level=1)
+            view = self.db.view('non_english/non_english', reduce=True, group_level=1, stale="OK")
            
             results = []
             for row in view:
@@ -76,7 +76,7 @@ class QueryCouch(object):
             
             # we have to query entire lot of tokens even if we only want topN as the sort has to be on Python side
             # (because CouchDB doesn't support sort by value)
-            view = self.db.view('couchapp/square_per_token', reduce=True, group_level=1)
+            view = self.db.view('couchapp/square_per_token', reduce=True, group_level=1, stale="OK")
            
             results = []
             for row in view:
@@ -91,7 +91,7 @@ class QueryCouch(object):
                     
         def locations_for_token(self, token):
                 
-            view = self.db.view('couchapp/location_by_token', reduce=False)
+            view = self.db.view('couchapp/location_by_token', reduce=False, stale="OK")
                 
             results = []
             rows = view[[token]:[token+' ']]

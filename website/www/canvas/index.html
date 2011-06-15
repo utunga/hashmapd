@@ -1,20 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>Hashmapd. the cleverest thing in the world.</title>
+    <title>Hashmapd Twitter world map.</title>
     <link rel="stylesheet" href="css.css">
+    <link rel="stylesheet" href="jquery-css/ui-lightness/jquery-ui-1.8.13.custom.css">
   </head>
 
   <body>
+    <div id="loading"></div>
     <div id="helpers"></div>
     <div id="content"></div>
     <div id="debug"></div>
+    <div id="ui"><form>
+      <h1>Hashmapd</h1>
+      <p>Who is talking about...<br />
+          <input type="text" /></p>
+        <div id="zoom-slider"></div>
+      </form>
+    </div>
+    <div id="ui-grabber"></div>
     <script src="jquery.js"></script>
+    <script src="jquery-ui.js"></script>
     <script src="debug.js"></script>
     <script src="fuzz.js"></script>
     <script src="canvas.js"></script>
+    <script src="ui.js"></script>
     <script src="overseer.js"></script>
     <script>
+      hm_setup();
       hm_draw_map();
     </script>
   </body>
