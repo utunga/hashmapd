@@ -263,9 +263,9 @@ function apply_density_map(src_ctx){
     var height = canvas.height;
     /* paste the raw image on the canvas */
     ctx.drawImage(src_ctx.canvas, 0, 0, width, height);
-
     var imgd = ctx.getImageData(0, 0, width, height);
     var pixels = imgd.data;
+    var map_pixels = $page.canvas.getContext("2d").getImageData(0, 0, width, height).data;
     /* two possible height references, depending on whether zoom is zero */
     var hctx;
     if ($state.zoom == 0){
@@ -274,23 +274,50 @@ function apply_density_map(src_ctx){
     else {
         hctx = named_canvas("zoomed_height_map").getContext("2d");
     }
-
     var height_pixels = hctx.getImageData(0, 0, width, height).data;
-    var map_pixels = $page.canvas.getContext("2d").getImageData(0, 0, width, height).data;
-    for (var i = 3, end = width * height * 4; i < end; i += 4){
-        var x = pixels[i] * height_pixels[i];
-        if(x){
-            pixels[i - 3] = (map_pixels[i - 2] * 2 - map_pixels[i - 1]);
-            pixels[i - 2] = (map_pixels[i - 1] * 2 - map_pixels[i - 3]);
-            pixels[i - 1] = (map_pixels[i - 3] * 2 - map_pixels[i - 2]);
-        }
-        else{
-            pixels[i] = 0;
-        }
-    }
+
+    var func = {
+        colour_cycle: colour_cycle,
+        grey_outside: grey_outside
+    }[$const.DENSITY_MAP_STYLE];
+
+    func(pixels, map_pixels, height_pixels);
+
     ctx.putImageData(imgd, 0, 0);
     return canvas;
 }
+
+function colour_cycle(pix, map_pix, height_pix){
+    for (var i = 3, end = pix.length; i < end; i += 4){
+        var x = pix[i] * height_pix[i];
+        if(x){
+            pix[i - 3] = (map_pix[i - 2] * 2 - map_pix[i - 1]);
+            pix[i - 2] = (map_pix[i - 1] * 2 - map_pix[i - 3]);
+            pix[i - 1] = (map_pix[i - 3] * 2 - map_pix[i - 2]);
+        }
+        else{
+            pix[i] = 0;
+        }
+    }
+    return pix;
+}
+
+function grey_outside(pix, map_pix, height_pix){
+    for (var i = 3, end = pix.length; i < end; i += 4){
+        pix[i] = 255 - pix[i];
+        var r = map_pix[i - 3];
+        var g = map_pix[i - 2];
+        var b = map_pix[i - 1];
+        var grey = (r * 2 + g * 5 + b) >> 3;
+        pix[i - 3] = grey;
+        pix[i - 2] = grey;
+        pix[i - 1] = grey;
+    }
+    return pix;
+}
+
+
+
 
 function paint_density_array(ctx, points){
     //token_ctx.fillStyle = "#f00";

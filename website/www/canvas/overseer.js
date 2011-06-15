@@ -33,6 +33,8 @@ var $const = {
     REDRAW_HEIGHT_MAP: false, /*whether to redraw the height map on zoom */
     MAP_RESOLUTION: 9,       /*initial requested resolution for overall map*/
     DENSITY_RESOLUTION: 7,   /*initial requested resolution for density maps*/
+    DENSITY_MAP_STYLE: 'grey_outside',
+    //DENSITY_MAP_STYLE: 'colour_cycle',
 
     QUAD_TREE_COORDS: 15,
     COORD_MAX: 1 << 16,   /* exclusive maximum xy coordinates (1 << (QUAD_TREE_COORDS + 1)) */
@@ -669,7 +671,7 @@ function temp_view(){
     $.when($waiters.full_map_drawn).done(
         function(){
             if ($state.transition){
-            var tc = named_canvas('temp', true);
+            var tc = named_canvas('temp');
             var d = get_zoom_pixel_bounds($state.zoom, $state.x, $state.y);
             zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
                 $(tc).offset($($page.canvas).offset());
@@ -682,4 +684,3 @@ function hide_temp_view(){
     $state.transition = false;
     $(named_canvas('temp')).css('visibility', 'hidden');
 }
-
