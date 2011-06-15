@@ -179,19 +179,59 @@ function construct_ui(){
     offset.left -= 20;
     slider.offset(offset);
     var x, y;
-    ui_grabber.mousedown(function(e){
+    var drag_x, drag_y;
+
+    var drag = function(e){
+        $page.mouse_dx = e.pageX - x;
+        $page.mouse_dy = e.pageY - y;
+    };
+
+    var start = function(e){
         x = e.pageX;
         y = e.pageY;
-    });
+        ui_grabber.mousemove(drag);
+    };
+
+
     var finish = function(e){
         if (x !== undefined && y !== undefined){
             pan_pixel_delta(e.pageX - x, e.pageY - y);
         }
         x = undefined;
         y = undefined;
+        drag_x = undefined;
+        drag_y = undefined;
+        $page.mouse_dx = 0;
+        $page.mouse_dy = 0;
+        ui_grabber.mousemove(undefined);
     };
+    ui_grabber.mousedown(start);
     ui_grabber.mouseup(finish);
     ui_grabber.mouseout(finish);
+    ui_grabber.dblclick(
+        function(){
+            set_state({zoom: $state.zoom + 1});
+        }
+    );
+}
+
+
+function temp_pan_delta(dx, dy){
+    log("mouse_move", dx, dy);
+
+}
+
+function hm_tick(){
+    if ($page.mouse_dx && $page.mouse_dy){
+        /* redraw the canvas on the temp canvas. */
+        var z = (1 << $state.zoom);
+        var dx = - $page.mouse_dx / ($page.x_scale * z);
+        var dy = - $page.mouse_dy / ($page.y_scale * z);
+        var tc = named_canvas('temp');
+        var d = get_zoom_pixel_bounds($state.zoom, $state.x + dx, $state.y + dy);
+        zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
+        $(tc).offset($($page.canvas).offset()).css('visibility', 'visible');
+    }
 }
 
 /** pan_pixel_delta moves the view window, if possible

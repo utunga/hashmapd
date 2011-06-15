@@ -14,6 +14,7 @@ var $const = {
                   'http://hashmapd.halo.gen.nz:5984/frontend_dev/_design/user/_view/'),
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
+    FPS: 20, /*how often is the animation tick */
     ARRAY_FUZZ_SCALE: 255, /*highest peak is this high*/
     ARRAY_FUZZ_LUT_LENGTH: 2000, /*granularity of height conversion LUT */
     ARRAY_FUZZ_CONSTANT: -0.013, /*concentration for array fuzz */
@@ -159,7 +160,11 @@ function hm_setup(){
            $waiters.hill_fuzz_ready).done(make_height_map, make_full_map);
     construct_form();
     construct_ui();
-
+    /*start the animation loop when the main map is done */
+    $.when($waiters.full_map_drawn).done(
+        function(){
+            $page.ticker = window.setInterval(hm_tick, 1000/ $const.FPS);
+        });
     /* move this here FOR NOW*/
     $state.token = 'LOL';
     $waiters.have_density = $.getJSON('tokens/LOL_16.json', hm_on_token_density);
