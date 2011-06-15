@@ -64,6 +64,7 @@ var $const = {
 var $page = {
     canvases: {},       /*Named canvases go in here (see named_canvas()) */
     canvas: undefined,  /* a reference to the main canvas gets put here */
+    full_map: undefined, /* will be the full unzoomed */
     loading: undefined,
     labels: undefined,  /* JSON derived structure describing labels */
     height_canvas: undefined, /*a height map canvas */
@@ -95,7 +96,8 @@ var $page = {
 /* $waiters is a repository for global $.Deferreds */
 var $waiters = {
     map_known: undefined, /*will be a deferred that fires when map scale is known */
-    map_drawn: undefined, /*will be a deferred that fires when the landscape is drawn */
+    map_drawn: undefined, /*will be a deferred that fires when $page.canvas is ready */
+    full_map_drawn: undefined, /*will fire when a canonical unzoomed map is at $page.full_map */
     height_map_drawn: undefined,
     hill_fuzz_ready: undefined,
     have_density: undefined,
@@ -127,14 +129,19 @@ var $timestamp;
 
 function hm_setup(){
     $timestamp = get_timer();
+    /*load matching query parameters into $const, just this once. */
     interpret_query($const);
+    /*now load them into $state. This happens regularly in hm_draw_map */
     interpret_query($state);
+
     $page.loading = loading_screen();
     $page.loading.show("Loading...");
 
     /* The main map canvas */
     $page.canvas = named_canvas('main');
+    $page.tmp_canvas = named_canvas('temp');
     $waiters.map_drawn = $.Deferred();
+    $waiters.full_map_drawn = $.Deferred();
     $waiters.height_map_drawn = $.Deferred();
 
     /* start downloading the main map */
@@ -148,7 +155,8 @@ function hm_setup(){
     else { /*a non-deferred acts as resolved to $.when() */
         $waiters.hill_fuzz_ready = true;
     }
-    $.when($waiters.map_known, $waiters.hill_fuzz_ready).done(make_height_map);
+    $.when($waiters.map_known,
+           $waiters.hill_fuzz_ready).done(make_height_map, make_full_map);
     construct_form();
     construct_ui();
 
@@ -163,10 +171,15 @@ function hm_setup(){
  */
 
 function hm_draw_map(){
+    $timestamp("start hm_draw_map", true);
     interpret_query($state);
     set_ui($state);
     //$waiters.have_density = get_json('token_density', $const.DENSITY_RESOLUTION, hm_on_token_density);
-    $timestamp("start hm_draw_map", true);
+    temp_view();
+    window.setTimeout(hm_draw_map2, 1);
+}
+
+function hm_draw_map2(){
     if ($state.labels){
         $waiters.have_labels = get_json('tokens', 7, hm_on_labels);
         $.when($waiters.have_labels,
@@ -180,7 +193,10 @@ function hm_draw_map(){
            $waiters.hill_fuzz_ready,
            $waiters.have_density)
                    .done(paint_token_density);
+
+    $.when($waiters.map_drawn).done(hide_temp_view);
 }
+
 
 
 /** get_json fetches data.
@@ -434,6 +450,26 @@ function make_height_map(){
     $waiters.height_map_drawn.resolve();
 }
 
+/** make_full_map draws the full map on an auxillary canvas.
+ *
+ * It is run when the page first loads, and puts the map in
+ * $page.full_map.  The map is used for temporary images while the
+ * main canvas is being redrawn. */
+function make_full_map(){
+    $timestamp("start make_full_map");
+    var points = $page.tweeters;
+    var canvas = named_canvas("full_map");
+    var ctx = canvas.getContext("2d");
+    var height_map = $page.height_canvas;
+    var height_ctx = height_map.getContext("2d");
+    hillshading(height_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
+    $page.full_map = canvas;
+    $waiters.full_map_drawn.resolve();
+    $timestamp("end make_full_map");
+}
+
+
+
 
 function get_zoom_pixel_bounds(zoom, centre_x, centre_y, width, height){
     var z = get_zoom_point_bounds(zoom, centre_x, centre_y, width, height);
@@ -620,5 +656,25 @@ function paint_labels(){
         var size = n * n * scale;
         add_label(ctx, text, x, y, size, "#000", "#fff");
     }
+}
+
+
+function temp_view(){
+    $state.transition = true;
+    $.when($waiters.full_map_drawn).done(
+        function(){
+            if ($state.transition){
+            var tc = named_canvas('temp', true);
+            var d = get_zoom_pixel_bounds($state.zoom, $state.x, $state.y);
+            zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
+                $(tc).offset($($page.canvas).offset());
+            $(tc).css('visibility', 'visible');
+        }
+    });
+}
+
+function hide_temp_view(){
+    $state.transition = false;
+    $(named_canvas('temp')).css('visibility', 'hidden');
 }
 

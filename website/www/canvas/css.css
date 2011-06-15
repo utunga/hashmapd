@@ -1,10 +1,12 @@
 /*z-indexes
 most stuff, including the main canvas, are a 0 */
 canvas.overlay        {z-index:   2}
+#canvas-temp          {z-index:   4}
 #ui                   {z-index:   6}
 #loading              {z-index:   9}
 #debug                {z-index:  99}
 #ui-grabber           {z-index: 999}
+
 
 body{
   background: #fff;
