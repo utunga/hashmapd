@@ -11,7 +11,7 @@
 var $const = {
     BASE_DB_URL: ((window.location.hostname == '127.0.0.1') ?
                   'http://127.0.0.1:5984/frontend_dev/_design/user/_view/' :
-                  'http://hashmapd.halo.gen.nz:5984/frontend_dev/_design/user/_view/'),
+                  'http://couch.hashmapd.com/fd/'),
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
     FPS: 20, /*how often is the animation tick */
