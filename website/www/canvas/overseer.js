@@ -435,22 +435,17 @@ function make_height_map(){
 }
 
 
-function get_zoom_pixel_bounds(zoom, centre_x, centre_y){
-    var w = $const.width;
-    var h = $const.height;
-    var zw = w / (1 << zoom);
-    var zh = h / (1 << zoom);
+function get_zoom_pixel_bounds(zoom, centre_x, centre_y, width, height){
+    var z = get_zoom_point_bounds(zoom, centre_x, centre_y, width, height);
+    var scale = 1.0 / (1 << zoom);
+    var x_scale = z.x_scale * scale;
+    var y_scale = z.y_scale * scale;
 
-    var left = Math.max(0, centre_x - $page.range_x / (1 << zoom) / 2);
-    var top = Math.max(0, centre_y - $page.range_y / (1 << zoom) / 2);
-
-    var x = Math.min(left * w / $page.range_x, w - zw);
-    var y = Math.min(top * h / $page.range_y, h - zh);
     return {
-        x: x,
-        y: y,
-        width: zw,
-        height: zh
+        left: (z.min_x - $page.min_x) * x_scale,
+        top: (z.min_y - $page.min_y) * y_scale,
+        width: z.width * x_scale,
+        height: z.height * y_scale
     };
 }
 
@@ -478,7 +473,9 @@ function get_zoom_point_bounds(zoom, centre_x, centre_y, width, height){
         max_x: min_x + size_x,
         max_y: min_y + size_y,
         x_scale: x_scale,
-        y_scale: y_scale
+        y_scale: y_scale,
+        width: size_x,
+        height: size_y
     };
     return z;
 }
@@ -525,7 +522,8 @@ function paint_map(){
         }
         else {
             var d = get_zoom_pixel_bounds(zoom, $state.x, $state.y);
-            zoom_in($page.height_canvas, height_ctx, d.x, d.y, d.width, d.height);
+            dump_object(d);
+            zoom_in($page.height_canvas, height_ctx, d.left, d.top, d.width, d.height);
         }
     }
     else {
