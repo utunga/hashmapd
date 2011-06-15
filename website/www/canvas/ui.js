@@ -237,12 +237,14 @@ function hm_tick(){
     if ($page.mouse_dx && $page.mouse_dy){
         /* redraw the canvas on the temp canvas. */
         var z = (1 << $state.zoom);
-        var dx = - $page.mouse_dx / ($page.x_scale * z);
-        var dy = - $page.mouse_dy / ($page.y_scale * z);
-        var tc = named_canvas('temp');
-        var d = get_zoom_pixel_bounds($state.zoom, $state.x + dx, $state.y + dy);
-        zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
-        $(tc).offset($($page.canvas).offset()).css('visibility', 'visible');
+        if (z > 1){
+            var dx = - $page.mouse_dx / ($page.x_scale * z);
+            var dy = - $page.mouse_dy / ($page.y_scale * z);
+            var tc = named_canvas('temp');
+            var d = get_zoom_pixel_bounds($state.zoom, $state.x + dx, $state.y + dy);
+            zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
+            $(tc).offset($($page.canvas).offset()).css('visibility', 'visible');
+        }
     }
 }
 
