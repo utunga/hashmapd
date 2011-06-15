@@ -155,7 +155,7 @@ function set_ui(state){
     );
 }
 
-/** construct_ui makes a zoom slider and sets up mouse dragging.
+/** construct_ui makes a zoom slider
  */
 
 function construct_ui(){
@@ -167,23 +167,32 @@ function construct_ui(){
                            set_state({'zoom': ui.value});
                        }
                      });
+    var offset = $($page.canvas).offset();
+    offset.left -= 20;
+    slider.offset(offset);
+}
+
+/** enable_drag sets up mouse dragging.
+ *
+ * It encloses a few event handlers which want to share state.
+ */
+function enable_drag(){
+    var x, y;
+    var drag_x, drag_y;
+    var p = $page; /*local reference purely to make emacs js2-mode happy */
+
     /*ui_grabber is a div that floats above everything, grabbing mouse moves.
      * The point is to not worry about which canvas is on top.
      */
     var ui_grabber = $("#ui-grabber");
     var offset = $($page.canvas).offset();
     ui_grabber.offset(offset);
-    ui_grabber.offset(offset);
     ui_grabber.width($const.width);
     ui_grabber.height($const.height);
-    offset.left -= 20;
-    slider.offset(offset);
-    var x, y;
-    var drag_x, drag_y;
 
     var drag = function(e){
-        $page.mouse_dx = e.pageX - x;
-        $page.mouse_dy = e.pageY - y;
+        p.mouse_dx = e.pageX - x;
+        p.mouse_dy = e.pageY - y;
     };
 
     var start = function(e){
@@ -191,7 +200,6 @@ function construct_ui(){
         y = e.pageY;
         ui_grabber.mousemove(drag);
     };
-
 
     var finish = function(e){
         if (x !== undefined && y !== undefined){
@@ -201,18 +209,22 @@ function construct_ui(){
         y = undefined;
         drag_x = undefined;
         drag_y = undefined;
-        $page.mouse_dx = 0;
-        $page.mouse_dy = 0;
+        p.mouse_dx = 0;
+        p.mouse_dy = 0;
         ui_grabber.mousemove(undefined);
     };
+
+    var dblclick = function(e){
+        var dx =  e.pageX - offset.left - ($const.width / 2);
+        var dy =  e.pageY - offset.top  - ($const.height / 2);
+        log(dx, dy);
+        pan_pixel_delta(-dx, -dy, 1);
+    };
+
     ui_grabber.mousedown(start);
     ui_grabber.mouseup(finish);
     ui_grabber.mouseout(finish);
-    ui_grabber.dblclick(
-        function(){
-            set_state({zoom: $state.zoom + 1});
-        }
-    );
+    ui_grabber.dblclick(dblclick);
 }
 
 
@@ -243,8 +255,7 @@ function hm_tick(){
  * @param dy
  *
  */
-
-function pan_pixel_delta(dx, dy){
+function pan_pixel_delta(dx, dy, dz){
     var z = (1 << $state.zoom);
     var scale_x = $page.x_scale * z;
     var scale_y = $page.y_scale * z;
@@ -259,5 +270,5 @@ function pan_pixel_delta(dx, dy){
     var pad_y = $page.range_y / (z * 2);
     x = Math.max($page.min_x + pad_x, Math.min($page.max_x - pad_x, x));
     y = Math.max($page.min_y + pad_y, Math.min($page.max_y - pad_y, y));
-    set_state({x: parseInt(x), y: parseInt(y)});
+    set_state({x: parseInt(x), y: parseInt(y), zoom: $state.zoom + dz});
 }

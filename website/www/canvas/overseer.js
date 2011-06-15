@@ -160,6 +160,7 @@ function hm_setup(){
            $waiters.hill_fuzz_ready).done(make_height_map, make_full_map);
     construct_form();
     construct_ui();
+    enable_drag();
     /*start the animation loop when the main map is done */
     $.when($waiters.full_map_drawn).done(
         function(){
@@ -563,7 +564,6 @@ function paint_map(){
         }
         else {
             var d = get_zoom_pixel_bounds(zoom, $state.x, $state.y);
-            dump_object(d);
             zoom_in($page.height_canvas, height_ctx, d.left, d.top, d.width, d.height);
         }
     }
