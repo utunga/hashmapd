@@ -23,11 +23,11 @@ function new_canvas(width, height, id){
  *
  * In development it pastes the canvas onto the webpage/
  */
-function scaled_canvas(p){
+function scaled_canvas(p, id){
     p = p || 1;
     var w = $const.width * p;
     var h = $const.height * p;
-    var canvas = new_canvas(w, h);
+    var canvas = new_canvas(w, h, id);
     document.getElementById("content").appendChild(canvas);
     return canvas;
 }
@@ -37,7 +37,7 @@ function scaled_canvas(p){
 function named_canvas(name, blank, p){
     var canvas = $page.canvases[name];
     if (canvas === undefined){
-        canvas = scaled_canvas(p);
+        canvas = scaled_canvas(p, "canvas-" + name);
         $page.canvases[name] = canvas;
     }
     if (blank){
@@ -49,7 +49,7 @@ function named_canvas(name, blank, p){
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         else {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
     }
     return canvas;
