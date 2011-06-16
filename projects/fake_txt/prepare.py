@@ -129,8 +129,8 @@ def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
     train_set_x = raw_counts[0:train_cutoff]
     train_sums = train_set_x.sum(axis=1)
     mean_doc_size = train_sums.mean()
-    print train_set_x
-    print train_sums
+    #print train_set_x
+    #print train_sums
     
     if (cfg.input.number_for_validation ==0):
         print 'WARNING: no examples set aside for validation, copying train set data for validation (as a quick hack only)'
@@ -194,7 +194,7 @@ def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
         
     cPickle.dump(data,f, cPickle.HIGHEST_PROTOCOL)
     
-    print data
+    #print data
     f.close()
     
 def normalize_data_x(data_x,sums_x,name):

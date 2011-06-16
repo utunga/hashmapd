@@ -102,9 +102,6 @@ class HiddenLayer(object):
         else:
             x = self.W.value
             
-        print 'layer '+ file_name + ' has shape '
-        print self.W.value.shape       
-        #print img_shape + ' ' + tile_shape
         image = PIL.Image.fromarray(tile_raster_images( x,
             img_shape = self.trace_img_shape,tile_shape = self.trace_tile_shape, 
             tile_spacing=(1,1)))
