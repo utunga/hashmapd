@@ -145,7 +145,10 @@ function hm_setup(){
 
     /* The main map canvas */
     $page.canvas = named_canvas('main');
-    $page.tmp_canvas = named_canvas('temp');
+    $("#map-div").append($page.canvas);
+    $page.tmp_canvas = overlay_canvas('temp', true);
+    overlay_canvas("density_overlay");
+
     $waiters.map_drawn = $.Deferred();
     $waiters.full_map_drawn = $.Deferred();
     $waiters.height_map_drawn = $.Deferred();
@@ -658,9 +661,9 @@ function paint_token_density(){
     $timestamp("applying density map");
     var canvas2 = apply_density_map(ctx);
     $timestamp("post density map");
-    $(canvas2).addClass("overlay").offset($($page.canvas).offset());
-    $(canvas2).css("visibility", "visible");
+    overlay(canvas2);
 }
+
 
 
 /*don't do too much until the drawing is done.*/
@@ -706,16 +709,16 @@ function temp_view(){
     $.when($waiters.full_map_drawn).done(
         function(){
             if ($state.transition){
-            var tc = named_canvas('temp');
-            var d = get_zoom_pixel_bounds($state.zoom, $state.x, $state.y);
-            zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
-                $(tc).offset($($page.canvas).offset());
-            $(tc).css('visibility', 'visible');
+                var tc = $page.tmp_canvas;
+                var d = get_zoom_pixel_bounds($state.zoom, $state.x, $state.y);
+                zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
+                overlay(tc);
+            }
         }
-    });
+    );
 }
 
 function hide_temp_view(){
     $state.transition = false;
-    $(named_canvas('temp')).css('visibility', 'hidden');
+    $($page.tmp_canvas).css('visibility', 'hidden');
 }

@@ -277,9 +277,9 @@ function hm_tick(){
             d.left != d2.left ||
             d.width != d2.width ||
             d.height != d2.height){
-            var tc = named_canvas('temp');
+            var tc = $page.tmp_canvas;
             zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
-            $(tc).offset($($page.canvas).offset()).css('visibility', 'visible');
+            $(tc).css('visibility', 'visible');
         }
     }
 }
