@@ -17,11 +17,12 @@ from hashmapd.load_config import LoadConfig
 
 
 def generate(USERS, WORDS):
+    random = numpy.random.RandomState(seed=1)
     DISTINCT = True
     TOPICS = 2
     SAMPLES = WORDS * 100
 
-    probabilities = numpy.random.uniform(size=[WORDS, TOPICS])
+    probabilities = random.uniform(size=[WORDS, TOPICS])
     
     # normalize so sum of P(word|topic) over all words == 1
     probabilities /= probabilities.sum(axis=0)
@@ -40,15 +41,15 @@ def generate(USERS, WORDS):
     for user in range(USERS):
         if DISTINCT:
             # Absolute interests, everyone talks about 0 or 1
-            topic = numpy.random.randint(TOPICS)
-            for x in numpy.random.uniform(size=[SAMPLES]):
+            topic = random.randint(TOPICS)
+            for x in random.uniform(size=[SAMPLES]):
                 word = bisect.bisect_left(partitions[:,topic], x)
                 counts[user, word] += 1
             labels.append(topic)
         
         else:
             # Mixed interests
-            interests = numpy.random.uniform(size=[TOPICS])
+            interests = random.uniform(size=[TOPICS])
             weights = probabilities.dot(interests)
             partition = numpy.add.accumulate(weights / weights.sum())
     
