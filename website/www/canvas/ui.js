@@ -112,7 +112,7 @@ function set_state(data){
     if (typeof(data) == 'string'){
         data = parse_query(data);
     }
-
+    dump_object(data);
     var copy = {};
     for (k in $state){
         copy[k] = $state[k];
@@ -155,7 +155,7 @@ function set_ui(state){
     );
 }
 
-/** construct_ui makes a zoom slider
+/** construct_ui makes a zoom slider and hooks up the token search box
  */
 
 function construct_ui(){
@@ -170,7 +170,39 @@ function construct_ui(){
     var offset = $($page.canvas).offset();
     offset.left -= 20;
     slider.offset(offset);
+
+    $("#token_form").submit(
+        function(e){
+            e.preventDefault();
+            var token = $("#token_input").val() || '';
+            token = normalise_token(token);
+            $("#token_input").val(token);
+            set_state({token: token});
+            //dump_object($state);
+            return false;
+        }
+    );
+    $("#token_input").val($state.token);
+
 }
+
+/** normalise_token puts the token in the form expected by the backend.
+ *
+ * Most words are capitalised, but if you write in all caps, we'll
+ * assume you mean that.
+ */
+function normalise_token(token){
+    var orig = token;
+    token = token.split(/\s/, 1)[0];
+    var uc = token.toUpperCase();
+    if (uc != token){
+        var lc = token.toLowerCase();
+        token = uc.charAt(0) + lc.substr(1);
+    }
+    log("converted", orig, "to", token);
+    return token;
+}
+
 
 /** enable_drag sets up mouse dragging.
  *
@@ -240,7 +272,7 @@ function hm_tick(){
         var dx = - $page.mouse_dx / ($page.x_scale * z);
         var dy = - $page.mouse_dy / ($page.y_scale * z);
         var d = get_zoom_pixel_bounds($state.zoom, $state.x + dx, $state.y + dy);
-        var d2 = get_zoom_pixel_bounds($state.zoom, $state.x + dx, $state.y + dy);
+        var d2 = get_zoom_pixel_bounds($state.zoom, $state.x, $state.y);
         if (d.top != d2.top ||
             d.left != d2.left ||
             d.width != d2.width ||

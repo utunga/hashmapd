@@ -118,6 +118,7 @@ var $state = {
     x: 0,    /* centre of drawn map (0 to COORD_MAX) */
     y: 0,
     zoom: 0,    /* zoom level. 0 is full size, 1 is 1/2, 2 is 1/4, etc */
+    token: '',
 
     labels: false
 };
@@ -169,9 +170,12 @@ function hm_setup(){
         function(){
             $page.ticker = window.setInterval(hm_tick, 1000/ $const.FPS);
         });
-    /* move this here FOR NOW*/
-    $state.token = 'LOL';
-    //$waiters.have_density = $.getJSON('tokens/LOL_16.json', hm_on_token_density);
+
+    if ($state.token){
+        $waiters.have_density = get_token_json($state.token,
+                                               $const.DENSITY_RESOLUTION,
+                                               hm_on_token_density);
+    }
 }
 
 /** hm_draw_map draws the approriate map
@@ -183,8 +187,13 @@ function hm_draw_map(){
     $timestamp("start hm_draw_map", true);
     interpret_query($state);
     set_ui($state);
-    $waiters.have_density = get_token_json($state.token, $const.DENSITY_RESOLUTION, hm_on_token_density);
+    if (! ($state.token in $page.token_data)){
+        $waiters.have_density = get_token_json($state.token,
+                                               $const.DENSITY_RESOLUTION,
+                                               hm_on_token_density);
+    }
     temp_view();
+    /*have a short break here to allow the temp view to show */
     window.setTimeout(hm_draw_map2, 1);
 }
 
@@ -203,7 +212,8 @@ function hm_draw_map2(){
            $waiters.have_density)
                    .done(paint_token_density);
 
-    $.when($waiters.map_drawn).done(hide_temp_view);
+    $.when($waiters.map_drawn,
+           $waiters.have_density).done(hide_temp_view);
 }
 
 
@@ -622,9 +632,17 @@ function paint_token_density(){
     if (! (token in $page.token_data)){
         /*what to do? fire off another request? */
         log("no token data for ", token, "in paint_token_density");
+        $(named_canvas("density_overlay")).css("visibility", "hidden");
         return;
     }
     var points = $page.token_data[token];
+    if (points.length == 0){
+        /*the token isn't in the database. hmm. */
+        log("No points for", token, "in paint_token_density");
+        $(named_canvas("density_overlay")).css("visibility", "hidden");
+        return;
+    }
+
     var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
 
@@ -638,6 +656,7 @@ function paint_token_density(){
     var canvas2 = apply_density_map(ctx);
     $timestamp("post density map");
     $(canvas2).addClass("overlay").offset($($page.canvas).offset());
+    $(canvas2).css("visibility", "visible");
 }
 
 
