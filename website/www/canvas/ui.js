@@ -302,11 +302,14 @@ function pan_pixel_delta(dx, dy, dz){
     var x = parseInt($state.x - px);
     var y = parseInt($state.y - py);
     /* because x and y are centre points, they need to be constrained
-     * according to the zoom.
+     * according to the zoom.  But the zoom could be changing
+     * simultaneously, so the recalculate that.
      */
-    var pad_x = $page.range_x / (z * 2);
-    var pad_y = $page.range_y / (z * 2);
+    var zoom = $state.zoom + (dz || 0);
+    var zz = (1 << zoom);
+    var pad_x = $page.range_x / (zz * 2);
+    var pad_y = $page.range_y / (zz * 2);
     x = Math.max($page.min_x + pad_x, Math.min($page.max_x - pad_x, x));
     y = Math.max($page.min_y + pad_y, Math.min($page.max_y - pad_y, y));
-    set_state({x: parseInt(x), y: parseInt(y), zoom: $state.zoom + dz});
+    set_state({x: parseInt(x), y: parseInt(y), zoom: zoom});
 }
