@@ -589,7 +589,7 @@ function paint_map(){
                                   $const.ARRAY_FUZZ_RADIUS,
                                   $const.ARRAY_FUZZ_CONSTANT,
                                   $const.ARRAY_FUZZ_SCALE_ARGS,
-                                  undefined);
+                                  $page.max_height);
         }
         else {
             var d = get_zoom_pixel_bounds(zoom, $state.x, $state.y);
