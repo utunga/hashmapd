@@ -11,12 +11,10 @@
 var $const = {
     DEBUG: (window.location.pathname.substr(-10) == 'debug.html'),
     BASE_DB_URL: 'http://couch.hashmapd.com/fd/',
-    /*BASE_DB_URL: ((window.location.hostname == '127.0.0.1') ?
-                  'http://127.0.0.1:5984/frontend_dev/_design/user/_view/' :
-                  'http://couch.hashmapd.com/fd/'),*/
+    //BASE_DB_URL: 'http://127.0.0.1:5984/frontend_dev/_design/user/_view/',
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
-    FPS: 20, /*how often is the animation tick */
+    FPS: 20, /*how often is the animation tick (frames per second)*/
     ARRAY_FUZZ_SCALE: 255, /*highest peak is this high*/
     ARRAY_FUZZ_LUT_LENGTH: 2000, /*granularity of height conversion LUT */
     ARRAY_FUZZ_CONSTANT: -0.013, /*concentration for array fuzz */
@@ -45,8 +43,8 @@ var $const = {
      * - bigger than the fuzz radius used to construct the map (so edge is sea).
      *
      * - big enough that PADDING/{width,height} is greater than the
-     *   inverse minimum resolution. That is > 1.0/128 if 7 quad tree
-     *   coordinates are used.
+     *   inverse minimum resolution. That is, > 800/128 if 7 quad tree
+     *   coordinates are used with an 800x800 canvas.
      */
     PADDING: 24,    /*padding for the full size map in pixels*/
     width: 800,   /* canvas padded pixel width */
