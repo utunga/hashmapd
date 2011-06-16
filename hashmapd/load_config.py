@@ -26,7 +26,9 @@ class ConfigLoader(object):
     
     def load(self, config_name):
         cfg = Config(file(os.path.join(self.BASE_PATH, 'base.cfg')))
-        cfg1 = Config(file(config_name + '.cfg'))
+        if not config_name.endswith('.cfg'):
+            config_name = config_name + '.cfg'
+        cfg1 = Config(file(config_name))
         self.sections_to_merge = cfg.sections_to_merge; 
         merger = ConfigMerger(self.merge_by_overwrite)
         merger.merge(cfg, cfg1)
