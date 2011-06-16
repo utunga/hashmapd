@@ -37,14 +37,19 @@ ${EC2_SSH} "sudo chown ubuntu:ubuntu /ebs"
 echo "Install software"
 #Install software
 ${EC2_SSH} "sudo aptitude update -y"
-${EC2_SSH} "sudo aptitude install git-core python-setuptools python-dev gcc -y"
+${EC2_SSH} "sudo aptitude install git-core python-setuptools python-dev gcc nginx -y"
 
 echo "Setup couchbase server"
 ${EC2_SSH} "wget http://c3145442.r42.cf0.rackcdn.com/couchbase-server-community_x86_1.1.deb"
 ${EC2_SSH} "sudo dpkg -i couchbase-server-community_x86_1.1.deb"
 ${EC2_SSH} "sudo mkdir /mnt/couchdb"
 ${EC2_SSH} "sudo chown couchbase:couchbase /mnt/couchdb /ebs/couchdb /ebs/log/couchdb"
-${EC2_SSH} "sudo echo -e '[couchdb]\ndatabase_dir = /ebs/couchdb/\nview_index_dir = /mnt/couchdb/\n\n[log]\nfile = /ebs/log/couchdb/couch.log\nlevel = error\n' > /opt/couchbase-server/etc/couchdb/local.ini"
+# configure couch
+cat conf/couch.local.ini | ${EC2_SSH} "sudo sh -c 'cat > /opt/couchbase-server/etc/couchdb/local.ini'"
+${EC2_SSH} "sudo /etc/init.d/couchbase-server restart"
+# configure nginx
+cat conf/nginx.default | ${EC2_SSH} "sudo sh -c 'cat > /etc/nginx/sites-available/default'"
+${EC2_SSH} "sudo /etc/init.d/nginx restart"
 
 echo "Install hashmapd software"
 ${EC2_SSH} "sudo easy_install pip"
