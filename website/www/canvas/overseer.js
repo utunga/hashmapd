@@ -9,9 +9,10 @@
  * beginning, but once data is loaded, they are fixed.
  */
 var $const = {
-    BASE_DB_URL: ((window.location.hostname == '127.0.0.1') ?
+    BASE_DB_URL: 'http://couch.hashmapd.com/fd/',
+    /*BASE_DB_URL: ((window.location.hostname == '127.0.0.1') ?
                   'http://127.0.0.1:5984/frontend_dev/_design/user/_view/' :
-                  'http://couch.hashmapd.com/fd/'),
+                  'http://couch.hashmapd.com/fd/'),*/
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
     FPS: 20, /*how often is the animation tick */
@@ -170,7 +171,7 @@ function hm_setup(){
         });
     /* move this here FOR NOW*/
     $state.token = 'LOL';
-    $waiters.have_density = $.getJSON('tokens/LOL_16.json', hm_on_token_density);
+    //$waiters.have_density = $.getJSON('tokens/LOL_16.json', hm_on_token_density);
 }
 
 /** hm_draw_map draws the approriate map
@@ -182,7 +183,7 @@ function hm_draw_map(){
     $timestamp("start hm_draw_map", true);
     interpret_query($state);
     set_ui($state);
-    //$waiters.have_density = get_json('token_density', $const.DENSITY_RESOLUTION, hm_on_token_density);
+    $waiters.have_density = get_token_json($state.token, $const.DENSITY_RESOLUTION, hm_on_token_density);
     temp_view();
     window.setTimeout(hm_draw_map2, 1);
 }
@@ -216,20 +217,26 @@ function hm_draw_map2(){
  *  @return a $.Deferred or $.Deferred-alike object.
 
  */
-function get_json(view, precision, callback){
+function get_json(view, precision, callback, start, end){
     /*If the view has non-quadtree data prepended to its key (e.g. a token),
      * then the precision needs to be adjusted accordingly.
      */
+    $timestamp("req JSON " + view + "[" + precision + "]");
     var adjust = $const.views[view].precision_adjust || 0;
     var level = precision + adjust;
 
-    /*inside out compare catches undefined precision, which defaults to deepest level*/
-    var group_level = ((precision <= $const.QUAD_TREE_COORDS + adjust) ?
-                       "group_level=" + level :
-                       "group=true");
+    var args = {stale: 'ok'};
 
-    $timestamp("req JSON " + view + "[" + precision + "]");
-    var url = $const.BASE_DB_URL + view + '?' + group_level + '&callback=?';
+    /*inside out compare catches undefined precision, which defaults to deepest level*/
+    if (precision <= $const.QUAD_TREE_COORDS + adjust)
+        args.group_level = level;
+    else
+        args.group = "true";
+    if (start) args.startkey = start;
+    if (end) args.endkey = end;
+
+    var jsonp_callback = ($const.USE_JSONP) ? '&callback=?': '';
+    var url = ($const.BASE_DB_URL + view + '?' + $.param(args)) + jsonp_callback;
     var d = $.ajax({
                        url: url,
                        dataType: ($const.USE_JSONP) ? 'jsonp': 'json',
@@ -242,6 +249,12 @@ function get_json(view, precision, callback){
     });
     return d;
 }
+
+function get_token_json(token, precision, callback){
+    var startkey = '["' + token + '"]';
+    var endkey = '["' + token + '",{}]';
+    return get_json('token_density', precision, callback, startkey, endkey);
+};
 
 
 /* Start creating fuzz images.  This might take a while and is
