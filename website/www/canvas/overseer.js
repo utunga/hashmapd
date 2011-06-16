@@ -9,6 +9,7 @@
  * beginning, but once data is loaded, they are fixed.
  */
 var $const = {
+    DEBUG: (window.location.pathname.substr(-10) == 'debug.html'),
     BASE_DB_URL: 'http://couch.hashmapd.com/fd/',
     /*BASE_DB_URL: ((window.location.hostname == '127.0.0.1') ?
                   'http://127.0.0.1:5984/frontend_dev/_design/user/_view/' :
@@ -133,7 +134,7 @@ var $timestamp;
  */
 
 function hm_setup(){
-    $timestamp = get_timer();
+    $timestamp = get_timer($const.DEBUG);
     /*load matching query parameters into $const, just this once. */
     interpret_query($const);
     /*now load them into $state. This happens regularly in hm_draw_map */
@@ -162,7 +163,9 @@ function hm_setup(){
     }
     $.when($waiters.map_known,
            $waiters.hill_fuzz_ready).done(make_height_map, make_full_map);
-    construct_form();
+    if ($const.DEBUG){
+        construct_form();
+    }
     construct_ui();
     enable_drag();
     /*start the animation loop when the main map is done */

@@ -28,7 +28,9 @@ function scaled_canvas(p, id){
     var w = $const.width * p;
     var h = $const.height * p;
     var canvas = new_canvas(w, h, id);
-    document.getElementById("content").appendChild(canvas);
+    if ($const.DEBUG){
+        document.getElementById("content").appendChild(canvas);
+    }
     return canvas;
 }
 
