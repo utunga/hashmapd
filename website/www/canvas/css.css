@@ -106,3 +106,8 @@ canvas.overlay {
   text-align: center;
   margin: 100px auto 0 auto;
 }
+
+#helpers input{
+  max-width: 100px;
+  border: 1px solid red;
+}

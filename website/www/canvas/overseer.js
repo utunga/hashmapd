@@ -8,6 +8,7 @@
  * Of course, some of these things *can* be changed right at the
  * beginning, but once data is loaded, they are fixed.
  */
+
 var $const = {
     DEBUG: (window.location.pathname.substr(-10) == 'debug.html'),
     BASE_DB_URL: 'http://couch.hashmapd.com/fd/',
@@ -18,19 +19,19 @@ var $const = {
     ARRAY_FUZZ_SCALE: 255, /*highest peak is this high*/
     ARRAY_FUZZ_LUT_LENGTH: 2000, /*granularity of height conversion LUT */
     ARRAY_FUZZ_CONSTANT: -0.013, /*concentration for array fuzz */
-    ARRAY_FUZZ_RADIUS: 25, /*array fuzz goes this far. shouldn't exceed PADDING */
+    ARRAY_FUZZ_THRESHOLD: 0.005, /*array fuzz gets this faint */
     /* *_SCALE_ARGS, out of ['linear'], ['clipped_gaussian', low, high], ['base', base] */
     ARRAY_FUZZ_SCALE_ARGS: ['clipped_gaussian', -3.5, -0.4],
     ARRAY_FUZZ_DENSITY_SCALE_ARGS: ['linear'],
     ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concentration for array fuzz */
-    ARRAY_FUZZ_DENSITY_RADIUS: 30, /*array fuzz goes this far */
+    ARRAY_FUZZ_DENSITY_THRESHOLD: 0.005, /*density fuzz gets this faint */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
     FUZZ_CONSTANT: -0.015, /*concentration of peaks, negative inverse variance */
     FUZZ_OFFSET: 0.5, /* lift floor by this much (0.5 rounds, more to lengthen tails) */
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
-    REDRAW_HEIGHT_MAP: false, /*whether to redraw the height map on zoom */
+    REDRAW_HEIGHT_MAP: true, /*whether to redraw the height map on zoom */
     MAP_RESOLUTION: 9,       /*initial requested resolution for overall map*/
     DENSITY_RESOLUTION: 7,   /*initial requested resolution for density maps*/
     DENSITY_MAP_STYLE: 'grey_outside',
@@ -165,7 +166,12 @@ function hm_setup(){
     $.when($waiters.map_known,
            $waiters.hill_fuzz_ready).done(make_height_map, make_full_map);
     if ($const.DEBUG){
-        construct_form();
+        construct_form($state, 'state-form', submit = function() {
+                           var q = this.serialize();
+                           set_state(q);
+                           return false;
+                       });
+        construct_form($const, 'const-form');
     }
     construct_ui();
     enable_drag();
@@ -468,8 +474,8 @@ function make_height_map(){
     var ctx = canvas.getContext("2d");
     if ($const.array_fuzz){
         var map = make_fuzz_array(points,
-                                  $const.ARRAY_FUZZ_RADIUS,
                                   $const.ARRAY_FUZZ_CONSTANT,
+                                  $const.ARRAY_FUZZ_THRESHOLD,
                                   $const.width, $const.height,
                                   $page.min_x, $page.min_y,
                                   $page.x_scale, $page.y_scale);
@@ -551,12 +557,13 @@ function get_zoom_point_bounds(zoom, centre_x, centre_y, width, height){
     return z;
 }
 
-function zoomed_paint(ctx, points, zoom, r, k, scale_args, max_height){
+function zoomed_paint(ctx, points, zoom, k, threshold, scale_args, max_height){
     var scale = 1 << zoom;
     var w = ctx.canvas.width;
     var h = ctx.canvas.height;
-    r *= scale;
     k /= (scale * scale);
+    var r = calc_fuzz_radius(k, threshold);
+    log(k, threshold, r);
     var z = get_zoom_point_bounds(zoom, $state.x, $state.y, w, h);
     var x_padding = r / z.x_scale;
     var y_padding = r / z.y_scale;
@@ -565,7 +572,7 @@ function zoomed_paint(ctx, points, zoom, r, k, scale_args, max_height){
                           z.min_y - y_padding,
                           z.max_y + y_padding);
     $timestamp("start zoomed paint");
-    var map = make_fuzz_array(points, r, k, w, h,
+    var map = make_fuzz_array(points, k, threshold, w, h,
                               z.min_x, z.min_y,
                               z.x_scale, z.y_scale);
     $timestamp("made zoomed map");
@@ -586,8 +593,8 @@ function paint_map(){
         var height_ctx = height_map.getContext("2d");
         if ($const.REDRAW_HEIGHT_MAP){
             var height = zoomed_paint(height_ctx, points, zoom,
-                                  $const.ARRAY_FUZZ_RADIUS,
                                   $const.ARRAY_FUZZ_CONSTANT,
+                                  $const.ARRAY_FUZZ_THRESHOLD,
                                   $const.ARRAY_FUZZ_SCALE_ARGS,
                                   $page.max_height);
         }
@@ -651,8 +658,8 @@ function paint_token_density(){
     var ctx = canvas.getContext("2d");
 
     var height = zoomed_paint(ctx, points, $state.zoom,
-                              $const.ARRAY_FUZZ_DENSITY_RADIUS,
                               $const.ARRAY_FUZZ_DENSITY_CONSTANT,
+                              $const.ARRAY_FUZZ_DENSITY_THRESHOLD,
                               $const.ARRAY_FUZZ_DENSITY_SCALE_ARGS,
                               undefined);
 

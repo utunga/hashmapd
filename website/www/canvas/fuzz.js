@@ -2,20 +2,34 @@
  * written by Douglas Bagnall
  */
 
-/** make_fuzz_table_1d makes a one dimensional gaussian distribution */
-function make_fuzz_table_1d(radius, k){
-    var x;
-    /* work out a table of 0-1 fuzz values */
-    var table = [];
-    var size = 2 * radius + 1;
-    for (x = 0; x < size; x++){
-        var dx2 = (x - radius) * (x - radius);
-        table[x] = Math.exp(dx2 * k);
-        if (table[x] < 0.001){
-            table[x] = 0;
-        }
+/** make_fuzz_table_1d makes a one dimensional gaussian distribution
+ *
+ * @param k is the fuzz constant (essentially -2 * variance)
+ * @param threshold is the lowest number to include
+ *
+ * The distribution is clipped to the range where threshold is
+ * exceeded.
+ */
+function make_fuzz_table_1d(k, threshold){
+    if (! threshold)
+        threshold = 0.01; /*there has to be something*/
+    var half_table = [];
+    for (var d = 0, f = threshold + 1; f > threshold; d++){
+        f = Math.exp(d * d * k);
+        half_table.push(f);
     }
-    return table;
+    var table = half_table.slice(1);
+    table.reverse();
+    return table.concat(half_table);
+}
+
+function calc_fuzz_radius(k, threshold){
+    if (! threshold)
+        threshold = 0.01; /*there has to be something*/
+    for (var d = 0, f = threshold + 1; f > threshold; d++){
+        f = Math.exp(d * d * k);
+    }
+    return d;
 }
 
 /** make_fuzz_table_2d makes a two dimensional gaussian distribution */
@@ -196,13 +210,15 @@ function zeroed_2d_array(w, h){
  * grain, vertically.
  *
  */
-function make_fuzz_array(points, radius, k,
+function make_fuzz_array(points, k, threshold,
                          width, height,
                          min_x, min_y,
                          x_scale, y_scale
                         ){
-    var lut = make_fuzz_table_1d(radius, k);
+    var lut = make_fuzz_table_1d(k, threshold);
     var len = lut.length;
+    var radius = parseInt(len / 2);
+    log(k, threshold, radius);
     var x, y, i;
     var map = zeroed_2d_array(width, height);
     var row;

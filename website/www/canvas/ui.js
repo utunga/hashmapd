@@ -77,28 +77,35 @@ function parse_query(query){
     }
 }
 
+
 /**construct_form makes a quick for for testing purposes
  */
+function construct_form(object, id, submit_func){
+    $("#helpers").append('<h2>' + id + '</h2>' + '<table><form id="' + id +
+                         '"></form></table>');
+    var form = $("#" + id);
+    var param;
+    for (param in object){
+        var existing = object[param];
+        switch(typeof(existing)){
+        case "number":
+        case "string":
+            form.append('<tr><td>' + param + '<td><input name="' + param + '" value="' +
+                        existing + '"></tr>');
+            break;
+        case "boolean":
+            form.append('<tr><td>' + param + '<td>'
+                        + '<input type="radio" value="true" name="' +param + '"' + (existing ? " checked" : '') + '>'
+                        + '<input type="radio" value="false" name="' +param + '"' + (existing ? '' : " checked") + '>'
+                        + '</tr>'
+                       );
 
-function construct_form(){
-    $("#helpers").append('<form id="state"></form>');
-    var form = $("#state");
-    for (var param in $state){
-        var existing = $state[param];
-        if (typeof(existing) in {number: 1, string: 1}){
-            form.append(param + '<input name="' + param + '" value="' +
-                        existing + '"><br>');
         }
     }
-
-    var submit = function() {
-        var q = form.serialize();
-        set_state(q);
-        return false;
-    };
-
-    form.append('<button>go</button>');
-    form.submit(submit);
+    form.append('<tr><td colspan="2"><button>go</button>');
+    if (submit_func)
+        form.submit(submit_func);
+    return form;
 }
 
 /** set_state redraws to match a query string or $state-like object
@@ -112,7 +119,7 @@ function set_state(data){
     if (typeof(data) == 'string'){
         data = parse_query(data);
     }
-    dump_object(data);
+    //dump_object(data);
     var copy = {};
     for (k in $state){
         copy[k] = $state[k];

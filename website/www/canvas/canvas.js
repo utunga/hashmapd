@@ -354,8 +354,8 @@ function paint_density_array(ctx, points){
     //token_ctx.fillStyle = "#f00";
     //token_ctx.fillRect(0, 0, token_ctx.canvas.width, token_ctx.canvas.height);
     var map = make_fuzz_array(points,
-        $const.ARRAY_FUZZ_DENSITY_RADIUS,
         $const.ARRAY_FUZZ_DENSITY_CONSTANT,
+        $const.ARRAY_FUZZ_DENSITY_THRESHOLD,
         ctx.canvas.width, ctx.canvas.height,
         $page.min_x, $page.min_y,
         $page.x_scale  * 0.25, $page.y_scale * 0.25);
