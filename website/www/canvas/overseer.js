@@ -32,6 +32,8 @@ var $const = {
     DENSITY_MAP_STYLE: 'grey_outside',
     //DENSITY_MAP_STYLE: 'colour_cycle',
 
+    DENSITY_MAP_ZOOM_DETAIL: true,
+
     QUAD_TREE_COORDS: 15,
     COORD_MAX: 1 << 16,   /* exclusive maximum xy coordinates (1 << (QUAD_TREE_COORDS + 1)) */
     COORD_MIN: 0,   /* inclusive minimum xy coordinates. */
@@ -613,9 +615,16 @@ function paint_token_density(){
 
     var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
+    var k;
+    if ($const.DENSITY_MAP_ZOOM_DETAIL){
+        k = $const.ARRAY_FUZZ_DENSITY_CONSTANT * (1 << $state.zoom);
+    }
+    else {
+        k = $const.ARRAY_FUZZ_DENSITY_CONSTANT;
+    }
 
     var height = zoomed_paint(ctx, points, $state.zoom,
-                              $const.ARRAY_FUZZ_DENSITY_CONSTANT,
+                              k,
                               $const.ARRAY_FUZZ_DENSITY_THRESHOLD,
                               $const.ARRAY_FUZZ_DENSITY_SCALE_ARGS,
                               undefined);
