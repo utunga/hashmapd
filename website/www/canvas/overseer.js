@@ -125,9 +125,9 @@ var $timestamp;
  */
 
 function hm_setup(){
-    $timestamp = get_timer($const.DEBUG);
     /*load matching query parameters into $const, just this once. */
     interpret_query($const);
+    $timestamp = get_timer();
     /*now load them into $state. This happens regularly in hm_draw_map */
     interpret_query($state);
 
@@ -149,7 +149,7 @@ function hm_setup(){
 
     $.when($waiters.map_known).done(make_height_map, make_full_map);
     if ($const.DEBUG){
-        construct_form($state, 'state-form', submit = function() {
+        construct_form($state, 'state-form', function() {
                            var q = this.serialize();
                            set_state(q);
                            return false;

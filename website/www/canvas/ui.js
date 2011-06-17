@@ -81,28 +81,31 @@ function parse_query(query){
 /**construct_form makes a quick for for testing purposes
  */
 function construct_form(object, id, submit_func){
-    $("#helpers").append('<h2>' + id + '</h2>' + '<table><form id="' + id +
-                         '"></form></table>');
+    $("#helpers").append('<h2>' + id + '</h2>' + '<form id="' + id +
+                         '"><table></table></form>');
     var form = $("#" + id);
+    var table = $("#" + id + " table");
     var param;
     for (param in object){
         var existing = object[param];
         switch(typeof(existing)){
         case "number":
         case "string":
-            form.append('<tr><td>' + param + '<td><input name="' + param + '" value="' +
-                        existing + '"></tr>');
+            table.append('<tr><td>' + param + '<td><input name="' + param + '" value="' +
+                         existing + '"></tr>');
             break;
         case "boolean":
-            form.append('<tr><td>' + param + '<td>'
-                        + '<input type="radio" value="true" name="' +param + '"' + (existing ? " checked" : '') + '>'
-                        + '<input type="radio" value="false" name="' +param + '"' + (existing ? '' : " checked") + '>'
-                        + '</tr>'
-                       );
+            table.append('<tr><td>' + param + '<td>'
+                         + '<input type="radio" value="true" title="true" name="'
+                         + param + '"' + (existing ? " checked" : '') + '>'
+                         + '<input type="radio" value="false" title="false" name="'
+                         + param + '"' + (existing ? '' : " checked") + '>'
+                         + '</tr>'
+                        );
 
         }
     }
-    form.append('<tr><td colspan="2"><button>go</button>');
+    table.append('<tr><td colspan="2"><button>go</button>');
     if (submit_func)
         form.submit(submit_func);
     return form;
