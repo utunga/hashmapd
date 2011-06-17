@@ -1,5 +1,10 @@
 cimport c_numpy
-    
+
+cdef extern from "math.h":
+    double log (double x)
+
+version_info = (1, 1)
+
 cdef void *checkArray(c_numpy.ndarray a, char typecode, int itemsize, 
         int nd, int **dims) except NULL:
     cdef int length, size
@@ -70,11 +75,11 @@ cdef double * checkArrayDouble2D(c_numpy.ndarray a, int *x, int *y) except NULL:
     return <double *> checkArray2D(a, c'f', sizeof(double), x, y)
 
 
-def calc_dY(  #
+def calc_dY(
         c_numpy.ndarray P,
         c_numpy.ndarray Y,
         c_numpy.ndarray num,
-        c_numpy.ndarray Y2,
+        c_numpy.ndarray Y2,    # if this is None calculates cost instead
         c_numpy.ndarray dY,
         ):
     
@@ -83,13 +88,16 @@ def calc_dY(  #
     
     cdef int d=0, n=0, w=0    # array dimension sizes
     cdef int i, j, k, tri_i   # indicies
-    cdef double num_total, num_scale, q, b
+    cdef double num_total, num_scale, p, q, b, cost
     cdef double *P_data, *num_data, *Y_data, *dY_data
 
     P_data = checkArrayDouble2D(P, &n, &n)
     num_data = checkArrayDouble1D(num, &w)
     Y_data = checkArrayDouble2D(Y, &n, &d)
-    dY_data = checkArrayDouble2D(dY, &n, &d)
+    if dY is None:
+        dY_data = NULL
+    else:
+        dY_data = checkArrayDouble2D(dY, &n, &d)
     Y2_data = checkArrayDouble1D(Y2, &n)
     assert w >= n*(n-1) // 2
     
@@ -97,11 +105,12 @@ def calc_dY(  #
         Y2_data[i] = 0.0
         for j in range(d):
             Y2_data[i] += Y_data[i*d+j] ** 2
-            dY_data[i*d+j] = 0.0
-            
+            if dY_data:
+                dY_data[i*d+j] = 0.0
+    
     num_total = 0.0
     for i in range(n):
-        tri_i = i*(i-1)//2
+        tri_i = i*(i-1) // 2
         for k in range(i):
             b = 0.0
             for j in range(d):
@@ -110,18 +119,25 @@ def calc_dY(  #
             num_data[tri_i+k] = b
             num_total += b
     num_scale = 1.0 / (num_total * 2.0)
-        
+    
+    cost = 0.0
     for i in range(n):
-        tri_i = i*(i-1)//2        
+        tri_i = i*(i-1) // 2
         for j in range(d):
             for k in range(i):
+                p = P_data[i*n+k]
                 b = num_data[tri_i+k]
                 q = b * num_scale
                 if q < 1e-12:
                     q = 1e-12
                 b *= (Y_data[i*d+j] - Y_data[k*d+j])
-                b *= (P_data[i*n+k] - q)
-                dY_data[i*d+j] += b
-                dY_data[k*d+j] -= b
-    
-    return dY    
+                b *= (p - q)
+                if dY_data:
+                    dY_data[i*d+j] += b
+                    dY_data[k*d+j] -= b
+                else:
+                    cost += p * log(p / q)
+    if dY is None:
+        return cost
+    else:  
+        return dY    
