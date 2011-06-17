@@ -181,11 +181,11 @@ function construct_ui(){
     $("#token_form").submit(
         function(e){
             e.preventDefault();
+            e.stopPropagation();
             var token = $("#token_input").val() || '';
             token = normalise_token(token);
             $("#token_input").val(token);
             set_state({token: token});
-            //dump_object($state);
             return false;
         }
     );
@@ -254,10 +254,13 @@ function enable_drag(){
     };
 
     var dblclick = function(e){
+        e.preventDefault();
+        e.stopPropagation();
         var dx =  e.pageX - offset.left - ($const.width / 2);
         var dy =  e.pageY - offset.top  - ($const.height / 2);
         log(dx, dy);
         pan_pixel_delta(-dx, -dy, 1);
+        return false;
     };
 
     ui_grabber.mousedown(start);
