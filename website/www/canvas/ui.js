@@ -77,28 +77,38 @@ function parse_query(query){
     }
 }
 
+
 /**construct_form makes a quick for for testing purposes
  */
+function construct_form(object, id, submit_func){
+    $("#helpers").append('<h2>' + id + '</h2>' + '<form id="' + id +
+                         '"><table></table></form>');
+    var form = $("#" + id);
+    var table = $("#" + id + " table");
+    var param;
+    for (param in object){
+        var existing = object[param];
+        switch(typeof(existing)){
+        case "number":
+        case "string":
+            table.append('<tr><td>' + param + '<td><input name="' + param + '" value="' +
+                         existing + '"></tr>');
+            break;
+        case "boolean":
+            table.append('<tr><td>' + param + '<td>'
+                         + '<input type="radio" value="true" title="true" name="'
+                         + param + '"' + (existing ? " checked" : '') + '>'
+                         + '<input type="radio" value="false" title="false" name="'
+                         + param + '"' + (existing ? '' : " checked") + '>'
+                         + '</tr>'
+                        );
 
-function construct_form(){
-    $("#helpers").append('<form id="state"></form>');
-    var form = $("#state");
-    for (var param in $state){
-        var existing = $state[param];
-        if (typeof(existing) in {number: 1, string: 1}){
-            form.append(param + '<input name="' + param + '" value="' +
-                        existing + '"><br>');
         }
     }
-
-    var submit = function() {
-        var q = form.serialize();
-        set_state(q);
-        return false;
-    };
-
-    form.append('<button>go</button>');
-    form.submit(submit);
+    table.append('<tr><td colspan="2"><button>go</button>');
+    if (submit_func)
+        form.submit(submit_func);
+    return form;
 }
 
 /** set_state redraws to match a query string or $state-like object
@@ -112,7 +122,7 @@ function set_state(data){
     if (typeof(data) == 'string'){
         data = parse_query(data);
     }
-
+    //dump_object(data);
     var copy = {};
     for (k in $state){
         copy[k] = $state[k];
@@ -155,7 +165,7 @@ function set_ui(state){
     );
 }
 
-/** construct_ui makes a zoom slider
+/** construct_ui makes a zoom slider and hooks up the token search box
  */
 
 function construct_ui(){
@@ -170,7 +180,39 @@ function construct_ui(){
     var offset = $($page.canvas).offset();
     offset.left -= 20;
     slider.offset(offset);
+
+    $("#token_form").submit(
+        function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            var token = $("#token_input").val() || '';
+            token = normalise_token(token);
+            $("#token_input").val(token);
+            set_state({token: token});
+            return false;
+        }
+    );
+    $("#token_input").val($state.token);
+
 }
+
+/** normalise_token puts the token in the form expected by the backend.
+ *
+ * Most words are capitalised, but if you write in all caps, we'll
+ * assume you mean that.
+ */
+function normalise_token(token){
+    var orig = token;
+    token = token.split(/\s/, 1)[0];
+    var uc = token.toUpperCase();
+    if (uc != token){
+        var lc = token.toLowerCase();
+        token = uc.charAt(0) + lc.substr(1);
+    }
+    log("converted", orig, "to", token);
+    return token;
+}
+
 
 /** enable_drag sets up mouse dragging.
  *
@@ -215,10 +257,13 @@ function enable_drag(){
     };
 
     var dblclick = function(e){
+        e.preventDefault();
+        e.stopPropagation();
         var dx =  e.pageX - offset.left - ($const.width / 2);
         var dy =  e.pageY - offset.top  - ($const.height / 2);
         log(dx, dy);
         pan_pixel_delta(-dx, -dy, 1);
+        return false;
     };
 
     ui_grabber.mousedown(start);
@@ -240,14 +285,14 @@ function hm_tick(){
         var dx = - $page.mouse_dx / ($page.x_scale * z);
         var dy = - $page.mouse_dy / ($page.y_scale * z);
         var d = get_zoom_pixel_bounds($state.zoom, $state.x + dx, $state.y + dy);
-        var d2 = get_zoom_pixel_bounds($state.zoom, $state.x + dx, $state.y + dy);
+        var d2 = get_zoom_pixel_bounds($state.zoom, $state.x, $state.y);
         if (d.top != d2.top ||
             d.left != d2.left ||
             d.width != d2.width ||
             d.height != d2.height){
-            var tc = named_canvas('temp');
+            var tc = $page.tmp_canvas;
             zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
-            $(tc).offset($($page.canvas).offset()).css('visibility', 'visible');
+            $(tc).css('visibility', 'visible');
         }
     }
 }
@@ -270,11 +315,14 @@ function pan_pixel_delta(dx, dy, dz){
     var x = parseInt($state.x - px);
     var y = parseInt($state.y - py);
     /* because x and y are centre points, they need to be constrained
-     * according to the zoom.
+     * according to the zoom.  But the zoom could be changing
+     * simultaneously, so the recalculate that.
      */
-    var pad_x = $page.range_x / (z * 2);
-    var pad_y = $page.range_y / (z * 2);
+    var zoom = $state.zoom + (dz || 0);
+    var zz = (1 << zoom);
+    var pad_x = $page.range_x / (zz * 2);
+    var pad_y = $page.range_y / (zz * 2);
     x = Math.max($page.min_x + pad_x, Math.min($page.max_x - pad_x, x));
     y = Math.max($page.min_y + pad_y, Math.min($page.max_y - pad_y, y));
-    set_state({x: parseInt(x), y: parseInt(y), zoom: $state.zoom + dz});
+    set_state({x: parseInt(x), y: parseInt(y), zoom: zoom});
 }

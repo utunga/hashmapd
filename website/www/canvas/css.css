@@ -64,11 +64,17 @@ canvas.overlay {
 #helpers {
   position: absolute;
   left: 0;
-  top: 300px;
+  top: 200px;
   width: 200px;
   font: normal 11px sans-serif;
   color: #ccc;
+  margin: 5px;
 }
+
+#helpers h2 {
+  margin: 2px;
+}
+
 
 #debug {
   font: normal 11px sans-serif;
@@ -105,4 +111,19 @@ canvas.overlay {
 #loading div{
   text-align: center;
   margin: 100px auto 0 auto;
+}
+
+#helpers input{
+  max-width: 100px;
+  border: 1px solid #ccc;
+}
+
+#helpers input[type=radio][value=true]{
+  color: green !important;
+  background-color: green !important;
+}
+
+#helpers input[type=radio][value=false]{
+  color: red !important;
+  background-color: red !important;
 }

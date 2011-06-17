@@ -28,12 +28,18 @@ function scaled_canvas(p, id){
     var w = $const.width * p;
     var h = $const.height * p;
     var canvas = new_canvas(w, h, id);
-    document.getElementById("content").appendChild(canvas);
+    if ($const.DEBUG){
+        document.getElementById("content").appendChild(canvas);
+    }
     return canvas;
 }
 
-/* get a particular canvas that is a member of $page, or if it doesn't
- * exist, make it up and store it */
+/* named_canvas will get or create a canvas in $page.canvases
+ *
+ * @param name is the name for the canvas.
+ * @param blank clears or (if css colour string) the canvas
+ * @param p sets the size (proportional to map size).
+ */
 function named_canvas(name, blank, p){
     var canvas = $page.canvases[name];
     if (canvas === undefined){
@@ -54,6 +60,31 @@ function named_canvas(name, blank, p){
     }
     return canvas;
 }
+
+/*overlay_canvas calls named_canvas, and overlays it on the main canvas
+ *
+ * Sorry for all the concentric functions.
+ *
+ * @param name is a name for the canvas
+ * @param hidden flags whether the canvas is visible to stgart with.
+ * @return the canvas
+ */
+
+function overlay_canvas(name, hidden){
+    var canvas = named_canvas(name);
+    overlay(canvas, hidden);
+    return canvas;
+}
+
+function overlay(canvas, hidden){
+    $("#map-div").append(canvas);
+    $(canvas).css("position", "absolute");
+    var vis = hidden ? 'hidden' : 'visible';
+    $(canvas).css("visibility", vis);
+    $(canvas).addClass("overlay").offset($($page.canvas).offset());
+    return canvas;
+}
+
 
 
 /* Algorithm borrowed from John Barratt <http://www.langarson.com.au/>
@@ -323,8 +354,8 @@ function paint_density_array(ctx, points){
     //token_ctx.fillStyle = "#f00";
     //token_ctx.fillRect(0, 0, token_ctx.canvas.width, token_ctx.canvas.height);
     var map = make_fuzz_array(points,
-        $const.ARRAY_FUZZ_DENSITY_RADIUS,
         $const.ARRAY_FUZZ_DENSITY_CONSTANT,
+        $const.ARRAY_FUZZ_DENSITY_THRESHOLD,
         ctx.canvas.width, ctx.canvas.height,
         $page.min_x, $page.min_y,
         $page.x_scale  * 0.25, $page.y_scale * 0.25);

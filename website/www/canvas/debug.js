@@ -10,6 +10,9 @@
  * javascript's scoping of "this" in async contexts.
  */
 function get_timer(){
+    if (! $const.DEBUG){
+        return function(){};
+    }
     var previous = Date.now();
     var start = previous;
     var s = ('<table id="hm_timer"><tr><td colspan="3">milliseconds<tr>' +
@@ -30,6 +33,9 @@ function get_timer(){
 }
 
 function log(){
+    if (! $const.DEBUG){
+        return;
+    }
     var s = "<div>";
     for (var i = 0; i < arguments.length; i++){
         s += arguments[i] + " ";
