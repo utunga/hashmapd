@@ -26,11 +26,6 @@ var $const = {
     ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concentration for array fuzz */
     ARRAY_FUZZ_DENSITY_THRESHOLD: 0.005, /*density fuzz gets this faint */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
-    FUZZ_CONSTANT: -0.015, /*concentration of peaks, negative inverse variance */
-    FUZZ_OFFSET: 0.5, /* lift floor by this much (0.5 rounds, more to lengthen tails) */
-    FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
-    FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
-    FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
     REDRAW_HEIGHT_MAP: true, /*whether to redraw the height map on zoom */
     MAP_RESOLUTION: 9,       /*initial requested resolution for overall map*/
     DENSITY_RESOLUTION: 7,   /*initial requested resolution for density maps*/
@@ -51,7 +46,6 @@ var $const = {
     width: 800,   /* canvas padded pixel width */
     height: 800,  /* canvas padded pixel height */
 
-    array_fuzz: true,
     HILL_LUT_CENTRE: 300,
     HILL_SHADE_FLATNESS: 16.0, /*8 is standard, higher means flatter hills */
     views : {  /* helps in interpreting various views. */
@@ -72,7 +66,6 @@ var $page = {
     loading: undefined,
     labels: undefined,  /* JSON derived structure describing labels */
     height_canvas: undefined, /*a height map canvas */
-    hill_fuzz: undefined, /* object wrapping Gaussian fuzz images */
     max_height: undefined, /* maximum value of array fuzz */
 
     /* convert data coordinates to canvas coordinates. */
@@ -103,7 +96,6 @@ var $waiters = {
     map_drawn: undefined, /*will be a deferred that fires when $page.canvas is ready */
     full_map_drawn: undefined, /*will fire when a canonical unzoomed map is at $page.full_map */
     height_map_drawn: undefined,
-    hill_fuzz_ready: undefined,
     have_density: undefined,
     density_drawn: undefined,
 
@@ -155,16 +147,7 @@ function hm_setup(){
     /* start downloading the main map */
     $waiters.map_known = get_json('locations', $const.MAP_RESOLUTION, hm_on_data);
 
-    /* if using image based convolution, start making the images */
-    if (! $const.array_fuzz){
-        $waiters.hill_fuzz_ready = $.Deferred();
-        start_fuzz_creation($waiters.hill_fuzz_ready);
-    }
-    else { /*a non-deferred acts as resolved to $.when() */
-        $waiters.hill_fuzz_ready = true;
-    }
-    $.when($waiters.map_known,
-           $waiters.hill_fuzz_ready).done(make_height_map, make_full_map);
+    $.when($waiters.map_known).done(make_height_map, make_full_map);
     if ($const.DEBUG){
         construct_form($state, 'state-form', submit = function() {
                            var q = this.serialize();
@@ -214,11 +197,9 @@ function hm_draw_map2(){
                $waiters.map_drawn).done(paint_labels);
     }
 
-    $.when($waiters.map_known,
-           $waiters.hill_fuzz_ready).done(paint_map);
+    $.when($waiters.map_known).done(paint_map);
 
     $.when($waiters.map_known,
-           $waiters.hill_fuzz_ready,
            $waiters.have_density)
                    .done(paint_token_density);
 
@@ -276,25 +257,6 @@ function get_token_json(token, precision, callback){
     return get_json('token_density', precision, callback, startkey, endkey);
 };
 
-
-/* Start creating fuzz images.  This might take a while and is
- * partially asynchronous.
- *
- *  (It takes 8-40 ms on an i5-540, at time of writing, which beats
- *  JSON loading from local/cached sources.)
- *
- */
-function start_fuzz_creation(deferred){
-    $timestamp("start make_fuzz");
-    $page.hill_fuzz = make_fuzz(
-        deferred,
-        $const.FUZZ_MAX_MULTIPLE,
-        $const.FUZZ_MAX_RADIUS,
-        $const.FUZZ_CONSTANT,
-        $const.FUZZ_OFFSET,
-        $const.FUZZ_PER_POINT);
-    $timestamp("end make_fuzz");
-}
 
 /** decode_points turns JSON rows into point arrays.
  *
@@ -465,26 +427,23 @@ function hm_on_data(data){
     $page.tweeters = points;
 }
 
-/** make_height_map() depends on  $waiters.hill_fuzz_ready and $waiters.map_known
+/** make_height_map() depends on  $waiters.map_known
  */
 function make_height_map(){
     $timestamp("start height_map");
     var points = $page.tweeters;
     var canvas = named_canvas("height_map", "rgba(255,0,0, 1)", 1);
     var ctx = canvas.getContext("2d");
-    if ($const.array_fuzz){
-        var map = make_fuzz_array(points,
-                                  $const.ARRAY_FUZZ_CONSTANT,
-                                  $const.ARRAY_FUZZ_THRESHOLD,
-                                  $const.width, $const.height,
-                                  $page.min_x, $page.min_y,
-                                  $page.x_scale, $page.y_scale);
-        $page.max_height = paste_fuzz_array(ctx, map,
-                                            $const.ARRAY_FUZZ_SCALE_ARGS);
-    }
-    else{
-        paste_fuzz(ctx, points, $page.hill_fuzz);
-    }
+
+    var map = make_fuzz_array(points,
+                              $const.ARRAY_FUZZ_CONSTANT,
+                              $const.ARRAY_FUZZ_THRESHOLD,
+                              $const.width, $const.height,
+                              $page.min_x, $page.min_y,
+                              $page.x_scale, $page.y_scale);
+    $page.max_height = paste_fuzz_array(ctx, map,
+                                        $const.ARRAY_FUZZ_SCALE_ARGS);
+
     $page.height_canvas = canvas;
     $timestamp("end height_map");
 
@@ -508,8 +467,6 @@ function make_full_map(){
     $waiters.full_map_drawn.resolve();
     $timestamp("end make_full_map");
 }
-
-
 
 
 function get_zoom_pixel_bounds(zoom, centre_x, centre_y, width, height){
