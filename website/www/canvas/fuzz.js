@@ -2,283 +2,252 @@
  * written by Douglas Bagnall
  */
 
-/** make_fuzz_table_1d makes a one dimensional gaussian distribution */
-function make_fuzz_table_1d(radius, k){
-    var x;
-    /* work out a table of 0-1 fuzz values */
-    var table = [];
-    var size = 2 * radius + 1;
-    for (x = 0; x < size; x++){
-        var dx2 = (x - radius) * (x - radius);
-        //log(x, radius, dx2, k);
-        table[x] = Math.exp(dx2 * k);
-    }
-    return table;
-}
-
-/** make_fuzz_table_2d makes a two dimensional gaussian distribution */
-function make_fuzz_table_2d(radius, k){
-    var x, y;
-    /* work out a table of 0-1 fuzz values */
-    var table = [];
-    /* middle pixel + radius on either side */
-    var size = 2 * radius + 1;
-
-    var height;
-    var centre_y;
-    for (y = 0; y < size; y++){
-        table[y] = [];
-        var ty = table[y];
-        var dy2 = (y - radius) * (y - radius);
-        for (x = 0; x < size; x++){
-            var dx2 = (x - radius) * (x - radius);
-            ty[x] = Math.exp((dx2 + dy2) * k);
-        }
-    }
-    return table;
-}
-
-
-/** Make_fuzz makes little fuzzy circle images for point convolution
+/** make_fuzz_table_1d makes a one dimensional gaussian distribution
  *
- * The returned object contains references to html imgs index by
- * numbers from 1 to <densities>, which contain fuzz corresponding to
- * that number of points.  The images vary in size, being clipped at
- * the edge of the representable curve -- higher densities spread
- * slightly further.
+ * @param k is the fuzz constant (essentially -2 * variance)
+ * @param threshold is the lowest number to include
  *
- * The images are not necessarily ready when the function returns.
- * You can use any individually via its .onload() handler or after
- * checking its .complete attribute, but the simplest thing is to use
- * the returned object's .ready jquery deferred attribute.  Like so:
- *
- * make_fuzz(...).ready.then(whatever);
- *
- * The fuzz is approximately gaussian and carried in the images alpha
- * channel.
- *
- * Look at the attributes of the $hm object that start with FUZZ_ for
- * documentation and useful values.
- *
- * The formula used is parseInt(Math.exp(k * d * d) + offset)
- *
- * @param deferred  a $.Deferred object to fire when the images are ready
- * @param densities make fuzz images with densities from 1 to <densities>
- * @param radius    size of guassian table. no image will exceed this.
- * @param k         negative inverse variance. closer to 0 is flatter.
- * @param offset    lifts floor in truncating (0.5 rounds, more to lengthen tails)
- * @param intensity level of fuzz at the center of density 1.
- *
- * @return an object referencing images that *will* contain fuzz when it it is ready.
+ * The distribution is clipped to the range where threshold is
+ * exceeded.
  */
-
-function make_fuzz(deferred, densities, radius, k, offset, intensity){
-    var x, y;
-    /* middle pixel + radius on either side */
-    var tsize = 2 * radius + 1;
-    var table = make_fuzz_table_2d(radius, k);
-
-    var centre_row = table[radius];
-    var images = {loaded: 0,
-                  ready: deferred
-                 };
-
-    for (var i = 1; i <= densities; i++){
-        var peak = intensity * i;
-        /* find how wide it needs to be. We want to clip <clip> off
-         * each side of the table.*/
-        for (var clip = 0; clip < radius; clip++){
-            var value = centre_row[clip] * peak + offset;
-            if (value >= 1){
-                break;
-            }
-        }
-        var size = tsize - 2 * clip;
-        var canvas = new_canvas(size, size);
-        var ctx = canvas.getContext("2d");
-        var imgd = ctx.getImageData(0, 0, size, size);
-        var pixels = imgd.data;
-        var stride = size * 4;
-        for (y = 0; y < size; y++){
-            var sy = clip + y;
-            var row = y * stride;
-            for (x = 0; x < size; x++){
-                var sx = clip + x;
-                var a = parseInt(table[sy][sx] * peak + offset);
-                var p = row + x * 4;
-                pixels[p] = 255;
-                pixels[p + 3] = a;
-            }
-        }
-        ctx.putImageData(imgd, 0, 0);
-        var img = document.createElement("img");
-        img.id = "fuzz-" + i + "-radius-" + (size - 1) / 2;
-        images[i] = img;
-        /*hacky way to forward onload */
-        img.onload = function(){
-            images.loaded++;
-            if(images.loaded == densities){
-                images.ready.resolve();
-            }
-        };
-        img.src = canvas.toDataURL();
-        $("#helpers").append(img);
+function make_fuzz_table_1d(k, threshold){
+    if (! threshold)
+        threshold = 0.01; /*there has to be something*/
+    var half_table = [];
+    for (var d = 0, f = threshold + 1; f > threshold; d++){
+        f = Math.exp(d * d * k);
+        half_table.push(f);
     }
-    images.table = table;
-    images.table1d = centre_row;
-    return images;
+    var table = half_table.slice(1);
+    table.reverse();
+    return table.concat(half_table);
+}
+
+function calc_fuzz_radius(k, threshold){
+    if (! threshold)
+        threshold = 0.01; /*there has to be something*/
+    for (var d = 0, f = threshold + 1; f > threshold; d++){
+        f = Math.exp(d * d * k);
+    }
+    return d;
+}
+
+/** zeroed_2d_array makes a 2d array suitable for floating point stuff
+ *
+ * If $const.ARRAY_FUZZ_TYPED_ARRAY is set, Float32Array()s are used.
+ * This is faster on some browsers and slightly slower on others.  (It
+ * would be possible, with marginal benefit, to test this dynamically
+ * and use the right array in every browser).
+ *
+ * @param w
+ * @param h
+ *
+ * @return an Array of either Arrays or Float32Arrays, filled with zeros.
+ * */
+
+function zeroed_2d_array(w, h){
+    var x, y;
+    var map = [];
+    if ($const.ARRAY_FUZZ_TYPED_ARRAY){
+        for (y = 0 ; y < h; y++){
+            map[y] = new Float32Array(w);
+        }
+    }
+    else {
+        for (y = 0 ; y < h; y++){
+            var row = map[y] = [];
+            for (x = 0; x < w; x++){
+                row[x] = 0.0;
+            }
+        }
+    }
+    return map;
 }
 
 
-/** paste_fuzz_array gaussian kernel using arrays
+/** make_fuzz_array uses a gaussian kernel function to blur points
  *
- * The 2d gaussian is decomposed into 2 1d gaussians.  THe first step
+ * The 2d gaussian is decomposed into 2 1d gaussians.  The first step
  * is quite quick because the number of accesses is exactly the
  * diameter times the number of points.  The second is slower because
  * the each pixel touched in the first round needs to be expanded.
  * Therefore it makes sense to perform the first round across the
  * grain, vertically.
  *
- * @param ctx a canvas 2d context to paint on
- * @param points the array of points
- * @param radius how far the influence of a point reaches
- * @param k a constant defining the shape of the gaussian
- *
- * <k> and <radius> should agree with each other: if <radius> is too
- * small for <k>, the image will show clipped square cliffs.  If it is
- * too large, it wastes time making infinitesimal changes.
-*/
-
-function make_fuzz_array(points, radius, k, img_width, img_height){
-    var lut = make_fuzz_table_1d(radius, k);
+ */
+function make_fuzz_array(points, k, threshold,
+                         width, height,
+                         min_x, min_y,
+                         x_scale, y_scale
+                        ){
+    var lut = make_fuzz_table_1d(k, threshold);
     var len = lut.length;
-    var array_width = img_width + len;
-    var array_height = img_height + len;
-    var x_scale = (img_width * $hm.x_scale) / $hm.canvas.width;
-    var y_scale = (img_height * $hm.y_scale) / $hm.canvas.height;
-
+    var radius = parseInt(len / 2);
+    log(k, threshold, radius);
     var x, y, i;
-    var map1 = [];
-    var map2 = [];
-    var row1, row2;
-    if ($hm.ARRAY_FUZZ_TYPED_ARRAY){
-        for (y = 0 ; y < array_height; y++){
-            map1[y] = new Float32Array(array_width);
-            map2[y] = new Float32Array(array_width);
-        }
-    }
-    else {
-        for (y = 0 ; y < array_height; y++){
-            map1[y] = row1 = [];
-            map2[y] = row2 = [];
-            for (x = 0; x < array_width; x++){
-                row1[x] = 0;
-                row2[x] = 0;
-            }
-        }
-    }
+    var map = zeroed_2d_array(width, height);
+    var row;
 
     /* first pass: vertical spread from each point */
-    var offset = radius + $hm.PADDING;
-    var counts = [];
+    var columns = {};
+    /* extrema for simple pasting in-array */
+    var max_oy = height - len;
+    var min_oy = 0;
     for (i = 0; i < points.length; i++){
         var p = points[i];
-        var px = parseInt(offset + (p[0] - $hm.min_x) * x_scale);
-        var py = parseInt(offset + (p[1] - $hm.min_y) * y_scale);
+        var py = parseInt((p[1] - min_y) * y_scale);
+        var px = parseInt((p[0] - min_x) * x_scale);
+        var pv = p[2];
         var oy = py - radius;
-        if (oy + len > array_height){
-            log("point", i, "(", p, ") is out of range");
-            continue;
+        var s = 0;
+        var e = len;
+        if (oy + e > height){
+            e = height - oy;
         }
-        for (y = 0; y < len; y++){
-            map1[oy + y][px] += lut[y];
+        if (oy < 0){
+            s = -oy;
+        }
+        /* sparse columns.  */
+        var col = columns[px];
+        if (col == undefined){
+            col = [];
+            for (var j = 0; j < height; j++){
+                col[j] = 0.0;
+            }
+            columns[px] = col;
+        }
+        for (y = s; y < e; y++){
+            col[oy + y] += pv * lut[y];
         }
     }
     /* second pass: horizontal spread from all pixels */
-    var count = 0;
-    for (y = 0; y < array_height; y++){
-        row1 = map1[y];
-        row2 = map2[y];
-	for (x = 0; x < array_width; x++){
-            var v = row1[x];
-            if (v < 0.01){
+    var count = 0; /*counts additions */
+    var cols = 0; /*for counting columns*/
+
+    for (x in columns){
+        for (y = 0; y < height; y++){
+            row = map[y];
+            var v = columns[x][y];
+            if (v < 0.001){
                 continue;
             }
-            count ++;
             var ox = x - radius;
-            for (i = 0; i < len; i++){
-                row2[ox + i] += v * lut[i];
+            var s = 0;
+            var e = len;
+            if (ox + e > width){
+                e = width - ox;
             }
+            if (ox < 0){
+                s = -ox;
+            }
+            for (i = s; i < e; i++){
+                row[ox + i] += v * lut[i];
+            }
+            count += e - s;
         }
+        cols += 1;
     }
-    log(count, "expansions");
-    return map2;
+    log(count, "expansions;", cols, "columns;", width, "width");
+    return map;
 }
 
-function paste_fuzz_array(ctx, points, radius, k, scale_exp){
-    var img_width = ctx.canvas.width;
-    var img_height = ctx.canvas.height;
-    var map2 = make_fuzz_array(points, radius, k, img_width, img_height);
-    var array_height = map2.length;
-    var array_width = map2[0].length;
-    var row2;
+/** paste_fuzz_array gaussian kernel using arrays
+ *
+ * @param ctx a canvas 2d context to paint on
+ * @param map a 2d array of floating point values
+ * @param scale_args array determining scaling of map values
+ * @param max_value considered highest value in map (undefined for auto)
+ *
+ * @return the given or discovered max_value.
+*/
+function paste_fuzz_array(ctx, map, scale_args, max_value){
+    var height = map.length;
+    var width = map[0].length;
+    var row;
     var x, y;
-    /*find a good scale */
-    var max_value = 0;
-    for (y = 0; y < array_height; y++){
-        row2 = map2[y];
-	for (x = 0; x < array_width; x++){
-            if(max_value < row2[x]){
-                max_value = row2[x];
+
+    if (max_value === undefined){
+        max_value = 0;
+        /*find the maximum to calculate a good scale */
+        for (y = 0; y < height; y++){
+            row = map[y];
+	    for (x = 0; x < width; x++){
+                if(max_value < row[x]){
+                    max_value = row[x];
+                }
             }
         }
     }
     /*do the map */
-    var imgd = ctx.getImageData(0, 0, img_width, img_height);
+    var imgd = ctx.getImageData(0, 0, width, height);
     var pixels = imgd.data;
-    var yend = img_height + radius;
-    var xend = img_width + radius;
     var pix = 3;
-
-    if (scale_exp == 0){
-        var scale = 255.99 / max_value;
-        for (y = radius; y < yend; y++){
-            row2 = map2[y];
-	    for (x = radius; x < xend; x++, pix += 4){
-                pixels[pix] = parseInt(row2[x] * scale);
-            }
-        }
-    }
-    if (scale_exp < 0){
-        //scale_exp is the exponent
-        scale_exp = -scale_exp;
-        var scale = 255.99 / (Math.pow(max_value, scale_exp) - 0.5);
-        for (y = radius; y < yend; y++){
-            row2 = map2[y];
-	    for (x = radius; x < xend; x++, pix += 4){
-                pixels[pix] = parseInt((Math.pow(row2[x], scale_exp) - 0.5) * scale);
-            }
-        }
-    }
-    else{
-        //scale_exp is the radix
-        var scale = 255.94 / (Math.pow(scale_exp, max_value));
-        /* we need to offset the results a bit, because
-         * {scale_exp ^ 0} == 1 which is multiplied by scale.
-         *
-         * So, to get that to zero, subtract scale, but to help
-         * {scale_exp ^ 1} == scale_exp round to 1, we subtract
-         * something a bit less.  Zero height pixels go to 0.95,
-         * which is truncated to zero.
-         */
-        var offset = scale - 0.95;
-        for (y = radius; y < yend; y++){
-            row2 = map2[y];
-	    for (x = radius; x < xend; x++, pix += 4){
-                pixels[pix] = parseInt(Math.pow(scale_exp, row2[x]) *
-                                       scale - offset);
-            }
+    /*concat rather than unshift, lest scale_args grow over time. */
+    var args = [max_value].concat(scale_args);
+    var lut = get_fuzz_scale_lut.apply(undefined, args);
+    var scale = lut.scale;
+    for (y = 0; y < height; y++){
+        row = map[y];
+	for (x = 0; x < width; x++, pix += 4){
+            pixels[pix] = lut[parseInt(row[x] * lut.scale)];
         }
     }
     ctx.putImageData(imgd, 0, 0);
+    return max_value;
+}
+
+function get_fuzz_scale_lut(max_value, mode){
+    var i;
+    var lut = [];
+    var len = $const.ARRAY_FUZZ_LUT_LENGTH;
+    var scale = (len - 0.1) / max_value;
+    lut.scale = scale;
+    var f;
+    var max_out = $const.ARRAY_FUZZ_SCALE;
+
+    if (mode == 'linear'){
+        f = function(i){
+            return parseInt(i * max_out / len);
+        };
+    }
+    else if (mode == 'base'){
+        //radix is the exponent
+        var radix = arguments[2];
+        var s = max_out / Math.pow(len, radix);
+        f = function(i){
+            return parseInt((Math.pow(i, radix) - 0.5) * s);
+        };
+    }
+    else if (mode == 'clipped_gaussian'){
+        /* clip a piece out of the normal curve.  The desired
+         * characteristics are: a flat start, a definite knee, and a
+         * limit to the eventual slope.
+         */
+        var rl = arguments[2];
+        var rh = arguments[3];
+        var range = Math.abs(rl - rh);
+        var top = Math.exp(rh);
+        var bottom = Math.exp(rl);
+        var s = max_out / (top - bottom);
+
+        f = function(i){
+            var p = rl + i / len  * range;
+            return parseInt((Math.exp(p)  - bottom) * s);
+        };
+    }
+    else{
+        log('unknown mode in get_fuzz_scale_lut:', mode);
+    }
+
+    for (i = 0; i < len; i++){
+        lut.push(f(i));
+    }
+    /*add on a whole lot of head room (flat). Clipping is better than NaN-ing*/
+    var k = f(len - 1);
+    for (i = 0; i < len; i++){
+        lut.push(k);
+    }
+
+    //alert(lut);
+    return lut;
 }

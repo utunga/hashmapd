@@ -7,7 +7,7 @@ import cPickle
 import gzip
 import theano
 import PIL.Image
-from hashmapd.utils import tile_raster_images
+from hashmapd.utils import tiled_array_image
 
 # Some fileconstants
 
@@ -98,9 +98,7 @@ def test_pickling(dataset=PICKLED_WORD_VECTORS_FILE):
     print(train_set_x.value.shape)
     
     # Plot image and reconstrution 
-    image = PIL.Image.fromarray(tile_raster_images( X = train_set_x.value,
-             img_shape = (28,28),tile_shape = (14,1), 
-             tile_spacing=(1,1)))
+    image = tiled_array_image(train_set_x)
     image.save('trace/fake_input.png')
         
 

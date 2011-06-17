@@ -1,5 +1,5 @@
 import os, sys, getopt
-import numpy, time, cPickle, gzip, PIL.Image
+import numpy, time, cPickle, gzip
 import theano
 
 import matplotlib.pyplot as plt
@@ -17,6 +17,7 @@ HOME = get_git_home()
 sys.path.append(HOME)
 
 from hashmapd.load_config import LoadConfig, DefaultConfig
+from hashmapd.utils import tiled_array_image
 from hashmapd.SMH import SMH
 
 def load_data(dataset_file):
@@ -317,14 +318,10 @@ def output_trace_info(smh, testing_data_x, prefix, skip_trace_images):
     output_y = smh.output_given_x(data_x); # output_y = smh.output_given_x(test_set_x.value);
     
     # Plot image and reconstrution 
-    image = PIL.Image.fromarray(tile_raster_images( X = data_x,
-             img_shape = (28,28),tile_shape = (10,10), 
-             tile_spacing=(1,1)))
+    image = tiled_array_image(data_x)
     image.save('trace/%s_input.png'%prefix)
     
-    image = PIL.Image.fromarray(tile_raster_images( X = output_y,
-             img_shape = (28,28),tile_shape = (10,10), 
-             tile_spacing=(1,1)))
+    image = tiled_array_image(output_y)
     image.save('trace/%s_reconstruction.png'%prefix)
 
 

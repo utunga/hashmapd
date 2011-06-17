@@ -8,9 +8,9 @@ import csv
 import cPickle
 import gzip
 import theano
-import time, PIL.Image
+import time
 
-from hashmapd.utils import tile_raster_images
+from hashmapd.utils import tiled_array_image
 # Some fileconstants
 
 ##real data
@@ -74,9 +74,7 @@ def test_truncated_mnist():
     # Plot filters after each training epoch
     
     # Construct image from the weight matrix 
-    image = PIL.Image.fromarray(tile_raster_images( train_set,
-             img_shape = (28,28),tile_shape = (30,30), 
-             tile_spacing=(1,1)))
+    image = tiled_array_image( train_set)
     image.save('truncated_input.png')
     
     f = gzip.open(MNIST_FILE,'rb')

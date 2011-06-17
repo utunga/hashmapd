@@ -10,13 +10,12 @@ the activations are softmaxed on the way 'down' from hidden to visible.
 """
 
 
-import numpy, time, cPickle, gzip, PIL.Image
+import numpy, time, cPickle, gzip
 
 import theano
 import theano.tensor as T
 import os
 
-from utils import tile_raster_images
 #from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 
