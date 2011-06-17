@@ -167,14 +167,14 @@ def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
         
     data_info = {'training_prefix': os.path.join('data', TRAINING_FILE),
         'n_training_files': 1,
-        'n_training_batches':train_cutoff/batch_size,
+        'n_training_batches': len(train_set_x) // batch_size,
         'validation_prefix':  os.path.join('data', VALIDATION_FILE),
         'n_validation_files': 1,
-        'n_validation_batches': validate_cutoff/batch_size,
+        'n_validation_batches': len(valid_set_x) // batch_size,
         'testing_prefix':  os.path.join('data', TESTING_FILE),
         'n_testing_files': 1,
-        'n_testing_batches': test_cutoff/batch_size,
-        'batches_per_file': (train_cutoff+validate_cutoff+test_cutoff)/batch_size,
+        'n_testing_batches': len(test_set_x) // batch_size,
+        'batches_per_file':  num_examples // batch_size,
         'mean_doc_size': mean_doc_size,
     }
 
