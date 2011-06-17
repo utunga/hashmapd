@@ -70,8 +70,8 @@ function named_canvas(name, blank, p){
  * @return the canvas
  */
 
-function overlay_canvas(name, hidden){
-    var canvas = named_canvas(name);
+function overlay_canvas(name, hidden, blank){
+    var canvas = named_canvas(name, blank);
     overlay(canvas, hidden);
     return canvas;
 }
@@ -274,6 +274,7 @@ function make_colour_range_mountains(scale){
 }
 
 function add_label(ctx, text, x, y, size, colour, shadow){
+    //log.apply(undefined, arguments);
     if (colour === undefined){
         colour = "#000";
     }
@@ -281,6 +282,7 @@ function add_label(ctx, text, x, y, size, colour, shadow){
         ctx.shadowColor = shadow;
         ctx.shadowBlur = size * 0.25;
     }
+    ctx.textAlign = "center";
     ctx.font = size + "px sans-serif";
     ctx.fillStyle = colour;
     ctx.fillText(text, x, y);

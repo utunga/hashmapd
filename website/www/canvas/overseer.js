@@ -194,9 +194,10 @@ function hm_draw_map(){
 
 function hm_draw_map2(){
     if ($state.labels){
-        $waiters.have_labels = get_json('tokens', 7, hm_on_labels);
+        $waiters.have_labels = get_label_json(hm_on_labels);
+        log($waiters.have_labels);
         $.when($waiters.have_labels,
-               $waiters.map_drawn).done(paint_labels);
+                $waiters.map_known).done(paint_labels);
     }
 
     $.when($waiters.map_known).done(paint_map);
@@ -258,6 +259,13 @@ function get_token_json(token, precision, callback){
     var endkey = '["' + token + '",{}]';
     return get_json('token_density', precision, callback, startkey, endkey);
 };
+
+function get_label_json(callback){
+    log("getting labels");
+    var d = $.getJSON("labels.json", callback);
+    return d;
+};
+
 
 
 /** decode_points turns JSON rows into point arrays.
@@ -470,6 +478,15 @@ function make_full_map(){
     $timestamp("end make_full_map");
 }
 
+function get_pixel_coords(x, y, state){
+    state = state || $state;
+    var z = get_zoom_point_bounds(state.zoom, state.x, state.y);
+    return {
+        x: (x - z.min_x) * z.x_scale,
+        y: (y - z.min_y) * z.y_scale
+    };
+}
+
 
 function get_zoom_pixel_bounds(zoom, centre_x, centre_y, width, height){
     var z = get_zoom_point_bounds(zoom, centre_x, centre_y, width, height);
@@ -640,37 +657,41 @@ function paint_token_density(){
 /*don't do too much until the drawing is done.*/
 
 function hm_on_labels(data){
+    log("got labels");
     var points = decode_points(data.rows);
     /*XXX depends on map_known */
     points = bound_points(points,
                           $page.min_x, $page.max_x,
                           $page.min_y, $page.max_y);
-    var max_freq = 0;
-    for (var i = 0; i < points.length; i++){
-        var freq = points[i][2][0][1];
-        max_freq = Math.max(freq, max_freq);
+    var max_size = 0;;
+    for (i = 0; i < points.length; i++){
+        var p = points[i];
+        var size = points[i][2];
+        max_size = Math.max(size, max_size);
     }
-    var scale = 14 / (max_freq * max_freq);
-
     $page.labels = {
         points: points,
-        max_freq: max_freq,
-        scale: scale
+        max_size: max_size
     };
 }
 
 function paint_labels(){
+    log("painting labels");
     var points = $page.labels.points;
-    var scale = $page.labels.scale;
-    var ctx = $page.canvas.getContext("2d");
+    var canvas = overlay_canvas("labels", undefined, true);
+    var ctx = canvas.getContext("2d");
     for (var i = 0; i < points.length; i++){
         var p = points[i];
-        var x = (p[0] - $page.min_x) * $page.x_scale;
-        var y = (p[1] - $page.min_y) * $page.y_scale;
-        var text = p[2][0][0];
-        var n = p[2][0][1];
-        var size = n * n * scale;
-        add_label(ctx, text, x, y, size, "#000", "#fff");
+        log(p);
+        var d = get_pixel_coords(p[0], p[1]);
+        if (d.x < 0 || d.x >= $const.width ||
+            d.y < 0 || d.y >= $const.height){
+            continue;
+        }
+        var text = p[4];
+        var n = p[2];
+        var size = n / 50;
+        add_label(ctx, text, d.x, d.y, size, "#000", "#fff");
     }
 }
 
