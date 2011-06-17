@@ -28,8 +28,7 @@ def load_data_without_labels(dataset):
     x = cPickle.load(f)
     f.close()
 
-    print "render data has shape:"
-    print x.shape
+    print "render data has shape:", x.shape
 
     return x
 
@@ -49,8 +48,7 @@ def load_data_with_labels(dataset):
     
     train_set_x, train_set_labels = train_set
 
-    print "render data has shape:"
-    print train_set_x.shape
+    print "render data has shape:", train_set_x.shape
     
     return [train_set_x, train_set_labels]
     
@@ -69,8 +67,7 @@ def load_data_with_multi_labels(dataset):
     x, x_sums, labels = cPickle.load(f)
     f.close()
     
-    print "render data has shape:"
-    print x.shape
+    print "render data has shape:", print x.shape
     
     # for now, for multi-label data, take the last (most-specific?) label only 
     if labels.shape[0] > 1 and labels.shape[1] > 1:

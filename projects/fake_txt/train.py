@@ -105,7 +105,9 @@ def train_SMH(finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.01, t
                     
                     if info['n_training_files'] > 1: training_data = None
                 
-                print 'Pre-training layer %i, epoch %d, cost '%(i,epoch),numpy.mean(c)
+                if (epoch < 100 and epoch % 10 == 0) or epoch % 100 == 0:
+                    print 'Pre-training layer {0}, epoch {1:3}, cost {2}'.format(
+                            i, epoch, numpy.mean(c))
 
 #===============================================================================
 #               Matplotlib debugging:
@@ -212,9 +214,10 @@ def train_SMH(finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.01, t
                     if info['n_training_files'] > 1: training_data = None # ensure training data is unloaded from memory
                     
                     # go through the validation set
-                    validation_losses = numpy.array([]);
+                    validation_losses = []
                     for v_file_index in xrange(info['n_validation_files']):
-                        if info['n_training_files'] > 1: validation_data = load_data(info['validation_prefix']+str(v_file_index)+dataset_postfix)
+                        if info['n_training_files'] > 1:
+                            validation_data = load_data(info['validation_prefix']+str(v_file_index)+dataset_postfix)
                         no_v_batches = info['batches_per_file']
                         # determine the number of batches in file
                         if (v_file_index+1)*info['batches_per_file'] > info['n_validation_batches']:
@@ -223,15 +226,15 @@ def train_SMH(finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.01, t
                         for v_batch_index in xrange(no_v_batches):
                             validation_loss_i = validate_model_i(valid_set_x = validation_data[0][v_batch_index*batch_size:(v_batch_index+1)*(batch_size),:], \
                                                     valid_set_x_sums = validation_data[1][v_batch_index*batch_size:(v_batch_index+1)*(batch_size),:])
-                            validation_losses = numpy.append(validation_losses,[validation_loss_i])
+                            validation_losses.append(validation_loss_i)
                     
                     if info['n_training_files'] > 1: validation_data = None # ensure validation data is unloaded from memory
                     
                     # determine total validation score
                     this_validation_loss = numpy.mean(validation_losses)
-                    print('epoch %i, minibatch %i/%i, validation error %f %%' % \
-                       (epoch, minibatch_iter, info['n_training_batches'], \
-                        this_validation_loss*100.))
+                    #print('epoch %i, minibatch %i/%i, validation error %f %%' % \
+                    #   (epoch, minibatch_iter, info['n_training_batches'], \
+                    #    this_validation_loss*100.))
                     
                     # if we got the best validation score until now
                     if this_validation_loss < best_validation_loss:
@@ -244,7 +247,7 @@ def train_SMH(finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.01, t
                         best_iter = iter
                         
                         # go through the test set
-                        test_losses = numpy.array([]);
+                        test_losses = []
                         for t_file_index in xrange(info['n_testing_files']):
                             if info['n_training_files'] > 1: testing_data = load_data(info['testing_prefix']+str(v_file_index)+dataset_postfix)
                             no_t_batches = info['batches_per_file']
@@ -255,29 +258,30 @@ def train_SMH(finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.01, t
                             for t_batch_index in xrange(no_t_batches):
                                 test_loss_i = test_model_i(test_set_x = testing_data[0][t_batch_index*batch_size:(t_batch_index+1)*(batch_size),:], \
                                                         test_set_x_sums = testing_data[1][t_batch_index*batch_size:(t_batch_index+1)*(batch_size),:])
-                                test_losses = numpy.append(test_losses,[test_loss_i])
+                                test_losses.append(test_loss_i)
                         
                         if info['n_training_files'] > 1: testing_data = None # ensure test data is unloaded from memory
                         
                         # determine total test score
                         test_score = numpy.mean(test_losses)
-                        print(('     epoch %i, minibatch %i/%i, test error of best '
-                              'model %f %%') % 
-                                   (epoch, minibatch_iter, info['n_training_batches'], \
-                                    test_score*100.))
+                        #print (('epoch %i, minibatch %i/%i, test error of best model %f %%') % 
+                        #            (epoch, minibatch_iter, info['n_training_batches'], \
+                        #            test_score*100.))
                     
-                    # reload the training data, and continue fine tuning
-                    if info['n_training_files'] > 1: training_data = load_data(info['training_prefix']+str(file_index)+dataset_postfix)
                 
                 # check if we are done
                 if patience <= iter :
                     done_looping = True
-                    break
     
+            # reload the training data, and continue fine tuning
+            if info['n_training_files'] > 1:
+                training_data = load_data(info['training_prefix']+str(file_index)+dataset_postfix)
+
+        if done_looping or (epoch < 100 and epoch % 10 == 0) or epoch % 100 == 0:
+            print "epoch {0:>3} validation error {1:%} test error of best model {2:%}".format(
+                    epoch, this_validation_loss, test_score)
+
     end_time = time.clock()
-    print(('Optimization complete with best validation score of %f %%,'
-           'with test performance %f %%') %  
-                 (best_validation_loss * 100., test_score*100.))
     print >> sys.stderr, ('The fine tuning code for file '+os.path.split(__file__)[1]+' ran for %.2fm' % ((end_time-start_time)/60.))
 
     if info['n_training_files'] > 1: testing_data = load_data(info['testing_prefix']+'0'+dataset_postfix)

@@ -120,7 +120,7 @@ class SMH(object):
                                         activation = T.nnet.sigmoid)
 
             
-            print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)            
+            #print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)            
             self.sigmoid_layers.append(sigmoid_layer)
             self.params.extend(sigmoid_layer.params)
             
@@ -188,7 +188,7 @@ class SMH(object):
                                         #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1), #cant for the life of me think of a good default for this 
                                         activation = T.nnet.sigmoid)
             
-            print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)
+            #print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)
             self.sigmoid_layers.append(sigmoid_layer)
             self.params.extend(sigmoid_layer.params) ##NB NN training gradients are computed with respect to self.params
 
