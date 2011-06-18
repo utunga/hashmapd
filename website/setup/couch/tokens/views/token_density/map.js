@@ -12,7 +12,8 @@ function(doc) {
     if (doc.doc_type == "token_n_coords"){
         var coords = convert_coords(doc.x_coord, doc.y_coord);
         if (coords !== undefined){
-            emit(coords, [doc.token, doc.user_wordcount]);
+            var key = [doc.token].concat(coords);
+            emit(key, doc.user_wordcount);
         }
     }
 }
