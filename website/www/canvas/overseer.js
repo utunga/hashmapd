@@ -272,9 +272,9 @@ function get_label_json(callback){
 function encode_point(x, y){
     var qt = [];
     /*last coord is always false */
-    //x >>= 1;
-    //y >>= 1;
-    for (var i = $const.QUAD_TREE_COORDS; i >= 0; i--){
+    x >>= 1;
+    y >>= 1;
+    for (var i = $const.QUAD_TREE_COORDS - 1; i >= 0; i--){
         qt[i] = (y & 1) * 2 + (x & 1);
         y >>= 1;
         x >>= 1;
