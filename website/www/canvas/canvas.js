@@ -283,6 +283,7 @@ function add_label(ctx, text, x, y, size, colour, shadow){
         ctx.shadowColor = shadow;
         ctx.shadowBlur = size * 0.25;
     }
+    //ctx.globalAlpha = "0.6";
     ctx.textAlign = "center";
     ctx.font = size + "px sans-serif";
     ctx.fillStyle = colour;

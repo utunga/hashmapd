@@ -26,7 +26,7 @@ var $const = {
     ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concentration for array fuzz */
     ARRAY_FUZZ_DENSITY_THRESHOLD: 0.005, /*density fuzz gets this faint */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
-    REDRAW_HEIGHT_MAP: true, /*whether to redraw the height map on zoom */
+    REDRAW_HEIGHT_MAP: false, /*whether to redraw the height map on zoom */
     MAP_RESOLUTION: 9,       /*initial requested resolution for overall map*/
     DENSITY_RESOLUTION: 7,   /*initial requested resolution for density maps*/
     DENSITY_MAP_STYLE: 'grey_outside',
@@ -114,7 +114,7 @@ var $state = {
     zoom: 0,    /* zoom level. 0 is full size, 1 is 1/2, 2 is 1/4, etc */
     token: '',
 
-    labels: false
+    labels: true
 };
 
 /* $timestamp is a global timer (once hm_setup is run)*/
