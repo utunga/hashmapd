@@ -218,11 +218,14 @@ function hm_draw_map2(){
  *  @param view is a couchDB view name (e.g. "locations")
  *  @param precision is the desired quadtree precision
  *  @param callback is a callback. It gets the data as first argument.
+ *  @param start exclude values before this
+ *  @param end exclude values after this (use "[x,{}]" include x*).
+ *  @param context data to be passed to the callback.
  *
  *  @return a $.Deferred or $.Deferred-alike object.
 
  */
-function get_json(view, precision, callback, start, end){
+function get_json(view, precision, callback, start, end, context){
     /*If the view has non-quadtree data prepended to its key (e.g. a token),
      * then the precision needs to be adjusted accordingly.
      */
@@ -249,7 +252,7 @@ function get_json(view, precision, callback, start, end){
                        success: function(data){
                            $page.loading.tick();
                            $timestamp("got JSON " + view + "[" + precision + "]");
-                           callback(data);
+                           callback(data, context);
                        }
     });
     return d;
@@ -258,7 +261,8 @@ function get_json(view, precision, callback, start, end){
 function get_token_json(token, precision, callback){
     var startkey = '["' + token + '"]';
     var endkey = '["' + token + '",{}]';
-    return get_json('token_density', precision, callback, startkey, endkey);
+    return get_json('token_density', precision, callback, startkey, endkey,
+                    {token: token});
 };
 
 function get_label_json(callback){
@@ -603,20 +607,32 @@ function paint_map(){
 }
 
 
-function hm_on_token_density(data){
+function hm_on_token_density(data, req){
     log("in hm_on_token_density");
     var points = decode_points(data.rows);
     var i, p;
+    var token = req.token;
     var cache = $page.token_data;
-    for (i = 0; i < points.length; i++){
-        p = points[i];
-        var token = p.pop();
-        if (! (token in cache)){
-            log("starting density cache for", token);
-            cache[token] = [];
+    if (token in cache){
+        /* this is presumably a request for more precision, which we
+         * don't yet handle.
+         *
+         * The thing to do is, for each received point, work out which
+         * existing point it is a subset of, and replace that.
+         */
+    }
+    else {
+        log("starting density cache for", token);
+        var count = 0;
+        for (i = 0; i < points.length; i++){
+            p = points[i];
+            p.pop();
+            count += p[2];
         }
-        /*XXX need to look at replacing less precise values*/
-        cache[token].push(p);
+        cache[token] = {
+            count: count,
+            points: points
+        };
     }
 }
 
@@ -632,14 +648,16 @@ function paint_token_density(){
         $(named_canvas("density_overlay")).css("visibility", "hidden");
         return;
     }
-    var points = $page.token_data[token];
-    if (points.length == 0){
-        /*the token isn't in the database. hmm. */
-        log("No points for", token, "in paint_token_density");
+    var data = $page.token_data[token];
+    var points = data.points;
+    var count = data.count;
+    if (count == 0){
+        $("#token-notes").html("There is no data for <b>" + token + "</b>.");
         $(named_canvas("density_overlay")).css("visibility", "hidden");
         return;
     }
 
+    $("#token-notes").html(count + " recorded uses of <b>" + token + "</b>.");
     var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
     var k;
