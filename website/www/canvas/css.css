@@ -4,6 +4,7 @@ canvas.overlay        {z-index:   2}
 #canvas-labels        {z-index:   3}
 #canvas-temp          {z-index:   4}
 #ui                   {z-index:   6}
+#helpers              {z-index:   7}
 #loading              {z-index:   9}
 #debug                {z-index:  99}
 #ui-grabber           {z-index: 999}

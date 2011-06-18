@@ -151,6 +151,7 @@ function hm_setup(){
 
     $.when($waiters.map_known).done(make_height_map, make_full_map);
     if ($const.DEBUG){
+        construct_msgbox();
         construct_form($state, 'state-form', function() {
                            var q = this.serialize();
                            set_state(q);
@@ -266,6 +267,20 @@ function get_label_json(callback){
     return d;
 };
 
+/** encode_point turns an x, y pair into a quad-tree coordinate.
+*/
+function encode_point(x, y){
+    var qt = [];
+    /*last coord is always false */
+    //x >>= 1;
+    //y >>= 1;
+    for (var i = $const.QUAD_TREE_COORDS; i >= 0; i--){
+        qt[i] = (y & 1) * 2 + (x & 1);
+        y >>= 1;
+        x >>= 1;
+    }
+    return qt;
+}
 
 
 /** decode_points turns JSON rows into point arrays.
@@ -326,20 +341,15 @@ function decode_points(raw){
     return points;
 }
 
-/** decode_and_filter_points turns JSON rows into point arrays.
+/** bound_points filters a list of points, rejecting those out of bounds
  *
  * If you supply <xmin>, <xmax>, <ymin>, or <ymax>, points outside
  * those bounds are excluded.  If any of those are undefined, there is
  * no bound in that direction.
  *
- * If quad tree coordinates are being used, they are converted to X, Y
- * coordinates.  The final result is an array of arrays, structured thus:
- *
- *  [ [x_coord, y_coord, value], [x_coord, y_coord, value], ...]
- *
  * The value is untouched.
  *
- * @param raw  the json data (as parsed by JSON or jsquery objects)
+ * @param points the points to filter
  * @param xmin an exclusive boundary value
  * @param xmax an exclusive boundary value
  * @param ymin an exclusive boundary value
