@@ -9,6 +9,7 @@ function new_canvas(width, height, id){
     var canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
+    canvas.draggable = false;
     if (id){
         canvas.id = id;
     }

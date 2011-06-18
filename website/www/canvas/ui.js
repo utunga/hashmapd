@@ -259,6 +259,9 @@ function enable_drag(){
             var cc = $("#click-coords");
             cc.text(cc.text() + "\n[" + encode_point(px, py) + "]");
         }
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
     };
 
     var finish = function(e){
