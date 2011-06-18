@@ -77,6 +77,13 @@ function parse_query(query){
     }
 }
 
+/**construct_msgbox makes a content editable box that recieves click
+ * quadtree coordinates.
+ */
+function construct_msgbox(){
+    $("#helpers").append('<h2>Click coordinates</h2><div id="click-coords"'
+                         + 'contenteditable="true"></div>');
+}
 
 /**construct_form makes a quick for for testing purposes
  */
@@ -241,6 +248,20 @@ function enable_drag(){
         x = e.pageX;
         y = e.pageY;
         ui_grabber.mousemove(drag);
+        if ($const.DEBUG){
+            var cx = e.pageX - offset.left;
+            var cy = e.pageY - offset.top;
+            var z = (1 << $state.zoom);
+            var scale_x = $page.x_scale * z;
+            var scale_y = $page.y_scale * z;
+            var px = parseInt(cx / scale_x) + $page.min_x;
+            var py = parseInt(cy / scale_y) + $page.min_y;
+            var cc = $("#click-coords");
+            cc.text(cc.text() + "\n[" + encode_point(px, py) + "]");
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
     };
 
     var finish = function(e){
