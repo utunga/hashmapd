@@ -184,9 +184,12 @@ function construct_ui(){
                            set_state({'zoom': ui.value});
                        }
                      });
+
     var offset = $($page.canvas).offset();
-    offset.left -= 20;
-    slider.offset(offset);
+    $("#zoom-controls").offset(offset);
+    $("#zoom-out-button").click(function(){set_state({zoom: $state.zoom - 1})});
+    $("#zoom-in-button").click(function(){set_state({zoom: $state.zoom + 1})});
+
 
     $("#token_form").submit(
         function(e){
