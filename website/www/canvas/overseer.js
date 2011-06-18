@@ -707,10 +707,10 @@ function paint_labels(){
 
 
 function temp_view(){
-    $state.transition = true;
+    $page.transition = true;
     $.when($waiters.full_map_drawn).done(
         function(){
-            if ($state.transition){
+            if ($page.transition){
                 var tc = $page.tmp_canvas;
                 var d = get_zoom_pixel_bounds($state.zoom, $state.x, $state.y);
                 zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
@@ -721,6 +721,6 @@ function temp_view(){
 }
 
 function hide_temp_view(){
-    $state.transition = false;
+    $page.transition = false;
     $($page.tmp_canvas).css('visibility', 'hidden');
 }
