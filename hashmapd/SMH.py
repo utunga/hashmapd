@@ -13,6 +13,7 @@ from HiddenLayer import HiddenLayer
 from rbm import RBM
 from rbm_poisson_vis import RBM_Poisson
 from logistic_sgd import LogisticRegression
+from utils import tiled_array_image
 
 def _batched(data, size, batch_size):
     """Yield [ a[batch] for a in data ] for each of size//batch_size batches"""
@@ -554,25 +555,16 @@ class SMH(object):
     
         if skip_trace_images:
             return
-   
+    
         # RECONSTRUCTION SAMPLES
     
         data_x = testing_data_x 
-        #data_x = [index*batch_size:(index+1)*batch_size];
-    
-        # Plot image and reconstrution 
-        #image = PIL.Image.fromarray(tile_raster_images( X = data_x,
-        #         img_shape = (28,28),tile_shape = (10,10), 
-        #         tile_spacing=(1,1)))
-        #image.save('trace/%s_input.png'%prefix)
+        image = tiled_array_image(data_x)
+        image.save('trace/%s_input.png'%prefix)
     
         output_y = self.output_given_x(data_x)
-        # output_y = self.output_given_x(test_set_x.value);
-
-        #image = PIL.Image.fromarray(tile_raster_images( X = output_y,
-        #         img_shape = (28,28),tile_shape = (10,10), 
-        #         tile_spacing=(1,1)))
-        #image.save('trace/%s_reconstruction.png'%prefix)
+        image = tiled_array_image(output_y)
+        image.save('trace/%s_reconstruction.png'%prefix)
 
     def matplotlib_debugging(self):
         import matplotlib.pyplot as plt

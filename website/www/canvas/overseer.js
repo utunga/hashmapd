@@ -2,26 +2,27 @@
  * written by Douglas Bagnall
  */
 
-
-/* $hm holds global state.  Capitalised names are assumed to be
- * constant (unnecessarily in some cases).
+/* $const holds constant global state.  Nothing in here should change
+ * in the course of the page session.
  *
- * Undefined properties are of course only included here by way of
- * documention.
+ * Of course, some of these things *can* be changed right at the
+ * beginning, but once data is loaded, they are fixed.
  */
-var $hm = {
+var $const = {
     BASE_DB_URL: ((window.location.hostname == '127.0.0.1') ?
                   'http://127.0.0.1:5984/frontend_dev/_design/user/_view/' :
-                  'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/'),
+                  'http://hashmapd.halo.gen.nz:5984/frontend_dev/_design/user/_view/'),
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
-    //DATA_URL: 'http://hashmapd.couchone.com/frontend_dev/_design/user/_view/xy_coords?group=true',
-    PADDING: 20,    /*padding for the image as a whole. */
-    ARRAY_FUZZ_CONSTANT: -0.013, /*concetration for array fuzz */
-    ARRAY_FUZZ_RADIUS: 18, /*array fuzz goes this far. shouldn't exceed PADDING */
-    ARRAY_FUZZ_RADIX: 1.2, /*exponential scaling for hills */
-    ARRAY_FUZZ_DENSITY_RADIX: 0, /*0 means linear */
-    ARRAY_FUZZ_DENSITY_CONSTANT: -0.005, /*concetration for array fuzz */
+    FPS: 20, /*how often is the animation tick */
+    ARRAY_FUZZ_SCALE: 255, /*highest peak is this high*/
+    ARRAY_FUZZ_LUT_LENGTH: 2000, /*granularity of height conversion LUT */
+    ARRAY_FUZZ_CONSTANT: -0.013, /*concentration for array fuzz */
+    ARRAY_FUZZ_RADIUS: 25, /*array fuzz goes this far. shouldn't exceed PADDING */
+    /* *_SCALE_ARGS, out of ['linear'], ['clipped_gaussian', low, high], ['base', base] */
+    ARRAY_FUZZ_SCALE_ARGS: ['clipped_gaussian', -3.5, -0.4],
+    ARRAY_FUZZ_DENSITY_SCALE_ARGS: ['linear'],
+    ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concentration for array fuzz */
     ARRAY_FUZZ_DENSITY_RADIUS: 30, /*array fuzz goes this far */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
     FUZZ_CONSTANT: -0.015, /*concentration of peaks, negative inverse variance */
@@ -29,12 +30,49 @@ var $hm = {
     FUZZ_PER_POINT: 8, /* a single point generates this much fuzz */
     FUZZ_MAX_RADIUS: 18, /*fuzz never reaches beyond this far */
     FUZZ_MAX_MULTIPLE: 15, /*draw fuzz images for up this many points in one place */
+    REDRAW_HEIGHT_MAP: false, /*whether to redraw the height map on zoom */
+    MAP_RESOLUTION: 9,       /*initial requested resolution for overall map*/
+    DENSITY_RESOLUTION: 7,   /*initial requested resolution for density maps*/
+    DENSITY_MAP_STYLE: 'grey_outside',
+    //DENSITY_MAP_STYLE: 'colour_cycle',
+
     QUAD_TREE_COORDS: 15,
-    map_known: undefined, /*will be a deferred that fires when map scale is known */
-    map_drawn: undefined, /*will be a deferredthat fires when the landscape is drawn */
+    COORD_MAX: 1 << 16,   /* exclusive maximum xy coordinates (1 << (QUAD_TREE_COORDS + 1)) */
+    COORD_MIN: 0,   /* inclusive minimum xy coordinates. */
+    /*PADDING should be both:
+     * - bigger than the fuzz radius used to construct the map (so edge is sea).
+     *
+     * - big enough that PADDING/{width,height} is greater than the
+     *   inverse minimum resolution. That is > 1.0/128 if 7 quad tree
+     *   coordinates are used.
+     */
+    PADDING: 24,    /*padding for the full size map in pixels*/
+    width: 800,   /* canvas padded pixel width */
+    height: 800,  /* canvas padded pixel height */
+
+    array_fuzz: true,
+    HILL_LUT_CENTRE: 300,
+    HILL_SHADE_FLATNESS: 16.0, /*8 is standard, higher means flatter hills */
+    views : {  /* helps in interpreting various views. */
+        locations: {},
+        token_density: {precision_adjust: 1},
+        tokens:{}
+    }
+};
+
+/* $page holds values that are calculated during a page session and
+ * are thereafter constant, including various canvas and DOM
+ * references.
+ */
+var $page = {
+    canvases: {},       /*Named canvases go in here (see named_canvas()) */
     canvas: undefined,  /* a reference to the main canvas gets put here */
-    width: 800,   /* canvas *unpadded* pixel width */
-    height: 800,  /* canvas *unpadded* pixel height */
+    full_map: undefined, /* will be the full unzoomed */
+    loading: undefined,
+    labels: undefined,  /* JSON derived structure describing labels */
+    height_canvas: undefined, /*a height map canvas */
+    hill_fuzz: undefined, /* object wrapping Gaussian fuzz images */
+    max_height: undefined, /* maximum value of array fuzz */
 
     /* convert data coordinates to canvas coordinates. */
     range_x: undefined,
@@ -45,67 +83,135 @@ var $hm = {
     min_y:  undefined,
     max_x:  undefined,
     max_y:  undefined,
-/*
-    absolute_min_x:  0,
-    absolute_min_y:  9 * 1024,
-    absolute_max_x:  23 * 1024,
-    absolute_max_y:  undefined,
- */
-    overlays: [],     /*a list of html objects to overlay the main canvas */
-    array_fuzz: true,
-    labels: false,
-    HILL_SHADE_FLATNESS: 16.0, /*8 is standard, higher means flatter hills */
-    views : {
-        locations: {},
-        token_density: {precision_adjust: 1},
-        tokens:{}
-    },
-
+    hillshade_luts: {},
+    /*token_data is a cache of token density data, with a list of points for each
+     * known token. Like so:
+     * {'LOL': [[x, y, value, precision], [x, y, value, precision], ...],
+     *  'Orange': [...],
+     * ...}
+     *  */
+    token_data: {},
+    tweeters: undefined, /*the parsed user data that makes the main map. */
 
     trailing_commas_are_GOOD: true
 };
 
-/** hm_draw_map is the main entrance point.
+/* $waiters is a repository for global $.Deferreds */
+var $waiters = {
+    map_known: undefined, /*will be a deferred that fires when map scale is known */
+    map_drawn: undefined, /*will be a deferred that fires when $page.canvas is ready */
+    full_map_drawn: undefined, /*will fire when a canonical unzoomed map is at $page.full_map */
+    height_map_drawn: undefined,
+    hill_fuzz_ready: undefined,
+    have_density: undefined,
+    density_drawn: undefined,
+
+    trailing_commas_are_GOOD: true
+};
+
+/* $state contains values that reflect the manipulable state of page.
+ * It has a one-to-one relationship to the URL query string.
+ */
+
+var $state = {
+    x: 0,    /* centre of drawn map (0 to COORD_MAX) */
+    y: 0,
+    zoom: 0,    /* zoom level. 0 is full size, 1 is 1/2, 2 is 1/4, etc */
+
+    labels: false
+};
+
+/* $timestamp is a global timer (once hm_setup is run)*/
+var $timestamp;
+
+/** hm_setup does any initialisation that needs to be done once, upon
+ * first load.
+ *
+ * Nothing much happens until the json is loaded.
+ */
+
+function hm_setup(){
+    $timestamp = get_timer();
+    /*load matching query parameters into $const, just this once. */
+    interpret_query($const);
+    /*now load them into $state. This happens regularly in hm_draw_map */
+    interpret_query($state);
+
+    $page.loading = loading_screen();
+    $page.loading.show("Loading...");
+
+    /* The main map canvas */
+    $page.canvas = named_canvas('main');
+    $page.tmp_canvas = named_canvas('temp');
+    $waiters.map_drawn = $.Deferred();
+    $waiters.full_map_drawn = $.Deferred();
+    $waiters.height_map_drawn = $.Deferred();
+
+    /* start downloading the main map */
+    $waiters.map_known = get_json('locations', $const.MAP_RESOLUTION, hm_on_data);
+
+    /* if using image based convolution, start making the images */
+    if (! $const.array_fuzz){
+        $waiters.hill_fuzz_ready = $.Deferred();
+        start_fuzz_creation($waiters.hill_fuzz_ready);
+    }
+    else { /*a non-deferred acts as resolved to $.when() */
+        $waiters.hill_fuzz_ready = true;
+    }
+    $.when($waiters.map_known,
+           $waiters.hill_fuzz_ready).done(make_height_map, make_full_map);
+    construct_form();
+    construct_ui();
+    enable_drag();
+    /*start the animation loop when the main map is done */
+    $.when($waiters.full_map_drawn).done(
+        function(){
+            $page.ticker = window.setInterval(hm_tick, 1000/ $const.FPS);
+        });
+    /* move this here FOR NOW*/
+    $state.token = 'LOL';
+    $waiters.have_density = $.getJSON('tokens/LOL_16.json', hm_on_token_density);
+}
+
+/** hm_draw_map draws the approriate map
  *
  * Nothing much happens until the json is loaded.
  */
 
 function hm_draw_map(){
-    $hm.timer = get_timer();
-    interpret_query();
-    $hm.loading = loading_screen();
-    $hm.loading.show("Loading...");
-
-    $hm.canvas = scaled_canvas();
-    $hm.map_drawn = $.Deferred();
-
-    $.ajaxSetup({
-        dataType: ($hm.use_jsonp) ? 'jsonp': 'json',
-        cache: true /*not on by default in jsonp mode*/
-    });
-
-    if (! $hm.array_fuzz){
-        $hm.hill_fuzz_ready = $.Deferred();
-        start_fuzz_creation($hm.hill_fuzz_ready);
-    }
-
-    $hm.map_known = get_json('locations', 9, hm_on_data);
-    $hm.have_density = get_json('token_density', 9, hm_on_token_density);
-    if ($hm.labels){
-        $hm.have_labels = get_json('tokens', 7, hm_on_labels);
-        $hm.have_labels.then(paint_labels);
-    }
-
-    $hm.map_known.then(function(){$hm.timer.checkpoint("got map data 2")});
-    $hm.map_known.then(paint_map);
-    $hm.have_density.then(paint_density_map);
+    $timestamp("start hm_draw_map", true);
+    interpret_query($state);
+    set_ui($state);
+    //$waiters.have_density = get_json('token_density', $const.DENSITY_RESOLUTION, hm_on_token_density);
+    temp_view();
+    window.setTimeout(hm_draw_map2, 1);
 }
+
+function hm_draw_map2(){
+    if ($state.labels){
+        $waiters.have_labels = get_json('tokens', 7, hm_on_labels);
+        $.when($waiters.have_labels,
+               $waiters.map_drawn).done(paint_labels);
+    }
+
+    $.when($waiters.map_known,
+           $waiters.hill_fuzz_ready).done(paint_map);
+
+    $.when($waiters.map_known,
+           $waiters.hill_fuzz_ready,
+           $waiters.have_density)
+                   .done(paint_token_density);
+
+    $.when($waiters.map_drawn).done(hide_temp_view);
+}
+
+
 
 /** get_json fetches data.
  *
- *  @param view is a couchDB view
+ *  @param view is a couchDB view name (e.g. "locations")
  *  @param precision is the desired quadtree precision
- *  @param callback is a callback
+ *  @param callback is a callback. It gets the data as first argument.
  *
  *  @return a $.Deferred or $.Deferred-alike object.
 
@@ -114,21 +220,23 @@ function get_json(view, precision, callback){
     /*If the view has non-quadtree data prepended to its key (e.g. a token),
      * then the precision needs to be adjusted accordingly.
      */
-    var adjust = $hm.views[view].precision_adjust || 0;
+    var adjust = $const.views[view].precision_adjust || 0;
     var level = precision + adjust;
 
     /*inside out compare catches undefined precision, which defaults to deepest level*/
-    var group_level = ((precision <= $hm.QUAD_TREE_COORDS + adjust) ?
+    var group_level = ((precision <= $const.QUAD_TREE_COORDS + adjust) ?
                        "group_level=" + level :
                        "group=true");
 
-    $hm.timer.checkpoint("req JSON " + view + "[" + precision + "]");
-    var url = $hm.BASE_DB_URL + view + '?' + group_level + '&callback=?';
+    $timestamp("req JSON " + view + "[" + precision + "]");
+    var url = $const.BASE_DB_URL + view + '?' + group_level + '&callback=?';
     var d = $.ajax({
                        url: url,
+                       dataType: ($const.USE_JSONP) ? 'jsonp': 'json',
+                       cache: true, /*not on by default in jsonp mode*/
                        success: function(data){
-                           $hm.loading.tick();
-                           $hm.timer.checkpoint("got JSON " + view + "[" + precision + "]");
+                           $page.loading.tick();
+                           $timestamp("got JSON " + view + "[" + precision + "]");
                            callback(data);
                        }
     });
@@ -144,54 +252,32 @@ function get_json(view, precision, callback){
  *
  */
 function start_fuzz_creation(deferred){
-    $hm.timer.checkpoint("start make_fuzz");
-    $hm.hill_fuzz = make_fuzz(
+    $timestamp("start make_fuzz");
+    $page.hill_fuzz = make_fuzz(
         deferred,
-        $hm.FUZZ_MAX_MULTIPLE,
-        $hm.FUZZ_MAX_RADIUS,
-        $hm.FUZZ_CONSTANT,
-        $hm.FUZZ_OFFSET,
-        $hm.FUZZ_PER_POINT);
-    $hm.timer.checkpoint("end make_fuzz");
+        $const.FUZZ_MAX_MULTIPLE,
+        $const.FUZZ_MAX_RADIUS,
+        $const.FUZZ_CONSTANT,
+        $const.FUZZ_OFFSET,
+        $const.FUZZ_PER_POINT);
+    $timestamp("end make_fuzz");
 }
-
-function paint_map(){
-    if ($hm.array_fuzz){
-        _paint_map();
-    }
-    else{
-        $hm.hill_fuzz.ready.then(_paint_map);
-    }
-}
-
-function paint_labels(){
-    $hm.map_drawn.then(_paint_labels);
-}
-
-function paint_density_map(){
-    $hm.map_drawn.then(
-        function(){
-            if ($hm.array_fuzz){
-                _paint_density_map();
-            }
-            else{
-                $hm.hill_fuzz.ready.then(_paint_density_map);
-            }
-        }
-    );
-}
-
 
 /** decode_points turns JSON rows into point arrays.
  *
  * The quad tree coordinates are converted to X, Y coordinates.  The
  * final result is an array of arrays, structured thus:
  *
- *  [ [x_coord, y_coord, value],
- *    [x_coord, y_coord, value],
+ *  [ [x_coord, y_coord, value, precision, extra],
+ *    [x_coord, y_coord, value, precision, extra],
  *  ...]
  *
- * The value is untouched.
+ * where precision indicates the number of quadtree coordinates found,
+ * and extra is any string data that preceded the quadtree coordinates
+ * (usually a token name).
+ *
+ * The value is untouched.  In practice it is usually an integer
+ * count, but could be anything encodable in json.
  *
  * @param raw  the json data (as parsed by JSON or jquery objects)
  *
@@ -205,6 +291,7 @@ function decode_points(raw){
         var r = raw[i];
         r.special_keys = [];
         var coords = r.key;
+
         var x = 0;
         var y = 0;
         /*filter out any that aren't numbers and put them in a special place */
@@ -218,13 +305,18 @@ function decode_points(raw){
             x = (x << 1) | (p & 1);
             y = (y << 1) | (p >> 1);
         }
+        /* add an extra one to put it in the middle of the specified square,
+         * rather than the top left corner.
+         */
+        x = (x << 1) + 1;
+        y = (y << 1) + 1;
         /* if these coordinates are less than fully accurate,
          * expand with zeros.
          */
-        var n_coords = coords.length - r.special_keys.length;
-        x <<= ($hm.QUAD_TREE_COORDS - n_coords);
-        y <<= ($hm.QUAD_TREE_COORDS - n_coords);
-        points.push([x, y, r.value, r.special_keys]);
+        var precision = coords.length - r.special_keys.length;
+        x <<= ($const.QUAD_TREE_COORDS - precision);
+        y <<= ($const.QUAD_TREE_COORDS - precision);
+        points.push([x, y, r.value, precision, r.special_keys]);
     }
     return points;
 }
@@ -252,11 +344,11 @@ function decode_points(raw){
  */
 
 function bound_points(points, xmin, xmax, ymin, ymax){
-    /*undefined is equivalent to +/- inf */
-    xmin = (xmin !== undefined) ? xmin : -1e999;
-    ymin = (ymin !== undefined) ? ymin : -1e999;
-    xmax = (xmax !== undefined) ? xmax :  1e999;
-    ymax = (ymax !== undefined) ? ymax :  1e999;
+    /*undefined is equivalent to extreme bounds */
+    xmin = (xmin !== undefined) ? xmin : $const.COORD_MIN - 1;
+    ymin = (ymin !== undefined) ? ymin : $const.COORD_MIN - 1;
+    xmax = (xmax !== undefined) ? xmax : $const.COORD_MAX;
+    ymax = (ymax !== undefined) ? ymax : $const.COORD_MAX;
     return points.filter(function(p){
                              return  ((xmin < p[0]) &&
                                       (xmax > p[0]) &&
@@ -270,31 +362,35 @@ function bound_points(points, xmin, xmax, ymin, ymax){
  *
  * It coordinates the actual drawing.
  *
- * @param canvas the html5 canvas
  * @param data is parsed but otherwise unprocessed JSON data.
  */
 
 function hm_on_data(data){
-    $hm.timer.checkpoint("got map data");
-    $hm.loading.show("Painting");
+    $timestamp("got map data");
+    $page.loading.show("Painting");
     var i;
-    var width = $hm.width;
-    var height = $hm.height;
+    var width = $const.width;
+    var height = $const.height;
     var max_value = 0;
-    var max_x = -1e999;
-    var max_y = -1e999;
-    var min_x =  1e999;
-    var min_y =  1e999;
     var points = decode_points(data.rows);
-    if ($hm.absolute_min_x !== undefined ||
-        $hm.absolute_max_x !== undefined ||
-        $hm.absolute_min_y !== undefined ||
-        $hm.absolute_max_y !== undefined){
-        points = bound_points(points, $hm.absolute_min_x,
-                              $hm.absolute_max_x,
-                              $hm.absolute_min_y,
-                              $hm.absolute_max_y);
+    /* $const.absolute_{min,max}_{x,y} can be used to restrict the
+     * overall map to some region.  But you should really try to do
+     * that on the server.
+     */
+    if ($const.absolute_min_x !== undefined ||
+        $const.absolute_max_x !== undefined ||
+        $const.absolute_min_y !== undefined ||
+        $const.absolute_max_y !== undefined){
+        points = bound_points(points,
+                              $const.absolute_min_x,
+                              $const.absolute_max_x,
+                              $const.absolute_min_y,
+                              $const.absolute_max_y);
     }
+    var max_x = $const.COORD_MIN;
+    var max_y = $const.COORD_MIN;
+    var min_x = $const.COORD_MAX;
+    var min_y = $const.COORD_MAX;
     /*find the coordinate and value ranges */
     for (i = 0; i < points.length; i++){
         var r = points[i];
@@ -304,115 +400,232 @@ function hm_on_data(data){
         min_x = Math.min(r[0], min_x);
         min_y = Math.min(r[1], min_y);
     }
-    $hm.tweeters = points;
-    $hm.range_x = max_x - min_x;
-    $hm.range_y = max_y - min_y;
-    var x_scale = width / $hm.range_x;
-    var y_scale = height / $hm.range_y;
-    if ($hm.SQUISH_INTO_SHAPE){
-        $hm.x_scale = x_scale;
-        $hm.y_scale = y_scale;
+    /* add some padding to the discovered extrema.  This has two
+     * purposes:
+     * 1. The edge of the map will be sea.
+     * 2. Some points may lie outside the discovered points at higher
+     * levels of precision.
+     */
+    var point_range_x = max_x - min_x;
+    var pixel_range_x = $const.width - 2 * $const.PADDING;
+    var x_scale = pixel_range_x / point_range_x;
+    $page.min_x = min_x - $const.PADDING / x_scale;
+
+    var point_range_y = max_y - min_y;
+    var pixel_range_y = $const.height - 2 * $const.PADDING;
+    var y_scale = pixel_range_y / point_range_y;
+    $page.min_y = min_y - $const.PADDING / y_scale;
+
+    if ($const.SQUISH_INTO_CANVAS){
+        $page.x_scale = x_scale;
+        $page.y_scale = y_scale;
     }
     else{
-        $hm.x_scale = Math.min(x_scale, y_scale);
-        $hm.y_scale = Math.min(x_scale, y_scale);
-        /*XXX range_x, range_y too?*/
+        $page.x_scale = Math.min(x_scale, y_scale);
+        $page.y_scale = Math.min(x_scale, y_scale);
     }
-    $hm.min_x = min_x;
-    $hm.min_y = min_y;
-    $hm.max_x = max_x;
-    $hm.max_y = max_y;
+    $page.max_x = $page.min_x + $const.width / $page.x_scale;
+    $page.max_y = $page.min_y + $const.width / $page.y_scale;
+    $page.range_x = $page.max_x - $page.min_x;
+    $page.range_y = $page.max_y - $page.min_y;
+
+    $page.tweeters = points;
 }
 
-/** _paint_map() depends on  $hm.hill_fuzz.ready and $hm.map_known
+/** make_height_map() depends on  $waiters.hill_fuzz_ready and $waiters.map_known
  */
-
-function _paint_map(){
-    var points = $hm.tweeters;
-    var canvas = $hm.canvas;
+function make_height_map(){
+    $timestamp("start height_map");
+    var points = $page.tweeters;
+    var canvas = named_canvas("height_map", "rgba(255,0,0, 1)", 1);
     var ctx = canvas.getContext("2d");
-    var fuzz_canvas = scaled_canvas();
-    var fuzz_ctx = fuzz_canvas.getContext("2d");
-    $hm.timer.checkpoint("start paste_fuzz");
-    if ($hm.array_fuzz){
-        paste_fuzz_array(fuzz_ctx, points,
-                         $hm.ARRAY_FUZZ_RADIUS,
-                         $hm.ARRAY_FUZZ_CONSTANT,
-                         $hm.ARRAY_FUZZ_RADIX
-                        );
+    if ($const.array_fuzz){
+        var map = make_fuzz_array(points,
+                                  $const.ARRAY_FUZZ_RADIUS,
+                                  $const.ARRAY_FUZZ_CONSTANT,
+                                  $const.width, $const.height,
+                                  $page.min_x, $page.min_y,
+                                  $page.x_scale, $page.y_scale);
+        $page.max_height = paste_fuzz_array(ctx, map,
+                                            $const.ARRAY_FUZZ_SCALE_ARGS);
     }
     else{
-        paste_fuzz(fuzz_ctx, points, $hm.hill_fuzz);
+        paste_fuzz(ctx, points, $page.hill_fuzz);
     }
-    $hm.height_canvas = fuzz_canvas;
-    $hm.timer.checkpoint("end paste_fuzz");
-    $hm.timer.checkpoint("start hillshading");
-    hillshading(fuzz_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
-    $hm.timer.checkpoint("end hillshading");
-    $hm.map_drawn.resolve();
-    $hm.loading.done();
+    $page.height_canvas = canvas;
+    $timestamp("end height_map");
+
+    $waiters.height_map_drawn.resolve();
+}
+
+/** make_full_map draws the full map on an auxillary canvas.
+ *
+ * It is run when the page first loads, and puts the map in
+ * $page.full_map.  The map is used for temporary images while the
+ * main canvas is being redrawn. */
+function make_full_map(){
+    $timestamp("start make_full_map");
+    var points = $page.tweeters;
+    var canvas = named_canvas("full_map");
+    var ctx = canvas.getContext("2d");
+    var height_map = $page.height_canvas;
+    var height_ctx = height_map.getContext("2d");
+    hillshading(height_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
+    $page.full_map = canvas;
+    $waiters.full_map_drawn.resolve();
+    $timestamp("end make_full_map");
 }
 
 
-function wait_for_flag(flag, func){
-    if ($hm[flag]){
-        func();
+
+
+function get_zoom_pixel_bounds(zoom, centre_x, centre_y, width, height){
+    var z = get_zoom_point_bounds(zoom, centre_x, centre_y, width, height);
+    var scale = 1.0 / (1 << zoom);
+    var x_scale = z.x_scale * scale;
+    var y_scale = z.y_scale * scale;
+
+    return {
+        left: (z.min_x - $page.min_x) * x_scale,
+        top: (z.min_y - $page.min_y) * y_scale,
+        width: z.width * x_scale,
+        height: z.height * y_scale
+    };
+}
+
+function get_zoom_point_bounds(zoom, centre_x, centre_y, width, height){
+    if (width === undefined)
+        width = $const.width;
+    if (height === undefined)
+        height = $const.height;
+
+    var scale = 1.0 / (1 << zoom);
+    var size_x = $page.range_x * scale;
+    var size_y = $page.range_y * scale;
+    var out_x = $page.range_x - size_x;
+    var out_y = $page.range_y - size_y;
+    var left = Math.max($page.min_x, centre_x - size_x / 2);
+    var top = Math.max($page.min_y, centre_y - size_y / 2);
+    var min_x = Math.min(left, $page.min_x + out_x);
+    var min_y = Math.min(top, $page.min_y + out_y);
+    var x_scale = width / size_x;
+    var y_scale = height / size_y;
+
+    var z = {
+        min_x: min_x,
+        min_y: min_y,
+        max_x: min_x + size_x,
+        max_y: min_y + size_y,
+        x_scale: x_scale,
+        y_scale: y_scale,
+        width: size_x,
+        height: size_y
+    };
+    return z;
+}
+
+function zoomed_paint(ctx, points, zoom, r, k, scale_args, max_height){
+    var scale = 1 << zoom;
+    var w = ctx.canvas.width;
+    var h = ctx.canvas.height;
+    r *= scale;
+    k /= (scale * scale);
+    var z = get_zoom_point_bounds(zoom, $state.x, $state.y, w, h);
+    var x_padding = r / z.x_scale;
+    var y_padding = r / z.y_scale;
+    points = bound_points(points, z.min_x - x_padding,
+                          z.max_x + x_padding,
+                          z.min_y - y_padding,
+                          z.max_y + y_padding);
+    $timestamp("start zoomed paint");
+    var map = make_fuzz_array(points, r, k, w, h,
+                              z.min_x, z.min_y,
+                              z.x_scale, z.y_scale);
+    $timestamp("made zoomed map");
+    max_height = paste_fuzz_array(ctx, map, scale_args, max_height);
+    $timestamp("pasted zoomed map");
+    return max_height;
+}
+
+
+function paint_map(){
+    $timestamp("start paint_map");
+    var points = $page.tweeters;
+    var height_map;
+    var zoom = $state.zoom;
+    if (zoom){
+        var scale = 1 << zoom;
+        height_map = named_canvas("zoomed_height_map", true, 1);
+        var height_ctx = height_map.getContext("2d");
+        if ($const.REDRAW_HEIGHT_MAP){
+            var height = zoomed_paint(height_ctx, points, zoom,
+                                  $const.ARRAY_FUZZ_RADIUS,
+                                  $const.ARRAY_FUZZ_CONSTANT,
+                                  $const.ARRAY_FUZZ_SCALE_ARGS,
+                                  undefined);
+        }
+        else {
+            var d = get_zoom_pixel_bounds(zoom, $state.x, $state.y);
+            zoom_in($page.height_canvas, height_ctx, d.left, d.top, d.width, d.height);
+        }
     }
     else {
-        window.setTimeout(wait_for_flag, 100, flag, func);
+        height_map = $page.height_canvas;
+        var height_ctx = height_map.getContext("2d");
     }
+    var canvas = $page.canvas;
+    var ctx = canvas.getContext("2d");
+    $timestamp("start hillshading");
+    hillshading(height_ctx, ctx, 1 / (zoom + 1), Math.PI * 1 / 4, Math.PI / 4);
+    $timestamp("end paint_map");
+    $waiters.map_drawn.resolve();
+    $page.loading.done();
 }
 
 
 function hm_on_token_density(data){
     log("in hm_on_token_density");
     var points = decode_points(data.rows);
-    $hm.map_known.then(function(){
-                           points = bound_points(points,
-                                                 $hm.min_x, $hm.max_x,
-                                                 $hm.min_y, $hm.max_y);
-                           $hm.timer.checkpoint("pre density map");
-                       });
-    var token_canvas = scaled_canvas(0.25);
-    var token_ctx = token_canvas.getContext("2d");
-    if ($hm.array_fuzz){
-        $hm.map_known.then(function()
-                           {
-                               paint_density_array(token_ctx, points);
-                           });
+    var i, p;
+    var cache = $page.token_data;
+    for (i = 0; i < points.length; i++){
+        p = points[i];
+        var token = p.pop();
+        if (! (token in cache)){
+            log("starting density cache for", token);
+            cache[token] = [];
+        }
+        /*XXX need to look at replacing less precise values*/
+        cache[token].push(p);
     }
-    else{
-        $hm.map_known.then(function()
-                           {
-                               paste_fuzz(token_ctx, points, $hm.hill_fuzz);
-                           });
+}
+
+function paint_token_density(){
+    var token = $state.token;
+    if (token === undefined){
+        log("no token density to draw! phew!");
+        return;
     }
+    if (! (token in $page.token_data)){
+        /*what to do? fire off another request? */
+        log("no token data for ", token, "in paint_token_density");
+        return;
+    }
+    var points = $page.token_data[token];
+    var canvas = named_canvas("density_map", true, 0.25);
+    var ctx = canvas.getContext("2d");
 
-    $hm.map_known.then(function(){
-                           $hm.timer.checkpoint("post density map");
-                           var token_canvas2 = apply_density_map(token_ctx);
-                           $hm.overlays.push(token_canvas2);
-                           $(token_canvas2).addClass("overlay").offset(
-                               $($hm.canvas).offset());
-                       });
+    var height = zoomed_paint(ctx, points, $state.zoom,
+                              $const.ARRAY_FUZZ_DENSITY_RADIUS,
+                              $const.ARRAY_FUZZ_DENSITY_CONSTANT,
+                              $const.ARRAY_FUZZ_DENSITY_SCALE_ARGS,
+                              undefined);
+
+    $timestamp("applying density map");
+    var canvas2 = apply_density_map(ctx);
+    $timestamp("post density map");
+    $(canvas2).addClass("overlay").offset($($page.canvas).offset());
 }
-
-function paint_density_array(token_ctx, points){
-    token_ctx.fillStyle = "#f00";
-    token_ctx.fillRect(0, 0, token_ctx.canvas.width, token_ctx.canvas.height);
-    paste_fuzz_array(token_ctx, points,
-                     $hm.ARRAY_FUZZ_DENSITY_RADIUS,
-                     $hm.ARRAY_FUZZ_DENSITY_CONSTANT,
-                     $hm.ARRAY_FUZZ_DENSITY_RADIX
-                    );
-
-}
-
-
-function _paint_density_map(){
-    $hm.timer.checkpoint("_paint_density_map");
-}
-
 
 
 /*don't do too much until the drawing is done.*/
@@ -421,8 +634,8 @@ function hm_on_labels(data){
     var points = decode_points(data.rows);
     /*XXX depends on map_known */
     points = bound_points(points,
-                          $hm.min_x, $hm.max_x,
-                          $hm.min_y, $hm.max_y);
+                          $page.min_x, $page.max_x,
+                          $page.min_y, $page.max_y);
     var max_freq = 0;
     for (var i = 0; i < points.length; i++){
         var freq = points[i][2][0][1];
@@ -430,21 +643,21 @@ function hm_on_labels(data){
     }
     var scale = 14 / (max_freq * max_freq);
 
-    $hm.labels = {
+    $page.labels = {
         points: points,
         max_freq: max_freq,
         scale: scale
     };
 }
 
-function _paint_labels(){
-    var points = $hm.labels.points;
-    var scale = $hm.labels.scale;
-    var ctx = $hm.canvas.getContext("2d");
+function paint_labels(){
+    var points = $page.labels.points;
+    var scale = $page.labels.scale;
+    var ctx = $page.canvas.getContext("2d");
     for (var i = 0; i < points.length; i++){
         var p = points[i];
-        var x = $hm.PADDING + (p[0] - $hm.min_x) * $hm.x_scale;
-        var y = $hm.PADDING + (p[1] - $hm.min_y) * $hm.y_scale;
+        var x = (p[0] - $page.min_x) * $page.x_scale;
+        var y = (p[1] - $page.min_y) * $page.y_scale;
         var text = p[2][0][0];
         var n = p[2][0][1];
         var size = n * n * scale;
@@ -452,57 +665,22 @@ function _paint_labels(){
     }
 }
 
-/** interpret_query puts any well specified query parameters into $hm
- *
- * This feels completely dodgy to a server side programmer, but is OK
- * on the client side.  They can only mangle their own browsers.
- */
 
-function interpret_query(){
-    var query = get_query();
-    for (var param in query){
-        if (param in $hm){
-            var v = query[param];
-            var existing = $hm[param];
-            switch(typeof(existing)){
-            case "number":
-                v = parseFloat(v);
-                if (! isNaN(v)){
-                    $hm[param] = v;
-                }
-                break;
-            case "boolean":
-                v = v.toLowerCase();
-                $hm[param] = (!(v == "0" ||
-                                v == "false" ||
-                                v == "no" ||
-                                v == ""));
-                break;
-            case "string":
-                $hm[param] = v;
-                break;
-            default:
-                log("ignoring " + param + "=" + v +
-                    " (unknown type)");
-            }
+function temp_view(){
+    $state.transition = true;
+    $.when($waiters.full_map_drawn).done(
+        function(){
+            if ($state.transition){
+            var tc = named_canvas('temp');
+            var d = get_zoom_pixel_bounds($state.zoom, $state.x, $state.y);
+            zoom_in($page.full_map, tc, d.left, d.top, d.width, d.height);
+                $(tc).offset($($page.canvas).offset());
+            $(tc).css('visibility', 'visible');
         }
-        else {
-            log("ignoring " + param + "=" + v +
-                " (unknown attribute)");
-        }
-    }
+    });
 }
 
-function get_query(){
-    var query = window.location.search.substring(1);
-    if (! query) return {};
-    var args = {};
-    var re = /([^&=]+)=?([^&]*)/g;
-    while (true){
-        var match = re.exec(query);
-        if (match === null){
-            return args;
-        }
-        args[decodeURIComponent(match[1])] = decodeURIComponent(match[2].replace(/\+/g, " "));
-    }
+function hide_temp_view(){
+    $state.transition = false;
+    $(named_canvas('temp')).css('visibility', 'hidden');
 }

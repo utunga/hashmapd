@@ -2,8 +2,7 @@ import numpy, time, cPickle, gzip, sys, os
 
 import theano
 import theano.tensor as T
-import PIL.Image
-from utils import tile_raster_images
+from utils import tiled_array_image
 from logistic_sgd import LogisticRegression
 
 class HiddenLayer(object):
@@ -66,22 +65,7 @@ class HiddenLayer(object):
         self.output = activation(T.dot(self.input, self.W) + self.b)
         # parameters of the model
         self.params = [self.W, self.b]
-                
-        #strictly for tracing only
-        if (self.W.value.shape[0]==(28*28)):
-            self.trace_img_shape = (28,28)    
-            self.trace_tile_shape = (10,10)
-            self.trace_transpose_weights_file = True
-        else:
-            if (self.W.value.shape[1]==(28*28)):
-                self.trace_img_shape = (28,28)    
-                self.trace_tile_shape = (10,10)
-                self.trace_transpose_weights_file = False
-            else:
-                self.trace_img_shape = (self.n_in,1)    
-                self.trace_tile_shape = (self.n_out,1)
-                self.trace_transpose_weights_file = True
-        
+    
     #added MKT
     def export_model(self):
         return self.params;
@@ -95,14 +79,6 @@ class HiddenLayer(object):
         self.b.value=inpt_params[1].value
         
     def export_weights_image(self, file_name):
-        # Construct image from the weight matrix
-        
-        if (self.trace_transpose_weights_file):
-            x = self.W.value.T
-        else:
-            x = self.W.value
-            
-        image = PIL.Image.fromarray(tile_raster_images( x,
-            img_shape = self.trace_img_shape,tile_shape = self.trace_tile_shape, 
-            tile_spacing=(1,1)))
+        # Construct image from the weight matrix        
+        image = tiled_array_image(self.W.value)
         image.save(file_name)

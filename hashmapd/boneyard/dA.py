@@ -34,9 +34,6 @@ import numpy, time, cPickle, gzip, sys, os
 
 import theano
 import theano.tensor as T
-import PIL.Image
-
-from utils import tile_raster_images
 
 from theano.tensor.shared_randomstreams import RandomStreams
 #from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams

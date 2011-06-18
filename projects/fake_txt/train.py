@@ -1,5 +1,8 @@
 import os, sys, getopt
-import numpy, cPickle, gzip, theano
+import numpy, cPickle, gzip
+import theano
+
+import matplotlib.pyplot as plt
 
 def get_git_home():
     testpath = '.'
@@ -14,6 +17,7 @@ HOME = get_git_home()
 sys.path.append(HOME)
 
 from hashmapd.load_config import LoadConfig, DefaultConfig
+from hashmapd.utils import tiled_array_image
 from hashmapd.SMH import SMH
 
 
