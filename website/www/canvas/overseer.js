@@ -700,7 +700,7 @@ function paint_labels(){
         }
         var text = p[4];
         var n = p[2];
-        var size = n / 50;
+        var size = n / 50 * (1 + $state.zoom);
         add_label(ctx, text, d.x, d.y, size, "#000", "#fff");
     }
 }
