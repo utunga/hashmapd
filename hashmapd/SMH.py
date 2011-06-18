@@ -2,7 +2,7 @@
 """
 import os
 
-import numpy, time, cPickle, gzip, os, sys
+import numpy, time, cPickle, gzip, os, sys, PIL.Image
 
 import theano
 import theano.tensor as T
@@ -13,6 +13,26 @@ from HiddenLayer import HiddenLayer
 from rbm import RBM
 from rbm_poisson_vis import RBM_Poisson
 from logistic_sgd import LogisticRegression
+
+def _batched(data, size, batch_size):
+    """Yield [ a[batch] for a in data ] for each of size//batch_size batches"""
+    for offset in range(0, size, batch_size):
+        yield [a[offset:offset+batch_size] for a in data]
+    
+def _batched_apply(f, data, gpu_rows, batch_size):
+    """[ f(*data[..., batch]) for batch in ... ]"""
+    length = len(data[0])
+    assert all(len(arg) == length for arg in data)
+    gpu_rows = gpu_rows - gpu_rows % batch_size
+    assert gpu_rows >= batch_size and gpu_rows % batch_size == 0
+    result = []
+    for gpu_batch in _batched(data, length - length % batch_size, gpu_rows):
+        actual_gpu_rows = len(gpu_batch[0])
+        # this isn't sufficient:
+        #gpu_batch = [theano.shared(value=a) for a in gpu_batch]
+        for grad_batch in _batched(gpu_batch, actual_gpu_rows, batch_size): 
+            result.append(f(*grad_batch))
+    return result
 
 
 class SMH(object):
@@ -402,17 +422,184 @@ class SMH(object):
         
         return train_fn, valid_score_i, test_score_i
     
-    
-    #added MKT
     def export_model(self):
         joint_params = []
         for layer in self.sigmoid_layers:
             joint_params.append(layer.export_model())
-        return joint_params;
+        return joint_params
     
     def load_model(self, inpt_params):
         for i in xrange(len(inpt_params)):
             #print 'loading layer %i'%i
             self.sigmoid_layers[i].load_model(inpt_params[i])
+
+    def save_model(self, weights_file):
+        save_file=open(weights_file,'wb')
+        cPickle.dump(self.export_model(), save_file, cPickle.HIGHEST_PROTOCOL)
+        save_file.close()
+
+    def train(self, training_data, validation_data, testing_data, 
+                finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.01, training_epochs = 100, 
+                method = 'cd', k = 1, noise_std_dev = 0, cost_method = 'squared_diff', 
+                batch_size = 10,  
+                skip_trace_images=False, weights_file=None):
+    
+        gpu_rows = 10**6 // 8 // len(training_data[0][0])
+        
+        # PRETRAINING
+
+        print >>sys.stderr, '... getting the pretraining functions'
+        pretraining_fns = self.pretraining_functions(
+                batch_size       = batch_size,
+                method           = method,
+                k                = k)
+
+        print >>sys.stderr, '... pre-training the model'
+        start_time = time.clock()
+        
+        for (i, pretrain) in enumerate(pretraining_fns):
+            def _pretrain(*args, **kw):
+                kw['lr'] = pretrain_lr
+                return pretrain(*args, **kw)
+            for epoch in xrange(pretraining_epochs):
+                costs = _batched_apply(_pretrain, training_data, gpu_rows, batch_size)
+
+                if (epoch < 100 and epoch % 10 == 0) or epoch % 100 == 0:
+                    print 'Pre-training layer {0}, epoch {1:3}, cost {2}'.format(
+                            i, epoch, numpy.mean(costs))
+    
+        end_time = time.clock()
+        print 'The pretraining code for file '+os.path.split(__file__)[1]+' ran for %.2fm' % ((end_time-start_time)/60.)
+    
+        self.unroll_layers(cost_method, noise_std_dev)
+    
+        # save model after pretraining
+        if weights_file is not None:
+            self.save_model(weights_file=weights_file)
+    
+        self.output_trace_info(testing_data[0],'b4_finetuning',skip_trace_images)
+
+        # FINETUNING
+    
+        print >>sys.stderr, '... getting the finetuning functions'
+    
+        train_fn, validate_model_i, test_model_i = self.build_finetune_functions ( 
+                    batch_size = batch_size, 
+                    learning_rate = finetune_lr) 
+    
+        print >>sys.stderr, '... finetuning the model'
+        
+        # early-stopping parameters
+        patience              = 4     # look as this many examples regardless
+        patience_increase     = 2    # wait this much longer when a new best is 
+                                      # found
+        improvement_threshold = 0.9995 # a relative improvement of this much is 
+                                      # considered significant
+    
+        best_params          = None
+        best_validation_loss = float('inf')
+        test_score           = 0.
+        start_time = time.clock()
+    
+        epoch = 0
+        while epoch < min(patience, training_epochs):
+            epoch += 1
+        
+            _batched_apply(train_fn, training_data, gpu_rows, batch_size)
+            
+            validation_losses = _batched_apply(validate_model_i, validation_data, gpu_rows, batch_size)
+            this_validation_loss = numpy.mean(validation_losses)
+        
+            if this_validation_loss < best_validation_loss:
+                # improve patience if loss improvement is good enough
+                if this_validation_loss < best_validation_loss * improvement_threshold:
+                    patience = max(patience, epoch * patience_increase)
+            
+                # save best validation score and iteration number
+                best_validation_loss = this_validation_loss
+                #best_iter = iter # NEVER USED
+            
+                # go through the test set
+                test_losses = _batched_apply(test_model_i, testing_data, gpu_rows, batch_size)
+                test_score = numpy.mean(test_losses)   # NEVER USED
+
+            if (epoch < 100 and epoch % 10 == 0) or epoch % 100 == 0:
+                print "epoch {0:>4}/{1:>4} validation error {2:%} test error of best model {3:%}".format(
+                        epoch, min(patience, training_epochs), this_validation_loss, test_score)
+
+        end_time = time.clock()
+        print >> sys.stderr, ('The fine tuning code for file '+os.path.split(__file__)[1]+' ran for %.2fm' % ((end_time-start_time)/60.))
+    
+        print "epoch {0:>4}/{1:>4} validation error {2:%} test error of best model {3:%}".format(
+            epoch, min(patience, training_epochs), this_validation_loss, test_score)
+
+        self.output_trace_info(testing_data[0],'after_finetuning',skip_trace_images)
+    
+        return self
+
+
+    def output_trace_info(self, testing_data_x, prefix, skip_trace_images):
+        # OUTPUT WEIGHTS
+
+        for layer in xrange(self.n_sigmoid_layers):
+            sigmoid_layer = self.sigmoid_layers[layer]
+            try:
+                os.makedirs('trace')
+            except OSError:
+                pass
+            try:
+                sigmoid_layer.export_weights_image('trace/%s_weights_%i.png'%(prefix,layer))
+            except IOError:
+                pass
+    
+        if skip_trace_images:
+            return
+   
+        # RECONSTRUCTION SAMPLES
+    
+        data_x = testing_data_x 
+        #data_x = [index*batch_size:(index+1)*batch_size];
+    
+        # Plot image and reconstrution 
+        #image = PIL.Image.fromarray(tile_raster_images( X = data_x,
+        #         img_shape = (28,28),tile_shape = (10,10), 
+        #         tile_spacing=(1,1)))
+        #image.save('trace/%s_input.png'%prefix)
+    
+        output_y = self.output_given_x(data_x)
+        # output_y = self.output_given_x(test_set_x.value);
+
+        #image = PIL.Image.fromarray(tile_raster_images( X = output_y,
+        #         img_shape = (28,28),tile_shape = (10,10), 
+        #         tile_spacing=(1,1)))
+        #image.save('trace/%s_reconstruction.png'%prefix)
+
+    def matplotlib_debugging(self):
+        import matplotlib.pyplot as plt
+
+        # plot weights (first three vis units, as well as the largest/smallest) 
+        plt.subplot(311)
+        max_i = self.rbm_layers[0].W.value.argmax()/self.rbm_layers[0].W.value.shape[1]
+        plt.plot(self.rbm_layers[0].W.value[0],color='red',linestyle='None',marker='o')
+        plt.plot(self.rbm_layers[0].W.value[1],color='blue',linestyle='None',marker='o')
+        plt.plot(self.rbm_layers[0].W.value[2],color='green',linestyle='None',marker='o')
+        plt.plot(self.rbm_layers[0].W.value[max_i],color='yellow',linestyle='None',marker='D')
+        print numpy.max(numpy.abs(self.rbm_layers[0].W.value)) # print the max weight value
+        plt.ylabel('weights')
+        plt.xlabel('units')
+
+        # plot vis biases
+        plt.subplot(312)
+        plt.plot(self.rbm_layers[0].vbias.value,'bo')
+        plt.ylabel('vis biases')
+        plt.xlabel('units')
+
+        # plot hidd biases
+        plt.subplot(313)
+        plt.plot(self.rbm_layers[0].hbias.value,'go')
+        plt.ylabel('hidd biases')
+        plt.xlabel('units')
+
+        plt.show()
 
 

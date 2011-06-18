@@ -183,10 +183,9 @@ if __name__ == '__main__':
     
     cost_method = cfg.train.cost;
     
-    info = LoadConfig('data')['info']
-
     #load data to generate codes for
     if (render_file_has_multi_labels):
+        raise RuntimeError('Peter broke this')
         dataset_x, dataset_labels = load_data_with_multi_labels(info['training_prefix']+'_0.pkl.gz')
     elif (render_file_has_labels):
         dataset_x, dataset_labels = load_data_with_labels(render_file)
