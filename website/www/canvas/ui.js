@@ -294,8 +294,36 @@ function enable_drag(){
     ui_grabber.mouseup(finish);
     ui_grabber.mouseout(finish);
     ui_grabber.dblclick(dblclick);
+
+    if ($const.KEY_CAPTURE){
+        $(document).keydown(key_events);
+    }
 }
 
+function key_events(e){
+    switch(e.keyCode){
+    case 37:/*left*/
+        pan_pixel_delta($const.width / 2, 0, 0);
+        break;
+    case 38:/*up*/
+        pan_pixel_delta(0, $const.height / 2, 0);
+        break;
+    case 39:/*right*/
+        pan_pixel_delta( -$const.width / 2, 0, 0);
+        break;
+    case 40:/*down*/
+        pan_pixel_delta(0, -$const.height / 2, 0);
+        break;
+    case 107:/* + keypad */
+    case 187:/* = */
+        pan_pixel_delta(0, 0, 1);
+        break;
+    case 109:/* - keypad */
+    case 189:/* - */
+        pan_pixel_delta(0, 0, -1);
+        break;
+    }
+}
 
 function temp_pan_delta(dx, dy){
     log("mouse_move", dx, dy);

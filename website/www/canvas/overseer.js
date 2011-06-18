@@ -32,6 +32,8 @@ var $const = {
     DENSITY_MAP_STYLE: 'grey_outside',
     //DENSITY_MAP_STYLE: 'colour_cycle',
 
+    KEY_CAPTURE: false, /* use keyboard events to scroll and zoom */
+
     DENSITY_MAP_ZOOM_DETAIL: true,
 
     QUAD_TREE_COORDS: 15,
