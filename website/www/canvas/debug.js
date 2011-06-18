@@ -23,6 +23,7 @@ function get_timer(){
         var now = Date.now();
         if (reset){
             start = now;
+        table.append('<tr><td colspan="2">....................</tr>');
         }
         var t = now - start;
         var d = now - previous;
