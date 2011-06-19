@@ -7,7 +7,8 @@ canvas.overlay        {z-index:   2}
 #helpers              {z-index:   7}
 #loading              {z-index:   9}
 #debug                {z-index:  99}
-#ui-grabber           {z-index: 999}
+#ui-grabber           {z-index: 900}
+#zoom-controls        {z-index: 999}
 
 
 body{
@@ -57,10 +58,6 @@ canvas.overlay {
   position: absolute;
   top: 0;
   left: 0px;
-}
-
-#zoom-slider {
-  height: 200px;
 }
 
 #helpers {
@@ -128,4 +125,27 @@ canvas.overlay {
 #helpers input[type=radio][value=false]{
   color: red !important;
   background-color: red !important;
+}
+
+#zoom-in-button {
+  display:block;
+  width: 15px;
+  margin-bottom: 2px;
+
+}
+
+#zoom-out-button {
+  display:block;
+  width: 15px;
+  margin-top: 2px;
+}
+
+#zoom-slider {
+  height: 100px;
+}
+
+#zoom-controls {
+  position:absolute;
+  width: 20px;
+  padding: 2px 0 0 2px;
 }

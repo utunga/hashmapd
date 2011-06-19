@@ -184,18 +184,21 @@ function construct_ui(){
                            set_state({'zoom': ui.value});
                        }
                      });
+
     var offset = $($page.canvas).offset();
-    offset.left -= 20;
-    slider.offset(offset);
+    $("#zoom-controls").offset(offset);
+    $("#zoom-out-button").click(function(){set_state({zoom: $state.zoom - 1})});
+    $("#zoom-in-button").click(function(){set_state({zoom: $state.zoom + 1})});
+
 
     $("#token_form").submit(
         function(e){
             e.preventDefault();
             e.stopPropagation();
-            var token = $("#token_input").val() || '';
-            token = normalise_token(token);
-            $("#token_input").val(token);
-            set_state({token: token});
+            var data = $("#token_input").val() || '';
+            data = sanitise_token_input(data);
+            $("#token_input").val(data);
+            set_state({token: data});
             return false;
         }
     );
@@ -209,15 +212,34 @@ function construct_ui(){
  * assume you mean that.
  */
 function normalise_token(token){
-    var orig = token;
-    token = token.split(/\s/, 1)[0];
     var uc = token.toUpperCase();
     if (uc != token){
         var lc = token.toLowerCase();
         token = uc.charAt(0) + lc.substr(1);
     }
-    log("converted", orig, "to", token);
     return token;
+}
+
+function sanitise_token_input(input){
+    var tokens = input.split(/\s/, 4);
+    var result;
+    if (tokens.length == 3 && tokens[1] in $const.DENSITY_OPS){
+        /*XXX should really have a proper parser */
+        result = [normalise_token(tokens[0]),
+                  tokens[1],
+                  normalise_token(tokens[2])];
+    }
+    else if (tokens.length == 2){
+        result = [normalise_token(tokens[0]),
+                  '+',
+                  normalise_token(tokens[1])];
+    }
+    else {
+        result = [normalise_token(tokens[0])];
+    }
+    result = result.join(' ');
+    log("converted", input, "to", result);
+    return result;
 }
 
 
@@ -291,8 +313,36 @@ function enable_drag(){
     ui_grabber.mouseup(finish);
     ui_grabber.mouseout(finish);
     ui_grabber.dblclick(dblclick);
+
+    if ($const.KEY_CAPTURE){
+        $(document).keydown(key_events);
+    }
 }
 
+function key_events(e){
+    switch(e.keyCode){
+    case 37:/*left*/
+        pan_pixel_delta($const.width / 2, 0, 0);
+        break;
+    case 38:/*up*/
+        pan_pixel_delta(0, $const.height / 2, 0);
+        break;
+    case 39:/*right*/
+        pan_pixel_delta( -$const.width / 2, 0, 0);
+        break;
+    case 40:/*down*/
+        pan_pixel_delta(0, -$const.height / 2, 0);
+        break;
+    case 107:/* + keypad */
+    case 187:/* = */
+        pan_pixel_delta(0, 0, 1);
+        break;
+    case 109:/* - keypad */
+    case 189:/* - */
+        pan_pixel_delta(0, 0, -1);
+        break;
+    }
+}
 
 function temp_pan_delta(dx, dy){
     log("mouse_move", dx, dy);

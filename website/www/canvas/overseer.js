@@ -32,6 +32,8 @@ var $const = {
     DENSITY_MAP_STYLE: 'grey_outside',
     //DENSITY_MAP_STYLE: 'colour_cycle',
 
+    KEY_CAPTURE: false, /* use keyboard events to scroll and zoom */
+
     DENSITY_MAP_ZOOM_DETAIL: true,
 
     QUAD_TREE_COORDS: 15,
@@ -54,7 +56,13 @@ var $const = {
         locations: {},
         token_density: {precision_adjust: 1},
         tokens:{}
-    }
+    },
+    DENSITY_OPS: {
+            '+': density_add,
+            '*': density_mul,
+            '-': density_sub,
+            '^': density_diff
+        }
 };
 
 /* $page holds values that are calculated during a page session and
@@ -142,7 +150,6 @@ function hm_setup(){
     $page.tmp_canvas = overlay_canvas('temp', true);
     overlay_canvas("density_overlay");
 
-    $waiters.map_drawn = $.Deferred();
     $waiters.full_map_drawn = $.Deferred();
     $waiters.height_map_drawn = $.Deferred();
 
@@ -166,12 +173,11 @@ function hm_setup(){
         function(){
             $page.ticker = window.setInterval(hm_tick, 1000/ $const.FPS);
         });
-
+    /*
     if ($state.token){
-        $waiters.have_density = get_token_json($state.token,
-                                               $const.DENSITY_RESOLUTION,
-                                               hm_on_token_density);
+        $waiters.have_density = parse_density_query($state.token);
     }
+     */
 }
 
 /** hm_draw_map draws the approriate map
@@ -180,13 +186,12 @@ function hm_setup(){
  */
 
 function hm_draw_map(){
+    $waiters.map_drawn = $.Deferred();
     $timestamp("start hm_draw_map", true);
     interpret_query($state);
     set_ui($state);
-    if (! ($state.token in $page.token_data)){
-        $waiters.have_density = get_token_json($state.token,
-                                               $const.DENSITY_RESOLUTION,
-                                               hm_on_token_density);
+    if ($state.token){
+        $waiters.have_density = parse_density_query($state.token);
     }
     temp_view();
     /*have a short break here to allow the temp view to show */
@@ -202,11 +207,6 @@ function hm_draw_map2(){
     }
 
     $.when($waiters.map_known).done(paint_map);
-
-    $.when($waiters.map_known,
-           $waiters.have_density)
-                   .done(paint_token_density);
-
     $.when($waiters.map_drawn,
            $waiters.have_density).done(hide_temp_view);
 }
@@ -218,11 +218,14 @@ function hm_draw_map2(){
  *  @param view is a couchDB view name (e.g. "locations")
  *  @param precision is the desired quadtree precision
  *  @param callback is a callback. It gets the data as first argument.
+ *  @param start exclude values before this
+ *  @param end exclude values after this (use "[x,{}]" include x*).
+ *  @param context data to be passed to the callback.
  *
  *  @return a $.Deferred or $.Deferred-alike object.
 
  */
-function get_json(view, precision, callback, start, end){
+function get_json(view, precision, callbacks, start, end, context){
     /*If the view has non-quadtree data prepended to its key (e.g. a token),
      * then the precision needs to be adjusted accordingly.
      */
@@ -246,19 +249,29 @@ function get_json(view, precision, callback, start, end){
                        url: url,
                        dataType: ($const.USE_JSONP) ? 'jsonp': 'json',
                        cache: true, /*not on by default in jsonp mode*/
+                       context: context,/*will be 'this' in callbacks */
                        success: function(data){
+                           log(context, this);
                            $page.loading.tick();
                            $timestamp("got JSON " + view + "[" + precision + "]");
-                           callback(data);
+                           /* Actually jquery can do this list of callbacks thing.
+                            *nevermind. */
+                           if (typeof(callbacks) == 'function'){
+                               callbacks = [callbacks];
+                           }
+                           for (var i = 0; i < callbacks.length; i++){
+                               callbacks[i](data, context);
+                           }
                        }
     });
     return d;
 }
 
-function get_token_json(token, precision, callback){
+function get_token_json(token, precision, callbacks){
     var startkey = '["' + token + '"]';
     var endkey = '["' + token + '",{}]';
-    return get_json('token_density', precision, callback, startkey, endkey);
+    return get_json('token_density', precision, callbacks, startkey, endkey,
+                    {token: token});
 };
 
 function get_label_json(callback){
@@ -267,14 +280,53 @@ function get_label_json(callback){
     return d;
 };
 
+/** If a token is not cached locally, fetch it.
+ *
+ * @param token a token (single word, usually capitalised)
+ * @return a deferred or true (which works as expected for $.when()).
+ */
+function maybe_get_token_json(token){
+    if (! (token in $page.token_data)){
+        return get_token_json(token,
+                              $const.DENSITY_RESOLUTION,
+                              hm_on_token_density);
+    }
+    return true;
+}
+
+function parse_density_query(query){
+    var tokens = query.split(/\s/, 4);
+    var op, func, args;
+    var deferred;
+    if (tokens.length == 3 && tokens[1] in $const.DENSITY_OPS){
+        /* token arithmetic */
+        func = paint_density_duo;
+        op = $const.DENSITY_OPS[tokens[1]];
+        var d1 = maybe_get_token_json(tokens[0]);
+        var d2 = maybe_get_token_json(tokens[2]);
+        deferred = $.when(d1, d2);
+        args = [tokens[0], tokens[2], op];
+    }
+    else {
+        /* the simple case of one token (possibly with ignored garbage) */
+        deferred = maybe_get_token_json(tokens[0]);
+        func = paint_token_density;
+        args = tokens;
+    }
+    $.when(args, $waiters.map_drawn, $waiters.full_map_drawn, deferred).done(func);
+    return deferred;
+}
+
+
+
 /** encode_point turns an x, y pair into a quad-tree coordinate.
 */
 function encode_point(x, y){
     var qt = [];
     /*last coord is always false */
-    //x >>= 1;
-    //y >>= 1;
-    for (var i = $const.QUAD_TREE_COORDS; i >= 0; i--){
+    x >>= 1;
+    y >>= 1;
+    for (var i = $const.QUAD_TREE_COORDS - 1; i >= 0; i--){
         qt[i] = (y & 1) * 2 + (x & 1);
         y >>= 1;
         x >>= 1;
@@ -543,30 +595,6 @@ function get_zoom_point_bounds(zoom, centre_x, centre_y, width, height){
     return z;
 }
 
-function zoomed_paint(ctx, points, zoom, k, threshold, scale_args, max_height){
-    var scale = 1 << zoom;
-    var w = ctx.canvas.width;
-    var h = ctx.canvas.height;
-    k /= (scale * scale);
-    var r = calc_fuzz_radius(k, threshold);
-    log(k, threshold, r);
-    var z = get_zoom_point_bounds(zoom, $state.x, $state.y, w, h);
-    var x_padding = r / z.x_scale;
-    var y_padding = r / z.y_scale;
-    points = bound_points(points, z.min_x - x_padding,
-                          z.max_x + x_padding,
-                          z.min_y - y_padding,
-                          z.max_y + y_padding);
-    $timestamp("start zoomed paint");
-    var map = make_fuzz_array(points, k, threshold, w, h,
-                              z.min_x, z.min_y,
-                              z.x_scale, z.y_scale);
-    $timestamp("made zoomed map");
-    max_height = paste_fuzz_array(ctx, map, scale_args, max_height);
-    $timestamp("pasted zoomed map");
-    return max_height;
-}
-
 
 function paint_map(){
     $timestamp("start paint_map");
@@ -603,63 +631,37 @@ function paint_map(){
 }
 
 
-function hm_on_token_density(data){
+function hm_on_token_density(data, req){
     log("in hm_on_token_density");
     var points = decode_points(data.rows);
     var i, p;
+    var token = req.token;
     var cache = $page.token_data;
-    for (i = 0; i < points.length; i++){
-        p = points[i];
-        var token = p.pop();
-        if (! (token in cache)){
-            log("starting density cache for", token);
-            cache[token] = [];
-        }
-        /*XXX need to look at replacing less precise values*/
-        cache[token].push(p);
-    }
-}
-
-function paint_token_density(){
-    var token = $state.token;
-    if (token === undefined){
-        log("no token density to draw! phew!");
-        return;
-    }
-    if (! (token in $page.token_data)){
-        /*what to do? fire off another request? */
-        log("no token data for ", token, "in paint_token_density");
-        $(named_canvas("density_overlay")).css("visibility", "hidden");
-        return;
-    }
-    var points = $page.token_data[token];
-    if (points.length == 0){
-        /*the token isn't in the database. hmm. */
-        log("No points for", token, "in paint_token_density");
-        $(named_canvas("density_overlay")).css("visibility", "hidden");
-        return;
-    }
-
-    var canvas = named_canvas("density_map", true, 0.25);
-    var ctx = canvas.getContext("2d");
-    var k;
-    if ($const.DENSITY_MAP_ZOOM_DETAIL){
-        k = $const.ARRAY_FUZZ_DENSITY_CONSTANT * (1 << $state.zoom);
+    if (token in cache){
+        /* this is presumably a request for more precision, which we
+         * don't yet handle.
+         *
+         * The thing to do is, for each received point, work out which
+         * existing point it is a subset of, and replace that.
+         */
+        dump_object(req);
+        dump_object(cache);
+        //dump_object(cache[token]);
+        log("got", token, "but it is already in cache, so I WILL IGNORE IT.");
     }
     else {
-        k = $const.ARRAY_FUZZ_DENSITY_CONSTANT;
+        log("starting density cache for", token);
+        var count = 0;
+        for (i = 0; i < points.length; i++){
+            p = points[i];
+            p.pop();
+            count += p[2];
+        }
+        cache[token] = {
+            count: count,
+            points: points
+        };
     }
-
-    var height = zoomed_paint(ctx, points, $state.zoom,
-                              k,
-                              $const.ARRAY_FUZZ_DENSITY_THRESHOLD,
-                              $const.ARRAY_FUZZ_DENSITY_SCALE_ARGS,
-                              undefined);
-
-    $timestamp("applying density map");
-    var canvas2 = apply_density_map(ctx);
-    $timestamp("post density map");
-    overlay(canvas2);
 }
 
 
