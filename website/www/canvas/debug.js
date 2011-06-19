@@ -45,14 +45,23 @@ function log(){
     $("#debug").append(s);
 };
 
-function dump_object(o){
-    var s = '{\n';
-    for (x in o){
-        s += '  ' + x + ':' + o[x] + ',\n';
+function dump_object(o, depth, padding){
+    if(padding === undefined)
+        padding = '';
+    if (depth === undefined)
+        depth = 1;
+    var s = padding + '{\n';
+    for (var x in o){
+        if (typeof(o[x]) == 'object' && depth > 1){
+            s += dump_object(o[x], depth - 1, padding + '  ');
+        }
+        s += padding + '  ' + x + ':' + o[x] + ',\n';
     }
-    s += '}';
-    //alert(s);
-    log(s);
+    s += padding + '}';
+    if (padding == ''){
+        log(s);
+    }
+    return s;
 }
 
 function loading_screen(){

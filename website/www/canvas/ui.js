@@ -195,10 +195,10 @@ function construct_ui(){
         function(e){
             e.preventDefault();
             e.stopPropagation();
-            var token = $("#token_input").val() || '';
-            token = normalise_token(token);
-            $("#token_input").val(token);
-            set_state({token: token});
+            var data = $("#token_input").val() || '';
+            data = sanitise_token_input(data);
+            $("#token_input").val(data);
+            set_state({token: data});
             return false;
         }
     );
@@ -212,15 +212,34 @@ function construct_ui(){
  * assume you mean that.
  */
 function normalise_token(token){
-    var orig = token;
-    token = token.split(/\s/, 1)[0];
     var uc = token.toUpperCase();
     if (uc != token){
         var lc = token.toLowerCase();
         token = uc.charAt(0) + lc.substr(1);
     }
-    log("converted", orig, "to", token);
     return token;
+}
+
+function sanitise_token_input(input){
+    var tokens = input.split(/\s/, 4);
+    var result;
+    if (tokens.length == 3 && tokens[1] in $const.DENSITY_OPS){
+        /*XXX should really have a proper parser */
+        result = [normalise_token(tokens[0]),
+                  tokens[1],
+                  normalise_token(tokens[2])];
+    }
+    else if (tokens.length == 2){
+        result = [normalise_token(tokens[0]),
+                  '+',
+                  normalise_token(tokens[1])];
+    }
+    else {
+        result = [normalise_token(tokens[0])];
+    }
+    result = result.join(' ');
+    log("converted", input, "to", result);
+    return result;
 }
 
 
