@@ -280,7 +280,8 @@ function get_token_json(token, precision, callbacks){
 
 function get_label_json(callback){
     log("getting labels");
-    var d = $.getJSON("labels.json", callback);
+    var d = $.getJSON("pre-filtered-1.json", callback);
+    //var d = $.getJSON("labels.json", callback);
     return d;
 };
 
@@ -712,8 +713,13 @@ function paint_labels(){
         }
         var text = p[4];
         var n = p[2];
-        var size = n / 50 * (1 + $state.zoom);
-        add_label(ctx, text, d.x, d.y, size, "#000", "#fff");
+        var jitter = $const.COORD_MAX >> (p[3] + 7);
+        var size = Math.log(n) * (1.3 + $state.zoom);
+        var jx = Math.random() * jitter * 2 - jitter;
+        var jy = Math.random() * jitter * 2 - jitter;
+        add_label(ctx, text, d.x + jx, d.y + jy, size, "#000"
+                  , "#fff"
+                 );
     }
 }
 
