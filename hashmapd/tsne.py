@@ -1,10 +1,14 @@
 #  Based on code Created by Laurens van der Maaten on 20-12-08.
 #  see point #4
 
-import numpy
+import sys, numpy
 
 try:
     from .compiled import calc_dY
+    try:
+        from .compiled import version_info
+    except ImportError:
+        raise RuntimeError('Cython code need recompiling. "python setup.py build_ext -i"')
 except ImportError:
     print >> sys.stderr, "No Cython"
     # Use "python setup.py build_ext -i" to compile it
@@ -16,7 +20,8 @@ try:
     psyco.full()
     print >> sys.stderr, "psyco is usable!"
 except:
-    print >> sys.stderr, "No psyco"
+    pass # psyco doesn't matter given cython
+    #print >> sys.stderr, "No psyco"
 
 
 class TSNE(object):
@@ -50,7 +55,6 @@ class TSNE(object):
         # we think local minima are a problem.
 
 
-
     def fit(self, iterations = None): 
         """Descends along tsne gradient path for the specified number of iterations"""
 
@@ -77,7 +81,6 @@ class TSNE(object):
         gains = numpy.ones((n, self.out_dims));
         
         # Compute P-values
-        print "Computing the P-values first"
         P = self.x2p();
         P = P + numpy.transpose(P);
         P = P / numpy.sum(P);
@@ -94,7 +97,6 @@ class TSNE(object):
 #>>>>>>> d749adedfcc2bfea5d666e92cdd171597a4c49d3:hashmapd/tsne.py
         
         # Run iterations
-        print "Doing the tsne minimization"
         dY = numpy.zeros_like(Y)
         Y2 = numpy.zeros_like(Y[:, 0])
         num = numpy.zeros([n*(n-1)//2], float)
@@ -126,9 +128,11 @@ class TSNE(object):
             
             if iter < 10 or (iter < 100 and (iter+1) % 10 == 0) or (iter+1) % 100 == 0:
                 # Compute current value of cost function
-                # Q doesn't exist if using cython
-                #C = numpy.sum(P * numpy.log(P / Q));
-                print "Iteration ", (iter + 1) #, ": error is ", C
+                if calc_dY is None:
+                    cost = numpy.sum(P * numpy.log(P / Q))
+                else:
+                    cost = calc_dY(P, Y, num, Y2, None)
+                print "TSNE Iteration {0:3} error is {1}".format(iter + 1, cost)
                 
             # Stop lying about P-values
             if iter == 100:

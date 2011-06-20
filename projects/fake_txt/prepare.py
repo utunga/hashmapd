@@ -7,6 +7,7 @@ import gzip
 import theano
 import time, PIL.Image
 import numpy as np
+import numpy.lib.format
 
 def get_git_home():
     testpath = '.'
@@ -112,8 +113,6 @@ def validate_config(cfg):
     assert validate_cutoff<=test_cutoff, \
         "config fail, number_for_testing should be >= 0"
     
-def get_filename(name, number, filetype=PICKLED_TYPE, extsep='.'):
-    return os.path.join("data", "%s_%s%s"%(name, number, filetype))
 
 def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
    
@@ -129,8 +128,6 @@ def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
     train_set_x = raw_counts[0:train_cutoff]
     train_sums = train_set_x.sum(axis=1)
     mean_doc_size = train_sums.mean()
-    print train_set_x
-    print train_sums
     
     if (cfg.input.number_for_validation ==0):
         print 'WARNING: no examples set aside for validation, copying train set data for validation (as a quick hack only)'
@@ -148,38 +145,15 @@ def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
    
     print '...  pickling and zipping train/validate/test data to data directory'
     
-    train_file = gzip.open(get_filename(TRAINING_FILE, 0),'wb')
-    valid_file = gzip.open(get_filename(VALIDATION_FILE, 0),'wb')
-    test_file = gzip.open(get_filename(TESTING_FILE, 0), 'wb')
-    
-    if (cfg.train.first_layer_type=='poisson'):
-        cPickle.dump((train_set_x,train_sums,np.zeros(train_sums.shape,dtype=theano.config.floatX)), train_file, cPickle.HIGHEST_PROTOCOL)
-        cPickle.dump((valid_set_x,valid_sums,np.zeros(valid_sums.shape,dtype=theano.config.floatX)), valid_file, cPickle.HIGHEST_PROTOCOL)
-        cPickle.dump((test_set_x,test_sums,np.zeros(test_sums.shape,dtype=theano.config.floatX)), test_file, cPickle.HIGHEST_PROTOCOL)
-    else:
-        cPickle.dump((normalize_data_x(train_set_x,train_sums,'training'),train_sums,np.zeros(train_sums.shape,dtype=theano.config.floatX)), train_file, cPickle.HIGHEST_PROTOCOL)
-        cPickle.dump((normalize_data_x(valid_set_x,valid_sums,'validation'),valid_sums,np.zeros(valid_sums.shape,dtype=theano.config.floatX)), valid_file, cPickle.HIGHEST_PROTOCOL)
-        cPickle.dump((normalize_data_x(test_set_x,test_sums,'testing'),test_sums,np.zeros(test_sums.shape,dtype=theano.config.floatX)), test_file, cPickle.HIGHEST_PROTOCOL)
-    
-    train_file.close()
-    valid_file.close()
-    test_file.close() 
+    for (filename, data, sums) in [
+            (TRAINING_FILE, train_set_x, train_sums),
+            (VALIDATION_FILE, valid_set_x, valid_sums),
+            (TESTING_FILE, test_set_x, test_sums)]:
+        if cfg.train.first_layer_type != 'poisson':
+            data = normalize_data_x(data, sums, filename)
+        filename = os.path.join("data", filename+'.npy')
+        numpy.lib.format.write_array(open(filename, 'wb'), data)
         
-    data_info = {'training_prefix': os.path.join('data', TRAINING_FILE),
-        'n_training_files': 1,
-        'n_training_batches':train_cutoff/batch_size,
-        'validation_prefix':  os.path.join('data', VALIDATION_FILE),
-        'n_validation_files': 1,
-        'n_validation_batches': validate_cutoff/batch_size,
-        'testing_prefix':  os.path.join('data', TESTING_FILE),
-        'n_testing_files': 1,
-        'n_testing_batches': test_cutoff/batch_size,
-        'batches_per_file': (train_cutoff+validate_cutoff+test_cutoff)/batch_size,
-        'mean_doc_size': mean_doc_size,
-    }
-
-    dict_to_cfg(data_info, 'info', 'data.cfg')
-
     print '...  pickling and zipping render_data to '+ cfg.input.render_data
     render_data = normalize_data_x(train_set_x,train_sums,'training')[0:num_examples]
     f = gzip.open(cfg.input.render_data,'wb')
@@ -194,15 +168,11 @@ def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
         
     cPickle.dump(data,f, cPickle.HIGHEST_PROTOCOL)
     
-    print data
-    f.close()
-    
 def normalize_data_x(data_x,sums_x,name):
     for idx in xrange(len(sums_x)):
         if sums_x[idx] == 0.:
             print 'input for '+name+' user_id %i has all elements zero will not attempt to normalize '%idx
             sums_x[idx] = 1
-    
     return (data_x.transpose()/sums_x).transpose()
 
 if __name__ == '__main__':
