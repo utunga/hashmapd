@@ -64,7 +64,8 @@ var $const = {
             '^': density_diff
     },
     DENSITY_UNO_OPS: {
-            '~': density_log
+            '~': density_log,
+            '`': density_sqrt
         }
 };
 

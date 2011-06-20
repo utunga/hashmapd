@@ -108,6 +108,15 @@ function density_log(m0, width, height){
     }
 }
 
+function density_sqrt(m0, width, height){
+    for (var y = 0; y < height; y++){
+        var r0 = m0[y];
+        for (var x = 0; x < width; x++){
+            r0[x] = Math.sqrt(r0[x]);
+        }
+    }
+}
+
 function density_mul(m0, m1, width, height){
     for (var y = 0; y < height; y++){
         var r0 = m0[y];
