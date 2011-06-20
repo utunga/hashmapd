@@ -68,7 +68,9 @@ function paint_token_density(tokens){
     var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
     var maps = extract_density_maps(tokens, canvas.width, canvas.height, $state);
-    paste_density(ctx, maps[0]);
+    if (maps !== undefined){
+        paste_density(ctx, maps[0]);
+    }
 }
 
 function paint_density_duo(args){

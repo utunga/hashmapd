@@ -208,13 +208,13 @@ function construct_ui(){
 
 /** normalise_token puts the token in the form expected by the backend.
  *
- * Most words are capitalised, but if you write in all caps, we'll
+ * Most words are capitalised, but if you write with some caps, we'll
  * assume you mean that.
  */
 function normalise_token(token){
-    var uc = token.toUpperCase();
-    if (uc != token){
-        var lc = token.toLowerCase();
+    var lc = token.toLowerCase();
+    if (lc == token){
+        var uc = token.toUpperCase();
         token = uc.charAt(0) + lc.substr(1);
     }
     return token;
