@@ -221,7 +221,7 @@ function normalise_token(token){
 }
 
 function sanitise_token_input(input){
-    var tokens = input.split(/\s/, 4);
+    var tokens = input.trim().split(/\s+/, 4);
     var result;
     if (tokens.length == 3 && tokens[1] in $const.DENSITY_OPS){
         /*XXX should really have a proper parser */
