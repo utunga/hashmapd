@@ -230,9 +230,15 @@ function sanitise_token_input(input){
                   normalise_token(tokens[2])];
     }
     else if (tokens.length == 2){
-        result = [normalise_token(tokens[0]),
-                  '+',
-                  normalise_token(tokens[1])];
+        if (tokens[0] in $const.DENSITY_UNO_OPS){
+            /* a unary operator on tokens[1] */
+            result = [tokens[0], normalise_token(tokens[1])];
+        }
+        else { /*two text tokens; give them an arbitrary operator */
+            result = [normalise_token(tokens[0]),
+                      '*',
+                      normalise_token(tokens[1])];
+        }
     }
     else {
         result = [normalise_token(tokens[0])];

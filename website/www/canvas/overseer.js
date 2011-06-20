@@ -62,6 +62,9 @@ var $const = {
             '*': density_mul,
             '-': density_sub,
             '^': density_diff
+    },
+    DENSITY_UNO_OPS: {
+            '~': density_log
         }
 };
 
@@ -306,6 +309,12 @@ function parse_density_query(query){
         var d2 = maybe_get_token_json(tokens[2]);
         deferred = $.when(d1, d2);
         args = [tokens[0], tokens[2], op];
+    }
+    else if (tokens.length == 2 && tokens[0] in $const.DENSITY_UNO_OPS){
+        func = paint_density_uno;
+        op = $const.DENSITY_UNO_OPS[tokens[0]];
+        deferred = maybe_get_token_json(tokens[1]);
+        args = [tokens[1], op];
     }
     else {
         /* the simple case of one token (possibly with ignored garbage) */

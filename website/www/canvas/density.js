@@ -83,10 +83,29 @@ function paint_density_duo(args){
     paste_density(ctx, m0);
 }
 
+function paint_density_uno(args){
+    log(args);
+    var op = args.pop();
+    var canvas = named_canvas("density_map", true, 0.25);
+    var ctx = canvas.getContext("2d");
+    var maps = extract_density_maps(args, canvas.width, canvas.height, $state);
+    op(maps[0], canvas.width, canvas.height);
+    paste_density(ctx, maps[0]);
+}
+
 function paste_density(ctx, map){
     paste_fuzz_array(ctx, map, $const.ARRAY_FUZZ_DENSITY_SCALE_ARGS);
     var canvas2 = apply_density_map(ctx);
     overlay(canvas2);
+}
+
+function density_log(m0, width, height){
+    for (var y = 0; y < height; y++){
+        var r0 = m0[y];
+        for (var x = 0; x < width; x++){
+            r0[x] = Math.log(r0[x]);
+        }
+    }
 }
 
 function density_mul(m0, m1, width, height){
