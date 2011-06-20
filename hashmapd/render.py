@@ -38,7 +38,7 @@ class Render(object):
 
 
         # Plot the labels
-        num_labels_to_plot = min(len(labels), self.max_labels)
+        num_labels_to_plot = min([len(labels), self.max_labels, len(x), len(y)])
         if self.has_labels:
             for i in range(num_labels_to_plot):
                 text(x[i],y[i],labels[i]) # assumes m size and order matches labels

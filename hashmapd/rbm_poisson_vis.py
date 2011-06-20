@@ -12,7 +12,7 @@ import theano
 import theano.tensor as T
 import os, sys, getopt
 
-from utils import tile_raster_images
+from utils import tiled_array_image
 from theano.tensor.shared_randomstreams import RandomStreams
 from load_config import LoadConfig, DefaultConfig
 import rbm

@@ -1,14 +1,53 @@
+/*z-indexes
+most stuff, including the main canvas, are a 0 */
+canvas.overlay        {z-index:   2}
+#canvas-labels        {z-index:   3}
+#canvas-temp          {z-index:   4}
+#ui                   {z-index:   6}
+#helpers              {z-index:   7}
+#loading              {z-index:   9}
+#debug                {z-index:  99}
+#ui-grabber           {z-index: 900}
+#zoom-controls        {z-index: 999}
+
+
 body{
-  background: #333;
+  background: #fff;
+  color: #333;
+  font-family: 'Helvetica Neue', Arial, 'Liberation Sans', FreeSans, sans-serif;
 }
+
+h1 {
+  margin: 0;
+  font-size: 36px;
+  /*position: absolute;
+  top: 2px;
+  left: 42px;*/
+}
+
+h1:before {
+  content: url(birds-30.PNG);
+}
+
+#ui p {
+  margin: 0 0 0 40px;
+}
+
 canvas{
-  background: #000;
+/*  background: #000;*/
+  border: 1px solid #ccc;
+  background: #fff;
   display: block;
   margin: 10px auto 0 auto;
-  cursor:move;
 }
+
 canvas.overlay {
   background: none;
+}
+
+#ui-grabber {
+  cursor:move;
+  position:absolute;
 }
 
 #content{
@@ -18,40 +57,38 @@ canvas.overlay {
 #ui {
   position: absolute;
   top: 0;
-  left: 300px;
-  z-index: 6;
-}
-
-#zoom-slider {
-  /*width: 20px;*/
-  height: 200px;
-  /*background: red;*/
-  /*border: 1px solid green;*/
+  left: 0px;
 }
 
 #helpers {
   position: absolute;
   left: 0;
-  top: 0;
+  top: 200px;
   width: 200px;
   font: normal 11px sans-serif;
   color: #ccc;
+  margin: 5px;
 }
+
+#helpers h2 {
+  margin: 2px;
+}
+
 
 #debug {
   font: normal 11px sans-serif;
   position: absolute;
   right: 0;
   top: 0;
-  background: #aaa;
-  z-index: 99;
-
+  padding: 1px;
+  border: #ccc 1px solid;
   /*stop annoying selection interaction with drag */
   -webkit-user-select: none;
   -khtml-user-select: none;
   -moz-user-select: none;
   -o-user-select: none;
   user-select: none;
+  white-space: pre;
 }
 
 #loading {
@@ -62,9 +99,10 @@ canvas.overlay {
   width: 100%;
   height: 100%;
   visibility: hidden;
-  color: white;
-  font: 40px bold sans-serif;
-  background: black;
+  color: #333;
+  font-size: 40px;
+  font-weight: bold;
+  background: #fff;
   padding: 100px;
   cursor: progress;
 }
@@ -72,4 +110,42 @@ canvas.overlay {
 #loading div{
   text-align: center;
   margin: 100px auto 0 auto;
+}
+
+#helpers input{
+  max-width: 100px;
+  border: 1px solid #ccc;
+}
+
+#helpers input[type=radio][value=true]{
+  color: green !important;
+  background-color: green !important;
+}
+
+#helpers input[type=radio][value=false]{
+  color: red !important;
+  background-color: red !important;
+}
+
+#zoom-in-button {
+  display:block;
+  width: 15px;
+  margin-bottom: 2px;
+
+}
+
+#zoom-out-button {
+  display:block;
+  width: 15px;
+  margin-top: 2px;
+}
+
+#zoom-slider {
+  height: 100px;
+}
+
+#zoom-controls {
+  position:absolute;
+  width: 20px;
+  padding: 2px 0 0 2px;
 }

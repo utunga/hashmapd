@@ -9,16 +9,26 @@
   <body>
     <div id="loading"></div>
     <div id="helpers"></div>
-    <div id="content"></div>
+    <div id="content"><div id="map-div"></div></div>
     <div id="debug"></div>
-    <div id="ui">
-      <form><input type="text" /></form>
-      <div id="zoom-slider"></div>
+    <div id="ui-grabber" draggable="false"></div>
+    <div id="ui"><form id="token_form">
+      <h1>Hashmapd</h1>
+      <p>Who is talking about...<br />
+          <input type="text" id="token_input" /></p>
+        <p id="token-notes"></p>
+      </form>
     </div>
+      <div id="zoom-controls">
+      <img id="zoom-in-button" src="up-24.PNG"><div id="zoom-slider">
+        </div><img id="zoom-out-button" src="down-arrow-22.PNG">
+    </div>
+
     <script src="jquery.js"></script>
     <script src="jquery-ui.js"></script>
     <script src="debug.js"></script>
     <script src="fuzz.js"></script>
+    <script src="density.js"></script>
     <script src="canvas.js"></script>
     <script src="ui.js"></script>
     <script src="overseer.js"></script>
