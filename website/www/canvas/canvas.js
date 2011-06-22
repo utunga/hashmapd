@@ -274,20 +274,32 @@ function make_colour_range_mountains(scale){
     return colours;
 }
 
-function add_label(ctx, text, x, y, size, colour, shadow){
+function add_label(ctx, text, x, y, size, colour, shadow, angle){
     //log.apply(undefined, arguments);
     if (colour === undefined){
         colour = "#000";
     }
+    if (angle){
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        x = 0; y = 0;
+    }
     if (shadow && size > 8){
         ctx.shadowColor = shadow;
-        ctx.shadowBlur = size * 0.25;
+        ctx.shadowBlur = size * 0.125;
+        ctx.shadowOffsetX = 0.5 + size * 0.125;
+        ctx.shadowOffsetY = 0.5 + size * 0.125;
     }
     //ctx.globalAlpha = "0.6";
     ctx.textAlign = "center";
     ctx.font = size + "px sans-serif";
     ctx.fillStyle = colour;
     ctx.fillText(text, x, y);
+
+    if (angle){
+        ctx.restore();
+    }
 }
 
 
