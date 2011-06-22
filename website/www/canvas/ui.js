@@ -134,6 +134,10 @@ function set_state(data){
     for (k in $state){
         copy[k] = $state[k];
     }
+    if (data.zoom !== undefined){
+        data.zoom = Math.min($const.MAX_ZOOM, Math.max(0, data.zoom));
+    }
+
     interpret_query($state, data);
     var h = window.history;
     var loc = window.location;
@@ -142,6 +146,7 @@ function set_state(data){
     if (url != loc.href){
         h.replaceState($state, "Hashmapd", url);
     }
+
     /*make sure something changed */
     for (k in $state){
         if (copy[k] != $state[k]){
@@ -178,7 +183,7 @@ function set_ui(state){
 function construct_ui(){
     var slider = $("#zoom-slider");
     $(slider).slider({ orientation: 'vertical',
-                       max: 6,
+                       max: $const.MAX_ZOOM,
                        min: 0,
                        slide: function( event, ui ) {
                            set_state({'zoom': ui.value});
