@@ -63,9 +63,12 @@ def save_as_json(locations, out_file, limit=100):
             f.write(s)
     f.write(']}\n')
 
-def save_as_html(locations, out_file, limit=100):
-    f = open(out_file, 'w')
-    cells = [[[] for a in range(64)] for b in range(64)]
+def make_cells(locations, limit=100):
+    cells = [[{'data':[],
+               'tokens': set(),
+               'classes': []
+              } for a in range(64)] for b in range(64)]
+    log("making cells, sets")
     for k, v in locations.iteritems():
         v.sort()
         v.reverse()
@@ -73,28 +76,61 @@ def save_as_html(locations, out_file, limit=100):
             x = 0
             y = 0
             adj = int(rvalue)
-            token = repr(token).replace(r'\\u', r'\u')
+            token = repr(token).replace(r'\\u', r'\u').decode('unicode_escape').encode('utf-8')
             for n in k.split(','):
                 n = int(n)
                 x = (x << 1) + (n & 1)
                 y = (y << 1) + (n >> 1)
-            cells[y][x].append((adj, token, k))
+            cell = cells[y][x]
+            cell['location'] = k
+            cell['data'].append((adj, token))
+            cell['tokens'].add(token)
+    return cells
 
-    f.write('<html><style>'
+def find_common_tokens(cells):
+    log("associating sets")
+    for y in range(1, len(cells)):
+        for x in range(1, len(cells[0])):
+            cell = cells[y][x]
+            up = cells[y - 1][x]
+            left = cells[y][x - 1]
+            if cell['tokens'] & left['tokens']:
+                cell['classes'].append('left')
+                left['classes'].append('right')
+            if cell['tokens'] & up['tokens']:
+                cell['classes'].append('up')
+                up['classes'].append('down')
+    return cells
+
+def save_as_html(locations, out_file, limit=100):
+    f = open(out_file, 'w')
+    cells = make_cells(locations, limit)
+    find_common_tokens(cells)
+
+    log("writing html")
+    f.write('<html><meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
+            '<style>'
             'td.sea {background: #cef}'
             'td {font: 10px sans-serif; border: 1px solid #ccc; padding: 2px;}'
+            'a {font-weight: bold; text-decoration: none;}'
+            '.up, .down, .left, .right {background: #fd9}'
+            '.up {border-top: 1px #fe0 solid}'
+            '.down {border-bottom: 1px #fe0 solid}'
+            '.left {border-left: 1px #fe0 solid}'
+            '.right {border-right: 1px #fe0 solid}'
             '</style>\n'
             '<table style="font: 10px sans-serif">\n')
     for row in cells:
         f.write('<tr>\n')
         for cell in row:
-            if cell:
-                coords = cell[0][2]
-                f.write('<td id="%s">\n' % coords.replace(',', ''))
-                f.write("<b>%s</b><br/>" % (coords))
+            if cell['data']:
+                coords = cell['location']
+                ID = coords#.replace(',', '')
+                f.write('<td id="%s" class="%s">\n' % (ID, ' '.join(cell['classes'])))
+                f.write('<a href="#%s">%s</a><br/>' % (ID, coords))
 
                 #cell.sort()
-                for tk in cell:
+                for tk in cell['data']:
                     f.write("%s: %s<br/>" % (tk[1], tk[0]))
             else:
                 f.write('<td class="sea">\n')
@@ -102,7 +138,7 @@ def save_as_html(locations, out_file, limit=100):
     f.write('</table></html>\n')
 
 
-def main(json_file, out_file):
+def main(json_file, out_file, style):
     from math import log
 
     rows = get_row_emitter(json_file)
@@ -117,12 +153,13 @@ def main(json_file, out_file):
         total = float(sum(value for value, coords in v))
         logtotal = log(total) + 3
         for value, coords in v:
-            locations.setdefault(coords, []).append((#value,
-                                                     value / total * 1000,
-                                                     #value / total * 100 * logtotal,
+            locations.setdefault(coords, []).append(({'total': value,
+                                                      'relative': value / total * 1000,
+                                                      'adjusted': value / total * 100 * logtotal,
+                                                      }[style],
                                                      value, token))
 
     save_as_html(locations, out_file, 10)
 
-main(sys.argv[1], sys.argv[2])
+main(sys.argv[1], sys.argv[2], sys.argv[3])
 
