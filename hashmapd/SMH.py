@@ -15,24 +15,15 @@ from rbm_poisson_vis import RBM_Poisson
 from logistic_sgd import LogisticRegression
 from utils import tiled_array_image
 
-def _batched(data, size, batch_size):
-    """Yield [ a[batch] for a in data ] for each of size//batch_size batches"""
-    for offset in range(0, size, batch_size):
-        yield [a[offset:offset+batch_size] for a in data]
     
-def _batched_apply(f, data, gpu_rows, batch_size):
-    """[ f(*data[..., batch]) for batch in ... ]"""
+def _batched_apply(f, data, batch_size):
+    """[ f(*data[0][batch], data[1][batch]) for each batch ]"""
     length = len(data[0])
     assert all(len(arg) == length for arg in data)
-    gpu_rows = gpu_rows - gpu_rows % batch_size
-    assert gpu_rows >= batch_size and gpu_rows % batch_size == 0
     result = []
-    for gpu_batch in _batched(data, length - length % batch_size, gpu_rows):
-        actual_gpu_rows = len(gpu_batch[0])
-        # this isn't sufficient:
-        #gpu_batch = [theano.shared(value=a) for a in gpu_batch]
-        for grad_batch in _batched(gpu_batch, actual_gpu_rows, batch_size): 
-            result.append(f(*grad_batch))
+    for offset in range(0, length - length % batch_size, batch_size):
+        batch = [arg[offset:offset+batch_size] for arg in data]
+        result.append(f(*batch))
     return result
 
 
@@ -76,7 +67,7 @@ class SMH(object):
         
         self.n_ins = n_ins
         self.inner_code_length = inner_code_length
-        self.mid_layer_sizes = mid_layer_sizes
+        self.mid_layer_sizes = list(mid_layer_sizes)
         
         self.numpy_rng = numpy_rng
         self.theano_rng = RandomStreams(numpy_rng.randint(2**30))
@@ -445,8 +436,6 @@ class SMH(object):
                 batch_size = 10,  
                 skip_trace_images=False, weights_file=None):
     
-        gpu_rows = 10**6 // 8 // len(training_data[0][0])
-        
         # PRETRAINING
 
         print >>sys.stderr, '... getting the pretraining functions'
@@ -463,7 +452,7 @@ class SMH(object):
                 kw['lr'] = pretrain_lr
                 return pretrain(*args, **kw)
             for epoch in xrange(pretraining_epochs):
-                costs = _batched_apply(_pretrain, training_data, gpu_rows, batch_size)
+                costs = _batched_apply(_pretrain, training_data, batch_size)
 
                 if (epoch < 100 and epoch % 10 == 0) or epoch % 100 == 0:
                     print 'Pre-training layer {0}, epoch {1:3}, cost {2}'.format(
@@ -506,9 +495,9 @@ class SMH(object):
         while epoch < min(patience, training_epochs):
             epoch += 1
         
-            _batched_apply(train_fn, training_data, gpu_rows, batch_size)
+            _batched_apply(train_fn, training_data, batch_size)
             
-            validation_losses = _batched_apply(validate_model_i, validation_data, gpu_rows, batch_size)
+            validation_losses = _batched_apply(validate_model_i, validation_data, batch_size)
             this_validation_loss = numpy.mean(validation_losses)
         
             if this_validation_loss < best_validation_loss:
@@ -521,7 +510,7 @@ class SMH(object):
                 #best_iter = iter # NEVER USED
             
                 # go through the test set
-                test_losses = _batched_apply(test_model_i, testing_data, gpu_rows, batch_size)
+                test_losses = _batched_apply(test_model_i, testing_data, batch_size)
                 test_score = numpy.mean(test_losses)   # NEVER USED
 
             if (epoch < 100 and epoch % 10 == 0) or epoch % 100 == 0:
