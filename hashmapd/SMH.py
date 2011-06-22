@@ -525,8 +525,8 @@ class SMH(object):
 
         self.output_trace_info(testing_data[0],'after_finetuning',skip_trace_images)
     
-        return self
-
+        if weights_file is not None:
+            self.save_model(weights_file=weights_file)
 
     def output_trace_info(self, testing_data_x, prefix, skip_trace_images):
         # OUTPUT WEIGHTS
