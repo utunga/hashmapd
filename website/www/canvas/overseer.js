@@ -28,7 +28,7 @@ var $const = {
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
     REDRAW_HEIGHT_MAP: true, /*whether to redraw the height map on zoom */
     MAP_RESOLUTION: 9,       /*initial requested resolution for overall map*/
-    DENSITY_RESOLUTION: 7,   /*initial requested resolution for density maps*/
+    DENSITY_RESOLUTION: 8,   /*initial requested resolution for density maps*/
     MAX_ZOOM: 5,   /*How close can you go (this many doublings)*/
     DENSITY_MAP_STYLE: 'grey_outside',
     //DENSITY_MAP_STYLE: 'colour_cycle',
