@@ -80,5 +80,5 @@ class HiddenLayer(object):
         
     def export_weights_image(self, file_name):
         # Construct image from the weight matrix        
-        image = tiled_array_image(self.W.value)
+        image = tiled_array_image(self.W.get_value())
         image.save(file_name)

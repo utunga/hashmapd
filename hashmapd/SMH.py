@@ -196,7 +196,7 @@ class SMH(object):
                                         input = layer_input, 
                                         n_in  = mirror_layer.n_out, 
                                         n_out = mirror_layer.n_in,
-                                        init_W = mirror_layer.W.value.T,
+                                        init_W = mirror_layer.W.get_value().T,
                                         #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1), #cant for the life of me think of a good default for this 
                                         activation = T.nnet.sigmoid)
             
