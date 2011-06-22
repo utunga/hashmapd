@@ -79,10 +79,16 @@ function paint_density_duo(args){
     var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
     var maps = extract_density_maps(args, canvas.width, canvas.height, $state);
-    var m0 = maps[0];
-    var m1 = maps[1];
-    op(m0, m1, canvas.width, canvas.height);
-    paste_density(ctx, m0);
+    try {
+        var m0 = maps[0];
+        var m1 = maps[1];
+        op(m0, m1, canvas.width, canvas.height);
+        paste_density(ctx, m0);
+    }
+    catch (e){
+        log(e);
+        return;
+    }
 }
 
 function paint_density_uno(args){
@@ -91,8 +97,14 @@ function paint_density_uno(args){
     var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
     var maps = extract_density_maps(args, canvas.width, canvas.height, $state);
-    op(maps[0], canvas.width, canvas.height);
-    paste_density(ctx, maps[0]);
+    try {
+        op(maps[0], canvas.width, canvas.height);
+        paste_density(ctx, maps[0]);
+    }
+    catch (e){
+        log(e);
+        return;
+    }
 }
 
 function paste_density(ctx, map){
@@ -110,6 +122,58 @@ function density_log(m0, width, height){
     }
 }
 
+function density_exp(m0, width, height){
+    for (var y = 0; y < height; y++){
+        var r0 = m0[y];
+        for (var x = 0; x < width; x++){
+            r0[x] = Math.pow(1.01, r0[x]);
+        }
+    }
+}
+
+function density_auto_gate(m0, width, height){
+    /* first find a reasonable threshold */
+    var sum = 0.0;
+    var sqsum = 0.0;
+    var count = 0;
+    var x, y;
+    for (y = 0; y < height; y++){
+        var r0 = m0[y];
+        for (x = 0; x < width; x++){
+            var v = r0[x];
+            if (v){
+                sum += v;
+                sqsum += v * v;
+                count ++;
+            }
+        }
+    }
+    //var mean = sum / (width * height);
+    var mean = sum / count;
+    var variance = (sqsum - sum * mean) / count;
+
+    /*hmm, now what?
+     * cut out all below some point, but which.
+     * the mean is a good start.*/
+    var floor = mean;
+    for (y = 0; y < height; y++){
+        var r0 = m0[y];
+        for (x = 0; x < width; x++){
+            var v = Math.max(0, r0[x] - floor);
+            r0[x] = v;
+        }
+    }
+}
+
+function density_cube(m0, width, height){
+    for (var y = 0; y < height; y++){
+        var r0 = m0[y];
+        for (var x = 0; x < width; x++){
+            r0[x] = Math.pow(r0[x], 3);
+        }
+    }
+}
+
 function density_sqrt(m0, width, height){
     for (var y = 0; y < height; y++){
         var r0 = m0[y];
@@ -118,6 +182,7 @@ function density_sqrt(m0, width, height){
         }
     }
 }
+
 
 function density_mul(m0, m1, width, height){
     for (var y = 0; y < height; y++){

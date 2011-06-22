@@ -66,7 +66,10 @@ var $const = {
     },
     DENSITY_UNO_OPS: {
             '~': density_log,
-            '`': density_sqrt
+            '^': density_exp,
+            '\\': density_auto_gate,
+            '`': density_sqrt,
+            '"': density_cube
         }
 };
 
