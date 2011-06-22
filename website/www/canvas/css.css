@@ -129,15 +129,15 @@ canvas.overlay {
 
 #zoom-in-button {
   display:block;
-  width: 15px;
-  margin-bottom: 2px;
+  width: 16px;
+  margin-bottom: 1px;
 
 }
 
 #zoom-out-button {
   display:block;
-  width: 15px;
-  margin-top: 2px;
+  width: 16px;
+  margin-top: 1px;
 }
 
 #zoom-slider {
