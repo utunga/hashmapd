@@ -23,8 +23,8 @@ var $const = {
     /* *_SCALE_ARGS, out of ['linear'], ['clipped_gaussian', low, high], ['base', base] */
     ARRAY_FUZZ_SCALE_ARGS: ['clipped_gaussian', -3.5, -0.4],
     ARRAY_FUZZ_DENSITY_SCALE_ARGS: ['linear'],
-    ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concentration for array fuzz */
-    ARRAY_FUZZ_DENSITY_THRESHOLD: 0.005, /*density fuzz gets this faint */
+    ARRAY_FUZZ_DENSITY_CONSTANT: -0.011, /*concentration for array fuzz */
+    ARRAY_FUZZ_DENSITY_THRESHOLD: 0.001, /*density fuzz gets this faint */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
     REDRAW_HEIGHT_MAP: true, /*whether to redraw the height map on zoom */
     MAP_RESOLUTION: 9,       /*initial requested resolution for overall map*/
