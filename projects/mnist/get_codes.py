@@ -27,16 +27,43 @@ def load_data_with_labels(dataset):
     train_set = cPickle.load(f)
     f.close()
     
-    data_x, labels_y = train_set
-
+    if len(train_set) == 3:
+        (data_x, sums, labels_y) = train_set
+    else:
+        data_x, labels_y = train_set
     
-    print "render data has shape:"
-    print data_x.shape
-    
-    print "render labels has shape"
-    print labels_y.shape
     return [data_x, labels_y]
     
+    
+def load_data_with_multi_labels(dataset):
+
+    # unlike the train_SMH case we expect both unsupervised data and appropriate labels for that data, in pairs,
+    print '... loading render data, expecting input and labels in pairs'
+
+    f = gzip.open(dataset,'rb')
+    x, x_sums, labels = cPickle.load(f)
+    f.close()
+    
+    print "render data has shape:", x.shape
+    
+    # for now, for multi-label data, take the last (most-specific?) label only 
+    if labels.shape[0] > 1 and labels.shape[1] > 1:
+        concat_labels = []
+        for i in xrange(labels.shape[0]):
+            concat_labels.append(-1);
+            for j in xrange(labels.shape[1]):
+                if labels[i,j] == 1:
+                    concat_labels[i] = j;
+    
+    return [x/numpy.array([x_sums]*(x.shape[1])).transpose(),concat_labels]
+    
+    #not sure if making these things 'shared' helps the GPU out but just in case we may as well do that
+    #x_shared  = theano.shared(numpy.asarray(x[0:500], dtype=theano.config.floatX))
+    #labels_shared  = theano.shared(numpy.asarray(labels[0:500], dtype=theano.config.floatX))
+    
+    #return [x_shared, labels_shared]
+
+
 def load_model(cost_method, n_ins=784,  mid_layer_sizes = [200],
                inner_code_length = 10, weights_file='data/last_smh_model_params.pkl.gz'):
     
@@ -52,7 +79,7 @@ def load_model(cost_method, n_ins=784,  mid_layer_sizes = [200],
 def get_output_codes(smh, data_x):
     print 'running input data forward through smh..'
     
-    output_codes = smh.output_codes_given_x(data_x);
+    output_codes = smh.output_codes_given_x(data_x)
     return output_codes; #a 2d array consisting of 'smh' representation of each input row as a row of floats
     
 def write_csv_labels(labels, output_file="out/labels.csv"):
@@ -60,7 +87,7 @@ def write_csv_labels(labels, output_file="out/labels.csv"):
     
     csv_writer = csv.writer(open(output_file, 'wb'), delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
     for label in labels:
-        csv_writer.writerow(("%d"%label,)) 
+        csv_writer.writerow([str(label),]) 
 
 def write_csv_codes(codes, output_file = "out/codes.csv"):
     print 'writing output codes to csv'
@@ -83,7 +110,7 @@ if __name__ == '__main__':
 
     
     #load data (and labels) to generate codes for
-    render_file = cfg.input.render_file 
+    render_file = 'data/render_data_0.pkl.gz'
     dataset_x, dataset_labels = load_data_with_labels(render_file)
  
     # write labels
