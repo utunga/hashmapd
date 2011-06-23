@@ -2,8 +2,6 @@ import os, sys, getopt
 import numpy, cPickle, gzip
 import theano
 
-import matplotlib.pyplot as plt
-
 def get_git_home():
     testpath = '.'
     while not '.git' in os.listdir(testpath) and not os.path.abspath(testpath) == '/':
@@ -16,66 +14,91 @@ def get_git_home():
 HOME = get_git_home()
 sys.path.append(HOME)
 
-from hashmapd.load_config import LoadConfig, DefaultConfig
-from hashmapd.utils import tiled_array_image
+from hashmapd.load_config import LoadConfig
 from hashmapd.SMH import SMH
 
 
-def load_data(dataset_file):
+def load_data_from_file(dataset_file):
     ''' Loads the dataset
 
-    :type dataset: string
-    :param dataset: the path to the dataset (here MNIST)
+    :type dataset_file: string
+    :param dataset_file: the path to the dataset
     '''
-    print '... loading data from file ' + dataset_file
+    print >>sys.stderr, '... loading data from file ' + dataset_file
     
     if dataset_file.endswith('.npy'):
-        x = numpy.lib.format.open_memmap(dataset_file, mode='r')
+        #x = numpy.lib.format.open_memmap(dataset_file, mode='r') # or mode='c'  
+        x = numpy.lib.format.read_array(open(dataset_file, 'rb'))
         assert x.dtype is numpy.dtype(theano.config.floatX), (x.dtype, theano.config.floatX)
-        x_sums = x.sum(axis=1)
+        y = None
     else:
         f = gzip.open(dataset_file, 'rb')
         (x, x_sums, y) = cPickle.load(f)
         x = numpy.asarray(x, dtype=theano.config.floatX)
+    return (x, y)
 
-    # build a replcated 2d array of sums so operations can be performed efficiently   # HUH?
-    x_sums = numpy.asarray(numpy.array([x_sums]*(x.shape[1])).transpose(), dtype=theano.config.floatX)
+
+def load_data(datadir, part):
+    """Try any known file formats in which the array might be stored"""
+    file_prefix = os.path.join(datadir, part + '_data')
+    for file_suffix in ['.npy', '_0.pkl.gz']:
+        filename = file_prefix + file_suffix
+        if os.path.exists(filename):
+            return load_data_from_file(filename)
+    raise RuntimeError('No {0} data found in {1}/'.format(part, datadir))
+            
+
+def load_training_arrays(datadir, input_vector_length=None):
+    """Load the arrays from the data directory
     
-    return (x, x_sums)
-
-
-def load_model(**kw):
-    numpy_rng = numpy.random.RandomState(212)
-    smh = SMH(numpy_rng = numpy_rng, **kw)
-    smh.unroll_layers(cost_method, 0); #need to unroll before loading model otherwise doesn't work
-    save_file=open(weights_file, 'rb')
-    smh_params = cPickle.load(save_file)
-    save_file.close()
-    smh.load_model(smh_params)
-    return smh
-
-
-def train_SMH(datadir="data", **kw):
+    :param datadir: path to the directory holding the data files
+    :param input_vector_length: number of columns expected in each file
+    
+    Returns [train, valid, test]"""
+            
+    result = []
     for part in ['training', 'validation', 'testing']:
-        for suffix in ['.npy', '_0.pkl.gz']:
-            filename = os.path.join(datadir, part + '_data' + suffix)
-            print filename
-            if os.path.exists(filename):
-                kw[part+'_data'] =  load_data(filename)
-                break
-        else:
-            raise RuntimeError('No {0} data found in {1}/'.format(part, datadir))
+        (x, y) = load_data(datadir, part)
+        if input_vector_length is None:
+            input_vector_length = x.shape[1]
+        elif x.shape[1] != input_vector_length:
+            raise ValueError('Expected {0} columns of {1} data but found {2}'.format(
+                    input_vector_length, part, x.shape[1]))
+        result.append(x)
+    return result
+
+
+def train_SMH(datadir, mid_layer_sizes, inner_code_length, first_layer_type, **kw):
+    """Create a SMH and train it with the data in 'datadir'"""
         
-    kw['mean_doc_size'] = kw['training_data'][1].mean()
+    for (alternate_name, suggest) in [
+            ('skip_trace_during_training', 'skip_trace_images'),
+            ('cost', 'cost_method'),
+            ('train_batch_size', 'batch_size'),
+            ('n_ins', 'input_vector_length'),]:
+        if alternate_name in kw:
+            value = kw.pop(alternate_name)
+            if suggest in kw:
+                print >>sys.stderr, "Config setting {0}={1} was ignored, but {2}={3}".format(
+                        alternate_name, value, suggest, kw[suggest])
+            else:
+                kw[suggest] = value
     
-    init_kw = {}
-    for arg in ['first_layer_type', 'mean_doc_size', 'inner_code_length', 'mid_layer_sizes', 'n_ins']:
-        if arg in kw:
-            init_kw[arg] = kw.pop(arg)
-    init_kw['numpy_rng'] = numpy.random.RandomState(123)
+    data = load_training_arrays(datadir, kw.pop('input_vector_length'))
+    data = [(a, a.sum(axis=1)[:, numpy.newaxis]) for a in data]
+    (training_data, validation_data, test_data) = data
+    (x, x_sums) = training_data
     
-    smh = SMH(**init_kw) 
-    smh.train(**kw)
+    smh = SMH(
+            numpy_rng = numpy.random.RandomState(123),
+            mean_doc_size = x.sum(axis=1).mean(), 
+            first_layer_type = first_layer_type, 
+            n_ins = x.shape[1],
+            mid_layer_sizes = mid_layer_sizes,
+            inner_code_length = inner_code_length,
+            )
+            
+    smh.train(training_data, validation_data, training_data, **kw)
 
     return smh
 
@@ -87,22 +110,25 @@ if __name__ == '__main__':
         help="Path of the config file to use")
     (options, args) = parser.parse_args()
     cfg = LoadConfig(options.config)
-    smh = train_SMH(
-            batch_size = cfg.train.train_batch_size, 
-            pretraining_epochs = cfg.train.pretraining_epochs,
-            training_epochs = cfg.train.training_epochs,
-            mid_layer_sizes = list(cfg.shape.mid_layer_sizes),
-            inner_code_length = cfg.shape.inner_code_length,
-            n_ins = cfg.shape.input_vector_length,
-            first_layer_type = cfg.train.first_layer_type,
-            method = cfg.train.method,
-            k = cfg.train.k,
-            noise_std_dev = cfg.train.noise_std_dev,
-            cost_method = cfg.train.cost,
-            skip_trace_images = cfg.train.skip_trace_images,
-            weights_file = cfg.train.weights_file)
-    
+    smh = train_SMH('data',
+            mid_layer_sizes = list(cfg.shape.mid_layer_sizes), 
+            inner_code_length = cfg.shape.inner_code_length, 
+            **cfg.train)
+
+
     #double check that save/load worked OK
+
+    #def load_model(**kw):
+    #    numpy_rng = numpy.random.RandomState(212)
+    #    smh = SMH(numpy_rng = numpy_rng, **kw)
+    #    smh.unroll_layers(cost_method, 0); #need to unroll before loading model otherwise doesn't work
+    #    save_file=open(weights_file, 'rb')
+    #    smh_params = cPickle.load(save_file)
+    #    save_file.close()
+    #    smh.load_model(smh_params)
+    #    return smh
+
+
     #info = LoadConfig('data')['info']
     #testing_data = load_data(info['testing_prefix']+'_0.pkl.gz')
     
