@@ -59,17 +59,17 @@ var $const = {
         tokens:{}
     },
     DENSITY_OPS: {
-            '+': density_add,
-            '*': density_mul,
-            '-': density_sub,
-            '^': density_diff
+            '+': density_duo_add,
+            '*': density_duo_mul,
+            '-': density_duo_sub,
+            '^': density_duo_diff
     },
     DENSITY_UNO_OPS: {
-            '~': density_log,
-            '^': density_exp,
-            '\\': density_auto_gate,
-            '`': density_sqrt,
-            '"': density_cube
+            '~': density_uno_log,
+            '^': density_uno_exp,
+            '\\': density_uno_gate,
+            '`': density_uno_sqrt,
+            '"': density_uno_cube
         }
 };
 
@@ -314,7 +314,7 @@ function parse_density_query(query){
         var d1 = maybe_get_token_json(tokens[0]);
         var d2 = maybe_get_token_json(tokens[2]);
         deferred = $.when(d1, d2);
-        args = [tokens[0], tokens[2], op];
+        args = [[tokens[0], tokens[2]], op];
     }
     else if (tokens.length == 2 && tokens[0] in $const.DENSITY_UNO_OPS){
         func = paint_density_uno;
@@ -324,11 +324,15 @@ function parse_density_query(query){
     }
     else {
         /* the simple case of one token (possibly with ignored garbage) */
+        func = paint_density_uno;
         deferred = maybe_get_token_json(tokens[0]);
-        func = paint_token_density;
-        args = tokens;
+        args = [tokens];
     }
-    $.when(args, $waiters.map_drawn, $waiters.full_map_drawn, deferred).done(func);
+    $.when($waiters.map_drawn,
+           $waiters.full_map_drawn,
+           deferred).done(function(){
+                              func.apply(undefined, args);
+                          });
     return deferred;
 }
 
@@ -578,6 +582,17 @@ function get_zoom_pixel_bounds(zoom, centre_x, centre_y, width, height){
         height: z.height * y_scale
     };
 }
+
+/** get_zoom_point_bounds find point extrema for a given zoom state
+ *
+ * @param zoom  a zoom level
+ * @param centre_x point coordinate
+ * @param centre_y point coordinate
+ * @param width    pixel width
+ * @param height   pixel height
+ *
+ * @return an object with various extrema and scale attributes
+ */
 
 function get_zoom_point_bounds(zoom, centre_x, centre_y, width, height){
     if (width === undefined)
