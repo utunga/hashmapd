@@ -239,6 +239,10 @@ function sanitise_token_input(input){
             /* a unary operator on tokens[1] */
             result = [tokens[0], normalise_token(tokens[1])];
         }
+        else if (tokens[0].match(/^>\d+$/)){
+            /* a limit on tokens[1] */
+            result = [tokens[0], normalise_token(tokens[1])];
+        }
         else { /*two text tokens; give them an arbitrary operator */
             result = [normalise_token(tokens[0]),
                       '*',

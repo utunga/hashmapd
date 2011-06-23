@@ -322,6 +322,12 @@ function parse_density_query(query){
         deferred = maybe_get_token_json(tokens[1]);
         args = [tokens[1], op];
     }
+    else if (tokens.length == 2 && tokens[0].match(/^>\d+$/)){
+        func = paint_density_top_n;
+        var n = parseInt(tokens[0].slice(1));
+        deferred = maybe_get_token_json(tokens[1]);
+        args = [tokens[1], n];
+    }
     else {
         /* the simple case of one token (possibly with ignored garbage) */
         func = paint_density_uno;

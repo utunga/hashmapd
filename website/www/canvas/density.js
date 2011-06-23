@@ -120,6 +120,27 @@ function paint_density_duo(tokens, op){
     }
 }
 
+/** paint_density_top_n paints a density map based on the top few points
+ *
+ * @param token a token to map
+ * @param n the number of points to use
+ */
+
+function paint_density_top_n(token, n){
+    var canvas = named_canvas("density_map", true, 0.25);
+    var ctx = canvas.getContext("2d");
+    var threshold = $const.ARRAY_FUZZ_DENSITY_THRESHOLD;
+    var k = get_density_k();
+    var data = $page.token_data[token];
+    var points = find_top_n_points(data.points, n);
+    var html = ("using top " + n + " out of " + data.count +
+                "mentions <br /> of <b>" + token + "</b>.<br/>");
+    var map = zoomed_fuzz_array($state.x, $state.y, canvas.width, canvas.height,
+                                points, $state.zoom, k, threshold);
+    $("#token-notes").html(html);
+    paste_density(ctx, map);
+}
+
 /** paint_density_uno performs an operation on a token map and shows the result
  *
  * the operation can be undefined, in which case the map is shown in original form
@@ -319,4 +340,22 @@ function find_median_point_value(points){
     }
     var middle = parseInt(len / 2);
     return values[middle];
+}
+
+/** find_top_n_points
+ *
+ * @param points is a list of points
+ * @param n is the number of top points you want
+ * @return a list of the n highest valued points
+ */
+function find_top_n_points(points, n){
+    var len = points.length;
+    if (len == 0){
+        return undefined;
+    }
+    var points2 = points.slice();
+    points2.sort(function(a, b){
+                     return a[2] - b[2];
+                 });
+    return points2.slice(-n);
 }
