@@ -75,8 +75,8 @@ class HiddenLayer(object):
         #self.params = inpt_params doesn't work
         #.. but it doesn't set the 'value' of shared variable W/b so we have
         #.. to do this explictly MKT
-        self.W.value=inpt_params[0].value
-        self.b.value=inpt_params[1].value
+        self.W.set_value(inpt_params[0].get_value())
+        self.b.set_value(inpt_params[1].get_value())
         
     def export_weights_image(self, file_name):
         # Construct image from the weight matrix        
