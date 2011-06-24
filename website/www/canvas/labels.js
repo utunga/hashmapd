@@ -125,7 +125,7 @@ function fit_label(ctx, lines, text, x, y, size, colour, angle, max_jitter){
     var sy = y - dy * width / 2;
     var ex = sx + dx * width;
     var ey = sy + dy * width;
-    var line = [sx, sy, ex, ey, size / 2];
+    var line = [sx, sy, ex, ey, size * 0.75];
 
     /*Because this is potentially happening a few times (to find a fit)
      winnow the list down to those that could possibly intersect.
@@ -145,12 +145,13 @@ function fit_label(ctx, lines, text, x, y, size, colour, angle, max_jitter){
         if (lx2 > hx ||
             hx2 < lx ||
             ly2 > hy ||
-            hy2 < ly){
+            hy2 < ly
+           ){
             continue;
         }
         close_lines.push(line2);
     }
-    log("found", close_lines.length, "close lines out of", lines.length);
+    //log("found", close_lines.length, "close lines out of", lines.length);
 
     /* recentre origin on sx, sy */
     var ox = sx;
@@ -163,6 +164,7 @@ function fit_label(ctx, lines, text, x, y, size, colour, angle, max_jitter){
     var cos = ex / len;
     var sin = ey / len;
 
+    var padding = size;
     /*go through all the lines and see whether they intersect */
     for (i = 0; i < close_lines.length; i++){
         var line2 = close_lines[i];
@@ -170,7 +172,7 @@ function fit_label(ctx, lines, text, x, y, size, colour, angle, max_jitter){
         var sy2 = line2[1] - oy;
         var ex2 = line2[2] - ox;
         var ey2 = line2[3] - oy;
-
+        padding = line2[4];
         /*rotate the system so ex,ey is on the x axis */
         var tmp = sx2 * cos + sy2 * sin;
         sy2 = sy2 * cos - sx2 * sin;
@@ -178,20 +180,33 @@ function fit_label(ctx, lines, text, x, y, size, colour, angle, max_jitter){
         tmp = ex2 * cos + ey2 * sin;
         ey2 = ey2 * cos - ex2 * sin;
         ex2 = tmp;
-
-        if ((sy2 < 0 && ey2 < 0) ||
-            (sy2 >= 0 && ey2 >= 0)){
+        if ((sy2 < -padding && ey2 < -padding) ||
+            (sy2 >= padding && ey2 >= padding)){
             /* a non-intersect because line2 doesn't cross the x axis*/
             continue;
         }
-        /*so it crosses x axis, but where? */
-        var xcross = ex2 + (sx2 - ex2) * ey2 / (ey2 - sy2);
-        if (xcross < 0 || xcross > len){
+        /*so it crosses x axis, but where?
+         * first check for vertical */
+        var xcross_low, xcross_high;
+        if (ey2 == sy2){
+            xcross_low = ey2 - padding;
+            xcross_high = ey2 + padding;
+        }
+        else{
+            /* padding is skewed by angle &
+               division by (ey2 - sy2) is safe. */
+            var dx2 = ex2 - sx2;
+            var dy2 = ey2 - sy2;
+            var xcross = ex2 - dx2 * ey2 / dy2;
+            var p = Math.abs(padding * dx2 / dy2);
+            xcross_high = xcross + p;
+            xcross_low = xcross - p;
+        }
+        if (xcross_high < 0 || xcross_low > len){
             continue;
         }
         return false;
     }
-    paint_line(ctx, line[0], line[1], line[2], line[3], '#f00', 1);
+    //paint_line(ctx, line[0], line[1], line[2], line[3], '#f00', 1);
     return line;
 }
-
