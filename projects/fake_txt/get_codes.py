@@ -16,24 +16,8 @@ sys.path.append(HOME)
 
 from hashmapd.load_config import LoadConfig, DefaultConfig
 from hashmapd.SMH import SMH
+from hashmapd.utils import load_data
 
-def load_data_with_labels(dataset):
-
-    print '... loading render data, expecting input and labels in pairs'
-    # unlike the training situation we expect both unsupervised 
-    # data and appropriate labels for that data, in pairs,
-    
-    f = gzip.open(dataset,'rb')
-    train_set = cPickle.load(f)
-    f.close()
-    
-    if len(train_set) == 3:
-        (data_x, sums, labels_y) = train_set
-    else:
-        data_x, labels_y = train_set
-    
-    return [data_x, labels_y]
-    
     
 def load_data_with_multi_labels(dataset):
 
@@ -110,8 +94,7 @@ if __name__ == '__main__':
 
     
     #load data (and labels) to generate codes for
-    render_file = 'data/render_data_0.pkl.gz'
-    dataset_x, dataset_labels = load_data_with_labels(render_file)
+    dataset_x, dataset_labels = load_data("data/render_data")
  
     # write labels
     labels_file = cfg.output.labels_file

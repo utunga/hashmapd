@@ -7,7 +7,10 @@ image from a set of samples or weights.
 """
 
 
-import numpy, PIL.Image
+import os, cPickle, gzip
+import numpy
+import theano
+import PIL.Image
 
 
 def tiled_array_image(A):
@@ -71,4 +74,34 @@ def tiled_array_image(A):
     return image
 
 
+def load_data_from_file(dataset_file):
+    ''' Loads the dataset
+
+    :type dataset_file: string
+    :param dataset_file: the path to the dataset
+    '''
+    
+    if dataset_file.endswith('.npy'):
+        #x = numpy.lib.format.open_memmap(dataset_file, mode='r') # or mode='c'  
+        x = numpy.lib.format.read_array(open(dataset_file, 'rb'))
+        assert x.dtype is numpy.dtype(theano.config.floatX), (x.dtype, theano.config.floatX)
+        y = None
+    else:
+        f = gzip.open(dataset_file, 'rb')
+        data = cPickle.load(f)
+        if len(data) == 3:
+            (x, x_sums, y) = data
+        else:
+            (x, y) = data
+        x = numpy.asarray(x, dtype=theano.config.floatX)
+    return (x, y)
+
+
+def load_data(file_prefix):
+    """Try any known file formats in which the array might be stored"""
+    for file_suffix in ['.npy', '_0.pkl.gz']:
+        filename = file_prefix + file_suffix
+        if os.path.exists(filename):
+            return load_data_from_file(filename)
+    raise RuntimeError('No {0} data found in {1}/'.format(part, datadir))
 

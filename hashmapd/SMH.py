@@ -1,8 +1,6 @@
 """
 """
-import os
-
-import numpy, time, cPickle, gzip, os, sys, PIL.Image
+import numpy, time, cPickle, os, sys, PIL.Image
 
 import theano
 import theano.tensor as T
@@ -13,7 +11,7 @@ from HiddenLayer import HiddenLayer
 from rbm import RBM
 from rbm_poisson_vis import RBM_Poisson
 from logistic_sgd import LogisticRegression
-from utils import tiled_array_image
+from utils import tiled_array_image, load_data
 
     
 def _batched_apply(f, data, batch_size):
@@ -584,3 +582,57 @@ class SMH(object):
         plt.show()
 
 
+def load_training_arrays(datadir, input_vector_length=None):
+    """Load the arrays from the data directory
+    
+    :param datadir: path to the directory holding the data files
+    :param input_vector_length: number of columns expected in each file
+    
+    Returns [train, valid, test]"""
+            
+    result = []
+    for part in ['training', 'validation', 'testing']:
+        file_prefix = os.path.join(datadir, part + '_data')
+        (x, y) = load_data(file_prefix)
+        if input_vector_length is None:
+            input_vector_length = x.shape[1]
+        elif x.shape[1] != input_vector_length:
+            raise ValueError('Expected {0} columns of {1} data but found {2}'.format(
+                    input_vector_length, part, x.shape[1]))
+        result.append(x)
+    return result
+
+
+def train_SMH(datadir, mid_layer_sizes, inner_code_length, first_layer_type, **kw):
+    """Create a SMH and train it with the data in 'datadir'"""
+        
+    for (alternate_name, suggest) in [
+            ('skip_trace_during_training', 'skip_trace_images'),
+            ('cost', 'cost_method'),
+            ('train_batch_size', 'batch_size'),
+            ('n_ins', 'input_vector_length'),]:
+        if alternate_name in kw:
+            value = kw.pop(alternate_name)
+            if suggest in kw:
+                print >>sys.stderr, "Config setting {0}={1} was ignored, but {2}={3}".format(
+                        alternate_name, value, suggest, kw[suggest])
+            else:
+                kw[suggest] = value
+    
+    data = load_training_arrays(datadir, kw.pop('input_vector_length'))
+    data = [(a, a.sum(axis=1)[:, numpy.newaxis]) for a in data]
+    (training_data, validation_data, test_data) = data
+    (x, x_sums) = training_data
+    
+    smh = SMH(
+            numpy_rng = numpy.random.RandomState(123),
+            mean_doc_size = x.sum(axis=1).mean(), 
+            first_layer_type = first_layer_type, 
+            n_ins = x.shape[1],
+            mid_layer_sizes = mid_layer_sizes,
+            inner_code_length = inner_code_length,
+            )
+            
+    smh.train(training_data, validation_data, training_data, **kw)
+
+    return smh
