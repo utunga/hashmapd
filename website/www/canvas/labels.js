@@ -152,10 +152,8 @@ function fit_label2(ctx, close_lines, text, x, y, width, height, angle){
     sy = 0;
     ex -= ox;
     ey -= oy;
-    var len = Math.sqrt(ex * ex + ey * ey);
-    var cos = ex / len;
-    var sin = ey / len;
-    log(cos, Math.cos(angle), sin, Math.sin(angle));
+    var cos = ex / width;
+    var sin = ey / width;
 
     var padding = height;
 
@@ -196,7 +194,7 @@ function fit_label2(ctx, close_lines, text, x, y, width, height, angle){
             xcross_high = xcross + p;
             xcross_low = xcross - p;
         }
-        if (xcross_high < 0 || xcross_low > len){
+        if (xcross_high < 0 || xcross_low > width){
             continue;
         }
         return false;
