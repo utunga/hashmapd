@@ -211,7 +211,7 @@ function hm_draw_map2(){
         $waiters.have_labels = get_label_json(hm_on_labels);
         log($waiters.have_labels);
         $.when($waiters.have_labels,
-                $waiters.map_known).done(paint_labels);
+               $waiters.map_known).done(paint_labels_cleverly);
     }
 
     $.when($waiters.map_known).done(paint_map);
@@ -722,35 +722,6 @@ function hm_on_labels(data){
         max_size: max_size
     };
 }
-
-function paint_labels(){
-    $timestamp("painting labels");
-    var points = $page.labels.points;
-    var canvas = overlay_canvas("labels", undefined, true);
-    var ctx = canvas.getContext("2d");
-    for (var i = 0; i < points.length; i++){
-        var p = points[i];
-        //log(p);
-        var d = get_pixel_coords(p[0], p[1]);
-        if (d.x < 0 || d.x >= $const.width ||
-            d.y < 0 || d.y >= $const.height){
-            continue;
-        }
-        var text = p[4];
-        var n = p[2];
-        var jitter = $const.COORD_MAX >> (p[3] + 7);
-        var size = Math.log(n) * (1.3 + $state.zoom);
-        var jx = Math.random() * jitter * 2 - jitter;
-        var ja = Math.random() * Math.PI - Math.PI / 2;
-        var jy = Math.random() * jitter * 2 - jitter;
-        add_label(ctx, text, d.x + jx, d.y + jy, size, "#fff"
-                  , "#000"
-                  , ja
-                 );
-    }
-    $timestamp("done painting labels");
-}
-
 
 function temp_view(){
     $page.transition = true;
