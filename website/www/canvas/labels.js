@@ -1,4 +1,15 @@
 
+function paint_line(ctx, sx, sy, ex, ey, colour, width){
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+}
+
+
 function paint_labels(){
     $timestamp("painting labels");
     var points = $page.labels.points;
@@ -60,12 +71,14 @@ function paint_labels_cleverly(){
     var points = $page.labels.points;
     var canvas = overlay_canvas("labels", undefined, true);
     var ctx = canvas.getContext("2d");
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.font = size + "px sans-serif";
     var lines = [];
     /* start with the biggest labels */
     points.sort(function(a, b){return b[2] - a[2]});
     for (var i = 0; i < points.length; i++){
         var p = points[i];
-        //log(p);
         var d = get_pixel_coords(p[0], p[1]);
         if (d.x < 0 || d.x >= $const.width ||
             d.y < 0 || d.y >= $const.height){
@@ -74,84 +87,63 @@ function paint_labels_cleverly(){
         var text = p[4];
         var n = p[2];
         var size = Math.log(n) * (1.3 + $state.zoom);
-        if (size < 8){
+        if (size < 9){
             continue;
         }
-        var jitter = $const.COORD_MAX >> (p[3] + 7);
-        for (var j = 0; j < 10; j++){
-            //var angle = Math.PI * j / 20;
-            var angle = Math.PI / 2;
-            var jx = Math.random() * jitter * 2 - jitter;
-            var ja = Math.random() * angle * 2 - angle;
-            var jy = Math.random() * jitter * 2 - jitter;
-            var line = fit_label(ctx, lines, text, d.x, d.y, size, "#000", ja, jitter);
-            if (line){
-                //log("adding " + line + " on iteration", j);
-                add_label(ctx, text, d.x + jx, d.y + jy, size, "#000"
-                          , undefined //, "#000"
-                          , ja
-                         );
-                lines.push(line);
-                break; /*continue main loop */
-            }
+        var max_jitter = size / 2 + $state.zoom;
+        var line = fit_label(ctx, lines, text, d.x, d.y, size, max_jitter);
+        if (line){
+            var x = line[5];
+            var y = line[6];
+            var angle = line[7];
+            add_label(ctx, text, x, y, size, "#000"
+                      , undefined //, "#000"
+                      , angle
+            );
+            lines.push(line);
         }
     }
     $timestamp("done painting labels");
 }
 
-function paint_line(ctx, sx, sy, ex, ey, colour, width){
-    ctx.strokeStyle = colour;
-    ctx.lineWidth = width;
-    ctx.beginPath();
-    ctx.arc(sx, sy, 2, 0, Math.PI * 2);
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(ex, ey);
-    ctx.stroke();
+function fit_label(ctx, lines, text, x, y, height, max_jitter){
+    var width = ctx.measureText(text).width + height; /*add an M-square*/
+
+    /* Because this is potentially happening a few times (to find a
+     * fit) first winnow the list down to those that could possibly
+     * intersect.
+     */
+    var radius = width / 2 + max_jitter + height;
+    var close_lines = filter_lines(lines, x, y, radius);
+    var angle = 0;
+    var jx = 0;
+    var jy = 0;
+    var rounds = 10;
+
+    for (var j = 0; j < rounds; j++){
+        var line = fit_label2(ctx, close_lines, text, x + jx, y + jy, width, height, angle);
+        if (line){
+            return line;
+        }
+        var jscale = (rounds + j + j) / (rounds * 3);
+        var dj = max_jitter * jscale;
+        var da = Math.PI / 2 * jscale;
+
+        jx = Math.random() * dj * 2 - dj;
+        jy = Math.random() * dj * 2 - dj;
+        angle = Math.random() * da * 2 - da;
+    }
+    return false;
 }
 
-function fit_label(ctx, lines, text, x, y, size, colour, angle, max_jitter){
-    /*XXX could get smaller rectangle */
-    ctx.textBaseline = "middle";
-    ctx.textAlign = "center";
-    ctx.font = size + "px sans-serif";
-    var w = ctx.canvas.width;
-    var h = ctx.canvas.height;
-    var i;
-    //var pix = ctx.getImageData(0, 0, w, h).data;
+function fit_label2(ctx, close_lines, text, x, y, width, height, angle){
     var dx = Math.cos(angle);
     var dy = Math.sin(angle);
-    var width =  ctx.measureText(text).width + size; /*add an M-sqaure*/
     var sx = x - dx * width / 2;
     var sy = y - dy * width / 2;
     var ex = sx + dx * width;
     var ey = sy + dy * width;
-    var line = [sx, sy, ex, ey, size * 0.75];
-
-    /*Because this is potentially happening a few times (to find a fit)
-     winnow the list down to those that could possibly intersect.
-     */
-    var close_lines = [];
-    var lx = x - width / 2 - max_jitter;
-    var hx = lx + width + max_jitter * 2;
-    var ly = y - width / 2 - max_jitter;
-    var hy = ly + width + max_jitter * 2;
-
-    for (var i = 0; i < lines.length; i++){
-        var line2 = lines[i];
-        var hx2 = Math.max(line2[0], line2[2]);
-        var hy2 = Math.max(line2[1], line2[3]);
-        var lx2 = Math.min(line2[0], line2[2]);
-        var ly2 = Math.min(line2[1], line2[3]);
-        if (lx2 > hx ||
-            hx2 < lx ||
-            ly2 > hy ||
-            hy2 < ly
-           ){
-            continue;
-        }
-        close_lines.push(line2);
-    }
-    //log("found", close_lines.length, "close lines out of", lines.length);
+    var line = [sx, sy, ex, ey, height * 0.75, x, y, angle];
 
     /* recentre origin on sx, sy */
     var ox = sx;
@@ -163,10 +155,12 @@ function fit_label(ctx, lines, text, x, y, size, colour, angle, max_jitter){
     var len = Math.sqrt(ex * ex + ey * ey);
     var cos = ex / len;
     var sin = ey / len;
+    log(cos, Math.cos(angle), sin, Math.sin(angle));
 
-    var padding = size;
+    var padding = height;
+
     /*go through all the lines and see whether they intersect */
-    for (i = 0; i < close_lines.length; i++){
+    for (var i = 0; i < close_lines.length; i++){
         var line2 = close_lines[i];
         var sx2 = line2[0] - ox;
         var sy2 = line2[1] - oy;
@@ -209,4 +203,26 @@ function fit_label(ctx, lines, text, x, y, size, colour, angle, max_jitter){
     }
     //paint_line(ctx, line[0], line[1], line[2], line[3], '#f00', 1);
     return line;
+}
+
+
+function filter_lines(lines, x, y, radius){
+    var close_lines = [];
+    var lx = x - radius;
+    var hx = x + radius;
+    var ly = y - radius;
+    var hy = y + radius;
+
+    for (var i = 0; i < lines.length; i++){
+        var line = lines[i];
+        if ((line[0] > hx && line[2] > hx) ||
+            (line[0] < lx && line[2] < lx) ||
+            (line[1] > hy && line[3] > hy) ||
+            (line[1] < ly && line[3] < ly)){
+            continue;
+        }
+        close_lines.push(line);
+    }
+    //log("found", close_lines.length, "close lines out of", lines.length);
+    return close_lines;
 }
