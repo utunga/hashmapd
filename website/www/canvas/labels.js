@@ -151,161 +151,47 @@ function fit_label(ctx, lines, text, x, y, size, colour, angle, max_jitter){
         close_lines.push(line2);
     }
     log("found", close_lines.length, "close lines out of", lines.length);
+
+    /* recentre origin on sx, sy */
+    var ox = sx;
+    var oy = sy;
+    sx = 0;
+    sy = 0;
+    ex -= ox;
+    ey -= oy;
+    var len = Math.sqrt(ex * ex + ey * ey);
+    var cos = ex / len;
+    var sin = ey / len;
+
     /*go through all the lines and see whether they intersect */
     for (i = 0; i < close_lines.length; i++){
         var line2 = close_lines[i];
-        var sx2 = line2[0];
-        var sy2 = line2[1];
-        var ex2 = line2[2];
-        var ey2 = line2[3];
-        if (intersect(sx, sy, ex, ey, sx2, sy2, ex2, ey2)){
-            return false;
+        var sx2 = line2[0] - ox;
+        var sy2 = line2[1] - oy;
+        var ex2 = line2[2] - ox;
+        var ey2 = line2[3] - oy;
+
+        /*rotate the system so ex,ey is on the x axis */
+        var tmp = sx2 * cos + sy2 * sin;
+        sy2 = sy2 * cos - sx2 * sin;
+        sx2 = tmp;
+        tmp = ex2 * cos + ey2 * sin;
+        ey2 = ey2 * cos - ex2 * sin;
+        ex2 = tmp;
+
+        if ((sy2 < 0 && ey2 < 0) ||
+            (sy2 >= 0 && ey2 >= 0)){
+            /* a non-intersect because line2 doesn't cross the x axis*/
+            continue;
         }
+        /*so it crosses x axis, but where? */
+        var xcross = ex2 + (sx2 - ex2) * ey2 / (ey2 - sy2);
+        if (xcross < 0 || xcross > len){
+            continue;
+        }
+        return false;
     }
-    paint_line(ctx, sx, sy, ex, ey, '#f00', 1);
+    paint_line(ctx, line[0], line[1], line[2], line[3], '#f00', 1);
     return line;
 }
 
-
-function intersect(sx1, sy1, ex1, ey1, sx2, sy2, ex2, ey2){
-    var  cos, sin, newX, ABpos;
-    //  (1) Translate the system so that point A is on the origin.
-    /*re-zero on sx1, sy1 */
-    ex1 -= sx1;
-    ey1 -= sy1;
-    ex2 -= sx1;
-    ey2 -= sy1;
-    sx2 -= sx1;
-    sy2 -= sy1;
-    sx1 = 0;
-    sy1 = 0;
-
-    //  Discover the length of segment A-B.
-    var len = Math.sqrt(ex1 * ex1 + ey1 * ey1);
-
-    //  (2) Rotate the system so that point B is on the positive X axis.
-    cos = ex1 / len;
-    sin = ey1 / len;
-    var tmp = sx2 * cos + sy2 * sin;
-    sy2 = sy2 * cos - sx2 * sin;
-    sx2 = tmp;
-    tmp = ex2 * cos + ey2 * sin;
-    ey2 = ey2 * cos - ex2 * sin;
-    ex2 = tmp;
-
-    //  Fail if segment C-D doesn't cross line A-B.
-    if ((sy2 < 0 && ey2 < 0) ||
-        (sy2 >= 0 && ey2 >= 0)){
-        return false;
-    }
-
-    //  (3) Discover the position of the intersection point along line A-B.
-    ABpos = ex2 + (sx2 - ex2) * ey2 / (ey2 - sy2);
-
-    //  Fail if segment C-D crosses line A-B outside of segment A-B.
-    if (ABpos < 0. || ABpos > len){
-        return false;
-    }
-    return true;
-}
-
-
-function intersect2(sx1, sy1, ex1, ey1, sx2, sy2, ex2, ey2) {
-    /*re-zero on sx1, sy1 */
-    ex1 -= sx1;
-    ey1 -= sy1;
-    ex2 -= sx1;
-    ey2 -= sy1;
-    sx2 -= sx1;
-    sy2 -= sy1;
-    sx1 = 0;
-    sy1 = 0;
-    var dx2 = ex2 - sx2;
-    var dy2 = ey2 - sy2;
-
-    var slope = ex1 * dx2 - ey1 * dy2;
-    if (Math.abs(slope) < 0.0001){
-        /*slopes are identical
-         *XXX should check for overlap */
-        return false;
-    }
-    var x = (ex2 * ey1 - ey2 * ex2) / slope;
-    var y = (sx2 * ey1 - sy2 * ex2) / slope;
-    log(x, y);
-    if(x < 0 || y < 0 || x > 1 || y > 1){
-        return false;
-    }
-    return true;
-}
-
-
-function intersect3(){
-    /* so here they are in the little quadrant defined by this label.
-     They intersect if line2 crosses the diagonal defined by the line.
-     That is, its sx, sy is on the other side from its ex, ey.
-
-     If the rectangle is scaled to square, and ey > sy, and the
-     points are normalised to put sx,sy at 0,0, then the known
-     line is on x == y.  The other line must intersect if
-     sx / sy > 1 and ex /ey < 1 or vice versa
-     and not if they are both on the same side of 1.
-     To get rid of zero division:
-     sx2r /sy2r > 1 ==> sx2r / sy2r > exr / eyr
-     ==> sx2r * eyr > exr * sy2r
-
-     and of course there is no need to scale to a square any more.
-
-     but if ey < sy, it is different. Now what matters is whether
-     they're on the same side of y = 1 - x.
-
-
-
-
-     if ey == sy, intersection is if sy2r and ey2r are on opposite sides.
-
-
-     */
-        /* normalise everybody into zero based square. our line is now 0,0 <--> exr, exr*/
-    var sx2r = line2[0] - sx;
-    var sy2r = line2[1] - sy;
-    var ex2r = (line2[2] - sx);
-    var ey2r = (line2[3] - sy);
-
-    /*
-     var shigh = (sx2r * eyr > exr * sy2r);
-     var ehigh = (ex2r * eyr > exr * ey2r);
-     if (shigh != ehigh)
-     {
-     // a crossing!
-     log(line2, "intesects with", line);
-     paint_line(ctx, sx, sy, ex, ey, '#f00', 1);
-     return false;
-     }
-     paint_line(ctx, sx, sy, ex, ey, '#afa', 3);
-     continue;
-     */
-
-
-
-    if(1){
-    /*rotate so that ex2, ey2 is on the x axis. */
-        var sx2rr = sx2r * cos + sy2r * sin;
-        var sy2rr = sy2r * cos + sx2r * sin;
-        var ex2rr = ex2r * cos + ey2r * sin;
-        var ey2rr = ey2r * cos + ex2r * sin;
-
-        if ((sy2rr < 0 && ey2rr < 0) || (sx2rr < 0 && ex2rr < 0)){
-            /*no intersection !*/
-            paint_line(ctx, sx, sy, ex, ey, '#afa', 3);
-            continue;
-        }
-        /*distance along line of intersection*/
-        var d = ex2r + (sx2r - ex2r) * ex2r / (ey2r - sy2r);
-        if (d < 0 || d > len){
-            /*no intersection */
-            //paint_line(ctx, sx, sy, ex, ey, '#aaf', 3);
-            continue;
-        }
-        return false;
-        }
-}
