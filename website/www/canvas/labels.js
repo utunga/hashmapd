@@ -86,8 +86,8 @@ function paint_labels_cleverly(){
         }
         var text = p[4];
         var n = p[2];
-        var size = Math.log(n) * (1.3 + $state.zoom);
-        if (size < 9){
+        var size = Math.log(n) * (1.4 + $state.zoom);
+        if (size < 8){
             continue;
         }
         var max_jitter = size / 2 + $state.zoom;
@@ -97,7 +97,7 @@ function paint_labels_cleverly(){
             var y = line[6];
             var angle = line[7];
             add_label(ctx, text, x, y, size, "#000"
-                      , undefined //, "#000"
+                      , undefined //"#fff"
                       , angle
             );
             lines.push(line);
@@ -155,8 +155,6 @@ function fit_label2(ctx, close_lines, text, x, y, width, height, angle){
     var cos = ex / width;
     var sin = ey / width;
 
-    var padding = height;
-
     /*go through all the lines and see whether they intersect */
     for (var i = 0; i < close_lines.length; i++){
         var line2 = close_lines[i];
@@ -164,7 +162,7 @@ function fit_label2(ctx, close_lines, text, x, y, width, height, angle){
         var sy2 = line2[1] - oy;
         var ex2 = line2[2] - ox;
         var ey2 = line2[3] - oy;
-        padding = line2[4];
+        var padding = line2[4];
         /*rotate the system so ex,ey is on the x axis */
         var tmp = sx2 * cos + sy2 * sin;
         sy2 = sy2 * cos - sx2 * sin;
