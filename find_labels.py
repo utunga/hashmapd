@@ -2,21 +2,29 @@
 
 import sys, os
 import heapq
+import gzip
 #import json
 import cPickle
+from operator import itemgetter
 
 USER_JSON = 'user-count.json'
 PICKLE = 'labels.pickle'
+USE_CACHE=True
 
 def log(*args):
     for x in args:
         print >> sys.stderr, x,
     print >> sys.stderr
 
+def open_maybe_gzip(filename):
+    if filename.endswith('.gz'):
+        return gzip.open(filename)
+    else:
+        return open(filename)
 
 def get_row_emitter(filename, has_token=True):
     # let's NOT parse it properly, which would be slow and memory hungry.
-    # (honestly, it is a 160MB file, and this already uses > 1 GB).
+    # (honestly, the 6 coordinate file is a 160MB file, and this already uses > 1 GB).
     # Rows look like:
     #
     # {"key":["\u0640\ufbb1",1,3,0,2,3,3],"value":3},
@@ -25,7 +33,7 @@ def get_row_emitter(filename, has_token=True):
     # and for user count:
     # {"key":[0,1,0,3,1,1],"value":1},
 
-    f = open(filename)
+    f = open_maybe_gzip(filename)
     if has_token:
         prefix = '{"key":["'
     else:
@@ -44,6 +52,7 @@ def get_row_emitter(filename, has_token=True):
             token, coords = key.rsplit('",', 1)
         else:
             token, coords = None, key
+        token = repr(token).replace(r'\\u', r'\u').decode('unicode_escape').encode('utf-8')
         #log(line)
         value = int(value.rsplit('}', 1)[0])
         #log (token, coords, value)
@@ -86,98 +95,81 @@ def group_by_token(rows):
         tokens.setdefault(token, []).append((value, coords))
     return tokens
 
-def calc_locations(rows):
-    #need to sort by tokens first to get totals for each token
-    tokens = group_by_token(rows)
-
+def calc_locations(tokens):
     log("calculating locations")
-
     locations = {}
     for token, v in tokens.iteritems():
         total = float(sum(value for value, coords in v))
         for value, coords in v:
             locations.setdefault(coords, []).append((value, total, token))
-
     return locations
 
-def make_empty_cells(users=None):
-    cells = [[{'data':[],
-               'tokens': set(),
-               'classes': [],
-               'users': ''
-               } for x in range(64)] for y in range(64)]
-    index = {}
-    for y in range(64):
-        ykey = [(y >> 4) & 2, (y >> 3) & 2,
-                (y >> 2) & 2, (y >> 1) & 2,
-                (y     ) & 2, (y << 1) & 2,
-                ]
-        for x in range(64):
-            key = ','.join(str(((x >> (5 - i)) & 1) + n) for
-                           i, n in enumerate(ykey))
-            index[key] = cells[y][x]
-    if users:
-        for token, coords, value in users:
-            index[coords]['users'] = value
-    return cells, index
+def quad_to_xy(coords):
+    x = 0
+    y = 0
+    for n in coords.split(','):
+        n = int(n)
+        x = (x << 1) + (n & 1)
+        y = (y << 1) + (n >> 1)
+    return (x, y)
 
-def make_cells(locations, orderby, users=None, limit=100):
+def make_location_cells(locations, orderby, users=None, limit=10):
     log("making cells, sets")
-    cells, index = make_empty_cells(users)
-    used_cells = []
+    coord = locations.iterkeys().next()
+    cells = {}
+    index = {}
     from math import log as mlog
     for k, v in locations.iteritems():
-        #x = 0
-        #y = 0
-        #for n in k.split(','):
-        #    n = int(n)
-        #    x = (x << 1) + (n & 1)
-        #    y = (y << 1) + (n >> 1)
-        #cell = cells[y][x]
-        cell = index[k]
-        used_cells.append(cell)
+        if not k in index:
+            cell = {'data':[],
+                    'tokens': set(),
+                    'classes': [],
+                    'users': '',
+                    'location': k,
+                    }
+            index[k] = cell
+            cells[quad_to_xy(k)] = cell
+        else:
+            cell = index[k]
         v.sort()
         v.reverse()
         for value, overall, token in v[:limit]:
             if orderby == 'adjusted':
-                adj = int(100.0 * value / overall * (3 + mlog(overall)))
+                adj = int(1000.0 * value / overall * (5 + mlog(overall)))
             elif orderby == 'total':
                 adj = value
             else: #elif orderby == 'relative':
                 adj = int(1000.0 * value / overall)
-            token = repr(token).replace(r'\\u', r'\u').decode('unicode_escape').encode('utf-8')
-            cell['location'] = k
             cell['data'].append((adj, token))
             cell['tokens'].add(token)
 
-    for cell in used_cells:
+    for cell in index.values():
         cell['data'].sort()
         cell['data'].reverse()
 
-    return cells
+    return cells, index
 
 def find_common_tokens(cells):
     log("associating sets")
-    for y in range(1, len(cells)):
-        for x in range(1, len(cells[0])):
-            cell = cells[y][x]
-            up = cells[y - 1][x]
-            left = cells[y][x - 1]
-            if cell['tokens'] & left['tokens']:
-                cell['classes'].append('left')
-                left['classes'].append('right')
-            if cell['tokens'] & up['tokens']:
-                cell['classes'].append('up')
-                up['classes'].append('down')
+    for k, cell in cells.iteritems():
+        x, y = k
+        up = cells.get((x, y - 1))
+        left = cells.get((x - 1,y))
+        if left and cell['tokens'] & left['tokens']:
+            cell['classes'].append('left')
+            left['classes'].append('right')
+        if up and cell['tokens'] & up['tokens']:
+            cell['classes'].append('up')
+            up['classes'].append('down')
     return cells
 
 def save_as_html(cells, out_file, orderby):
     f = open(out_file, 'w')
-
     log("writing html")
     f.write('<html><meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
             '<style>'
             'td.sea {background: #cef; min-width: 0}'
+            'td.error {background: #f00; min-width: 0}'
             'td.shallows {background: #eff; min-width: 0}'
             'td {font: 10px sans-serif; border: 1px solid #ccc; padding: 2px; min-width: 75px; vertical-align: top}'
             'a {font-weight: bold; text-decoration: none;}'
