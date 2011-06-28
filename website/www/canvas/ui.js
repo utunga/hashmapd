@@ -134,14 +134,31 @@ function set_state(data){
     for (k in $state){
         copy[k] = $state[k];
     }
+    if (data.zoom !== undefined){
+        data.zoom = Math.min($const.MAX_ZOOM, Math.max(0, data.zoom));
+    }
+
     interpret_query($state, data);
     var h = window.history;
     var loc = window.location;
     var url = loc.href.split("?", 1)[0] + "?" +  $.param($state);
 
     if (url != loc.href){
-        h.replaceState($state, "Hashmapd", url);
+        /* a change in search term merits an addition in the page history,
+         * but merely zooming or panning does not.
+         *
+         * XXX this actually interacts a little strangely with the first
+         * loaded url, which does not get stored in history; and it ends up
+         * storing the last view of each search term, not the first.
+         */
+        if (copy['token'] != $state['token']){
+            h.pushState($state, "Hashmapd", url);
+        }
+        else{
+            h.replaceState($state, "Hashmapd", url);
+        }
     }
+
     /*make sure something changed */
     for (k in $state){
         if (copy[k] != $state[k]){
@@ -178,7 +195,7 @@ function set_ui(state){
 function construct_ui(){
     var slider = $("#zoom-slider");
     $(slider).slider({ orientation: 'vertical',
-                       max: 6,
+                       max: $const.MAX_ZOOM,
                        min: 0,
                        slide: function( event, ui ) {
                            set_state({'zoom': ui.value});
@@ -232,6 +249,10 @@ function sanitise_token_input(input){
     else if (tokens.length == 2){
         if (tokens[0] in $const.DENSITY_UNO_OPS){
             /* a unary operator on tokens[1] */
+            result = [tokens[0], normalise_token(tokens[1])];
+        }
+        else if (tokens[0].match(/^>\d+$/)){
+            /* a limit on tokens[1] */
             result = [tokens[0], normalise_token(tokens[1])];
         }
         else { /*two text tokens; give them an arbitrary operator */
@@ -402,4 +423,13 @@ function pan_pixel_delta(dx, dy, dz){
     x = Math.max($page.min_x + pad_x, Math.min($page.max_x - pad_x, x));
     y = Math.max($page.min_y + pad_y, Math.min($page.max_y - pad_y, y));
     set_state({x: parseInt(x), y: parseInt(y), zoom: zoom});
+}
+
+function add_known_token_to_ui(token){
+    var link = $("<div>" + token + "</div>");
+    link.click(function(){
+                   set_state({token: token});
+               });
+    var div = $("#stored-searches");
+    div.append(link);
 }

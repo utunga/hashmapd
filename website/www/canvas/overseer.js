@@ -12,6 +12,14 @@
 var $const = {
     DEBUG: (window.location.pathname.substr(-10) == 'debug.html'),
     BASE_DB_URL: 'http://couch.hashmapd.com/fd/',
+    PRELOADED_SEARCH_TOKENS: ['Android', 'Samsung', 'Kindle', 'Xbox',
+                              'Followers', 'Dat', "Chillin'"],
+    LABEL_URL: 'labels.json',
+    //LABEL_URL: 'all-tokens-10-magic.json',
+    //LABEL_URL: 'pre-filtered-1.json',
+    LABEL_SCALE: 2.2, /* adjust to make labels the right size */
+    LABEL_COLOUR: '#000',
+    LABEL_SHADOW: '#fff', /* undefined for no shadow */
     //BASE_DB_URL: 'http://127.0.0.1:5984/frontend_dev/_design/user/_view/',
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
@@ -23,12 +31,13 @@ var $const = {
     /* *_SCALE_ARGS, out of ['linear'], ['clipped_gaussian', low, high], ['base', base] */
     ARRAY_FUZZ_SCALE_ARGS: ['clipped_gaussian', -3.5, -0.4],
     ARRAY_FUZZ_DENSITY_SCALE_ARGS: ['linear'],
-    ARRAY_FUZZ_DENSITY_CONSTANT: -0.007, /*concentration for array fuzz */
-    ARRAY_FUZZ_DENSITY_THRESHOLD: 0.005, /*density fuzz gets this faint */
+    ARRAY_FUZZ_DENSITY_CONSTANT: -0.011, /*concentration for array fuzz */
+    ARRAY_FUZZ_DENSITY_THRESHOLD: 0.001, /*density fuzz gets this faint */
     ARRAY_FUZZ_TYPED_ARRAY: true, /*whether to use Float32Array or traditional array */
     REDRAW_HEIGHT_MAP: true, /*whether to redraw the height map on zoom */
     MAP_RESOLUTION: 9,       /*initial requested resolution for overall map*/
-    DENSITY_RESOLUTION: 7,   /*initial requested resolution for density maps*/
+    DENSITY_RESOLUTION: 8,   /*initial requested resolution for density maps*/
+    MAX_ZOOM: 5,   /*How close can you go (this many doublings)*/
     DENSITY_MAP_STYLE: 'grey_outside',
     //DENSITY_MAP_STYLE: 'colour_cycle',
 
@@ -58,14 +67,17 @@ var $const = {
         tokens:{}
     },
     DENSITY_OPS: {
-            '+': density_add,
-            '*': density_mul,
-            '-': density_sub,
-            '^': density_diff
+            '+': density_duo_add,
+            '*': density_duo_mul,
+            '-': density_duo_sub,
+            '^': density_duo_diff
     },
     DENSITY_UNO_OPS: {
-            '~': density_log,
-            '`': density_sqrt
+            '~': density_uno_log,
+            '^': density_uno_exp,
+            '\\': density_uno_gate,
+            '`': density_uno_sqrt,
+            '"': density_uno_cube
         }
 };
 
@@ -177,11 +189,18 @@ function hm_setup(){
         function(){
             $page.ticker = window.setInterval(hm_tick, 1000/ $const.FPS);
         });
-    /*
-    if ($state.token){
-        $waiters.have_density = parse_density_query($state.token);
+
+    for (var i = 0; i < $const.PRELOADED_SEARCH_TOKENS.length; i++){
+        preload_token($const.PRELOADED_SEARCH_TOKENS[i]);
     }
-     */
+}
+
+function preload_token(token){
+    $.when($waiters.map_known).then(
+        function(){
+            maybe_get_token_json(token);
+        }
+    );
 }
 
 /** hm_draw_map draws the approriate map
@@ -207,7 +226,7 @@ function hm_draw_map2(){
         $waiters.have_labels = get_label_json(hm_on_labels);
         log($waiters.have_labels);
         $.when($waiters.have_labels,
-                $waiters.map_known).done(paint_labels);
+               $waiters.map_known).done(paint_labels_cleverly);
     }
 
     $.when($waiters.map_known).done(paint_map);
@@ -280,7 +299,7 @@ function get_token_json(token, precision, callbacks){
 
 function get_label_json(callback){
     log("getting labels");
-    var d = $.getJSON("pre-filtered-1.json", callback);
+    var d = $.getJSON($const.LABEL_URL, callback);
     //var d = $.getJSON("labels.json", callback);
     return d;
 };
@@ -310,7 +329,7 @@ function parse_density_query(query){
         var d1 = maybe_get_token_json(tokens[0]);
         var d2 = maybe_get_token_json(tokens[2]);
         deferred = $.when(d1, d2);
-        args = [tokens[0], tokens[2], op];
+        args = [[tokens[0], tokens[2]], op];
     }
     else if (tokens.length == 2 && tokens[0] in $const.DENSITY_UNO_OPS){
         func = paint_density_uno;
@@ -318,13 +337,23 @@ function parse_density_query(query){
         deferred = maybe_get_token_json(tokens[1]);
         args = [tokens[1], op];
     }
+    else if (tokens.length == 2 && tokens[0].match(/^>\d+$/)){
+        func = paint_density_top_n;
+        var n = parseInt(tokens[0].slice(1));
+        deferred = maybe_get_token_json(tokens[1]);
+        args = [tokens[1], n];
+    }
     else {
         /* the simple case of one token (possibly with ignored garbage) */
+        func = paint_density_uno;
         deferred = maybe_get_token_json(tokens[0]);
-        func = paint_token_density;
-        args = tokens;
+        args = [tokens];
     }
-    $.when(args, $waiters.map_drawn, $waiters.full_map_drawn, deferred).done(func);
+    $.when($waiters.map_drawn,
+           $waiters.full_map_drawn,
+           deferred).done(function(){
+                              func.apply(undefined, args);
+                          });
     return deferred;
 }
 
@@ -575,6 +604,17 @@ function get_zoom_pixel_bounds(zoom, centre_x, centre_y, width, height){
     };
 }
 
+/** get_zoom_point_bounds find point extrema for a given zoom state
+ *
+ * @param zoom  a zoom level
+ * @param centre_x point coordinate
+ * @param centre_y point coordinate
+ * @param width    pixel width
+ * @param height   pixel height
+ *
+ * @return an object with various extrema and scale attributes
+ */
+
 function get_zoom_point_bounds(zoom, centre_x, centre_y, width, height){
     if (width === undefined)
         width = $const.width;
@@ -672,6 +712,7 @@ function hm_on_token_density(data, req){
             count: count,
             points: points
         };
+        add_known_token_to_ui(token);
     }
 }
 
@@ -697,32 +738,6 @@ function hm_on_labels(data){
         max_size: max_size
     };
 }
-
-function paint_labels(){
-    log("painting labels");
-    var points = $page.labels.points;
-    var canvas = overlay_canvas("labels", undefined, true);
-    var ctx = canvas.getContext("2d");
-    for (var i = 0; i < points.length; i++){
-        var p = points[i];
-        log(p);
-        var d = get_pixel_coords(p[0], p[1]);
-        if (d.x < 0 || d.x >= $const.width ||
-            d.y < 0 || d.y >= $const.height){
-            continue;
-        }
-        var text = p[4];
-        var n = p[2];
-        var jitter = $const.COORD_MAX >> (p[3] + 7);
-        var size = Math.log(n) * (1.3 + $state.zoom);
-        var jx = Math.random() * jitter * 2 - jitter;
-        var jy = Math.random() * jitter * 2 - jitter;
-        add_label(ctx, text, d.x + jx, d.y + jy, size, "#000"
-                  , "#fff"
-                 );
-    }
-}
-
 
 function temp_view(){
     $page.transition = true;

@@ -2,14 +2,8 @@
  * written by Douglas Bagnall
  */
 
-/*
-            '+': density_add,
-            '*': density_mul,
-            '-': density_sub,
-            '^': density_diff
-*/
-
-
+/** is_token_bad returns a true value if a token map is doomed to fail
+ */
 function is_token_bad(token){
     if (token === undefined){
         return 'undefined token';
@@ -24,6 +18,7 @@ function is_token_bad(token){
     return false;
 }
 
+/** get_density_k adjusts the density map constant by the zoom state */
 function get_density_k(){
     if ($const.DENSITY_MAP_ZOOM_DETAIL){
         return $const.ARRAY_FUZZ_DENSITY_CONSTANT * (1 << $state.zoom);
@@ -32,6 +27,47 @@ function get_density_k(){
         return $const.ARRAY_FUZZ_DENSITY_CONSTANT;
     }
 }
+
+/**zoomed_fuzz_array creates a 2d density map array
+ *
+ * @param x  coordinate of centre (points)
+ * @param y  coordinate of centre
+ * @param w  width of map (pixels)
+ * @param h  height of map
+ * @param points the points to map
+ * @param zoom
+ * @param k Gaussian fuzz constant
+ * @param threshold value at outer edge of fuzz
+ *
+ * @return an unnormalised 2d floating point array representing the map
+ */
+
+function zoomed_fuzz_array(x, y, w, h, points, zoom, k, threshold){
+    var scale = 1 << zoom;
+    k /= (scale * scale);
+    var r = calc_fuzz_radius(k, threshold);
+    var z = get_zoom_point_bounds(zoom, x, y, w, h);
+    var x_padding = r / z.x_scale;
+    var y_padding = r / z.y_scale;
+    points = bound_points(points, z.min_x - x_padding,
+                          z.max_x + x_padding,
+                          z.min_y - y_padding,
+                          z.max_y + y_padding);
+    var map = make_fuzz_array(points, k, threshold, w, h,
+                              z.min_x, z.min_y,
+                              z.x_scale, z.y_scale);
+    return map;
+}
+
+/** extract_density_maps creates the density overlays in array form
+ *
+ * @param tokens list tokens to draw the overlays for
+ * @param w width of density picture
+ * @param h height of density picture
+ * @param state a $state-alike object, saying where to zoom.
+ *
+ * @return a list of 2d array maps, or undefined on error.
+ */
 
 function extract_density_maps(tokens, w, h, state){
     log(tokens);
@@ -61,47 +97,94 @@ function extract_density_maps(tokens, w, h, state){
     if (! fatal_error){
         return maps;
     }
+    return undefined;
 }
 
-function paint_token_density(tokens){
-    log("density_diff", tokens);
+/** paint_density_duo performs an operation on two token maps and shows the result
+ *
+ * @param tokens list of tokens to use
+ * @param op the operation function
+ */
+function paint_density_duo(tokens, op){
     var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
     var maps = extract_density_maps(tokens, canvas.width, canvas.height, $state);
-    if (maps !== undefined){
-        paste_density(ctx, maps[0]);
+    try {
+        var m0 = maps[0];
+        var m1 = maps[1];
+        op(m0, m1, canvas.width, canvas.height);
+        paste_density(ctx, m0);
+    }
+    catch (e){
+        log(e);
     }
 }
 
-function paint_density_duo(args){
-    log(args);
-    var op = args.pop();
+/** paint_density_top_n paints a density map based on the top few points
+ *
+ * @param token a token to map
+ * @param n the number of points to use
+ */
+
+function paint_density_top_n(token, n){
     var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
-    var maps = extract_density_maps(args, canvas.width, canvas.height, $state);
-    var m0 = maps[0];
-    var m1 = maps[1];
-    op(m0, m1, canvas.width, canvas.height);
-    paste_density(ctx, m0);
+    var threshold = $const.ARRAY_FUZZ_DENSITY_THRESHOLD;
+    var k = get_density_k();
+    var data = $page.token_data[token];
+    var points = find_top_n_points(data.points, n);
+    var html = ("using top " + n + " out of " + data.count +
+                "mentions <br /> of <b>" + token + "</b>.<br/>");
+    var map = zoomed_fuzz_array($state.x, $state.y, canvas.width, canvas.height,
+                                points, $state.zoom, k, threshold);
+    $("#token-notes").html(html);
+    paste_density(ctx, map);
 }
 
-function paint_density_uno(args){
-    log(args);
-    var op = args.pop();
+/** paint_density_uno performs an operation on a token map and shows the result
+ *
+ * the operation can be undefined, in which case the map is shown in original form
+ *
+ * @param token a token to map
+ * @param op the operation function
+ */
+function paint_density_uno(token, op){
     var canvas = named_canvas("density_map", true, 0.25);
     var ctx = canvas.getContext("2d");
-    var maps = extract_density_maps(args, canvas.width, canvas.height, $state);
-    op(maps[0], canvas.width, canvas.height);
-    paste_density(ctx, maps[0]);
+    var maps = extract_density_maps([token], canvas.width, canvas.height, $state);
+    if (maps === undefined){
+        return;
+    }
+    var map = maps[0];
+    if (op !== undefined){
+        try {
+            op(map, canvas.width, canvas.height);
+        }
+        catch (e){
+            log(e);
+            return;
+        }
+    }
+    paste_density(ctx, map);
 }
 
+
+
+
+/** paste_density turns a density array map into a canvas overlay
+ */
 function paste_density(ctx, map){
     paste_fuzz_array(ctx, map, $const.ARRAY_FUZZ_DENSITY_SCALE_ARGS);
-    var canvas2 = apply_density_map(ctx);
-    overlay(canvas2);
+    var canvas = apply_density_map(ctx);
+    overlay(canvas);
 }
 
-function density_log(m0, width, height){
+/* density_uno_* operate on one map
+ * density_duo_* operate on two
+ */
+
+/**density_uno_log transmutes the map into its log */
+function density_uno_log(m0, width, height){
     for (var y = 0; y < height; y++){
         var r0 = m0[y];
         for (var x = 0; x < width; x++){
@@ -110,7 +193,66 @@ function density_log(m0, width, height){
     }
 }
 
-function density_sqrt(m0, width, height){
+/**density_uno_exp uses the map values as exponent
+ * The radix is low so that 32 bit floats don't saturate.
+ */
+function density_uno_exp(m0, width, height){
+    for (var y = 0; y < height; y++){
+        var r0 = m0[y];
+        for (var x = 0; x < width; x++){
+            r0[x] = Math.pow(1.01, r0[x]);
+        }
+    }
+}
+
+/**density_uno_gate clips everything below a threshold it finds.
+ */
+function density_uno_gate(m0, width, height){
+    /* first find a reasonable threshold */
+    var sum = 0.0;
+    var sqsum = 0.0;
+    var count = 0;
+    var x, y;
+    for (y = 0; y < height; y++){
+        var r0 = m0[y];
+        for (x = 0; x < width; x++){
+            var v = r0[x];
+            if (v){
+                sum += v;
+                sqsum += v * v;
+                count ++;
+            }
+        }
+    }
+    //var mean = sum / (width * height);
+    var mean = sum / count;
+    var variance = (sqsum - sum * mean) / count;
+
+    /*hmm, now what?
+     * cut out all below some point, but which.
+     * the mean is a good start.*/
+    var floor = mean;
+    for (y = 0; y < height; y++){
+        var r0 = m0[y];
+        for (x = 0; x < width; x++){
+            var v = Math.max(0, r0[x] - floor);
+            r0[x] = v;
+        }
+    }
+}
+
+/** density_uno_cube cubes the map values */
+function density_uno_cube(m0, width, height){
+    for (var y = 0; y < height; y++){
+        var r0 = m0[y];
+        for (var x = 0; x < width; x++){
+            r0[x] = Math.pow(r0[x], 3);
+        }
+    }
+}
+
+/**density_uno_sqrt replaces map values with their positive square root*/
+function density_uno_sqrt(m0, width, height){
     for (var y = 0; y < height; y++){
         var r0 = m0[y];
         for (var x = 0; x < width; x++){
@@ -119,7 +261,9 @@ function density_sqrt(m0, width, height){
     }
 }
 
-function density_mul(m0, m1, width, height){
+
+/**density_duo_mul multiplies two maps together */
+function density_duo_mul(m0, m1, width, height){
     for (var y = 0; y < height; y++){
         var r0 = m0[y];
         var r1 = m1[y];
@@ -129,7 +273,8 @@ function density_mul(m0, m1, width, height){
     }
 }
 
-function density_add(m0, m1, width, height){
+/**density_duo_add adds two maps together (unnormalised)*/
+function density_duo_add(m0, m1, width, height){
     for (var y = 0; y < height; y++){
         var r0 = m0[y];
         var r1 = m1[y];
@@ -139,7 +284,8 @@ function density_add(m0, m1, width, height){
     }
 }
 
-function density_sub(m0, m1, width, height){
+/**density_duo_sub subtract the second map from the first */
+function density_duo_sub(m0, m1, width, height){
     for (var y = 0; y < height; y++){
         var r0 = m0[y];
         var r1 = m1[y];
@@ -149,7 +295,8 @@ function density_sub(m0, m1, width, height){
     }
 }
 
-function density_diff(m0, m1, width, height){
+/**density_duo_diff calculates the absolute difference between maps */
+function density_duo_diff(m0, m1, width, height){
     for (var y = 0; y < height; y++){
         var r0 = m0[y];
         var r1 = m1[y];
@@ -160,30 +307,55 @@ function density_diff(m0, m1, width, height){
 }
 
 
-function zoomed_fuzz_array(x, y, w, h, points, zoom, k, threshold){
-    var scale = 1 << zoom;
-    k /= (scale * scale);
-    var r = calc_fuzz_radius(k, threshold);
-    var z = get_zoom_point_bounds(zoom, x, y, w, h);
-    var x_padding = r / z.x_scale;
-    var y_padding = r / z.y_scale;
-    points = bound_points(points, z.min_x - x_padding,
-                          z.max_x + x_padding,
-                          z.min_y - y_padding,
-                          z.max_y + y_padding);
-    var map = make_fuzz_array(points, k, threshold, w, h,
-                              z.min_x, z.min_y,
-                              z.x_scale, z.y_scale);
-    return map;
-}
-
 function zoomed_paint(ctx, points, zoom, k, threshold, scale_args, max_height){
     $timestamp("start zoomed paint");
     var w = ctx.canvas.width;
     var h = ctx.canvas.height;
     var map = zoomed_fuzz_array($state.x, $state.y, w, h, points, zoom, k, threshold);
-    $timestamp("made zoomed map");
     max_height = paste_fuzz_array(ctx, map, scale_args, max_height);
-    $timestamp("pasted zoomed map");
+    $timestamp("end zoomed paint");
     return max_height;
+}
+
+/** find_median_point_value
+ *
+ * There are quicker algorithms than sorting for finding the median,
+ * but in practical terms they may not be faster in javascript.
+ *
+ * @param points is a list of points
+ * @return the median value
+ */
+function find_median_point_value(points){
+    var len = points.length;
+    if (len == 0){
+        return undefined;
+    }
+    var points2 = points.slice();
+    points2.sort(function(a, b){return a[2] - b[2]});
+    if ((len & 1) == 0){
+        /* even numbers, average of 2 centre points */
+        var mid1 = len / 2;
+        var mid2 = mid1 - 1;
+        return (points2[mid1][2] + points2[mid2][2]) / 2;
+    }
+    var middle = parseInt(len / 2);
+    return points2[middle][2];
+}
+
+/** find_top_n_points
+ *
+ * @param points is a list of points
+ * @param n is the number of top points you want
+ * @return a list of the n highest valued points
+ */
+function find_top_n_points(points, n){
+    var len = points.length;
+    if (len == 0){
+        return undefined;
+    }
+    var points2 = points.slice();
+    points2.sort(function(a, b){
+                     return a[2] - b[2];
+                 });
+    return points2.slice(-n);
 }
