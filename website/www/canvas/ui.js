@@ -426,7 +426,17 @@ function pan_pixel_delta(dx, dy, dz){
 }
 
 function add_known_token_to_ui(token){
-    var link = $("<div>" + token + "</div>");
+    var link;
+    var data = $page.token_data[token];
+    if (data.count){
+        link = $('<div class="token_data">' + token + ' <span class="token_count">' +
+                 data.count + "</span></div>");
+    }
+    else {
+        link = $('<div class="no_token_data">' + token +
+                 ' <span class="token_count">not mentioned</span></div>');
+    }
+
     link.click(function(){
                    set_state({token: token});
                });
