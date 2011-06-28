@@ -12,7 +12,7 @@
 var $const = {
     DEBUG: (window.location.pathname.substr(-10) == 'debug.html'),
     BASE_DB_URL: 'http://couch.hashmapd.com/fd/',
-    PRELOADED_SEARCH_TOKENS: ['%23worldcup', 'Android', 'Samsung', 'Kindle', 'Xbox',
+    PRELOADED_SEARCH_TOKENS: ['#worldcup', 'Android', 'Samsung', 'Kindle', 'Xbox',
                               'Followers', 'Dat', "Chillin'"],
     LABEL_URL: 'labels.json',
     //LABEL_URL: 'all-tokens-10-magic.json',
