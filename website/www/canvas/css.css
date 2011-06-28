@@ -7,7 +7,8 @@ canvas.overlay        {z-index:   2}
 #helpers              {z-index:   7}
 #loading              {z-index:   9}
 #debug                {z-index:  99}
-#ui-grabber           {z-index: 999}
+#ui-grabber           {z-index: 900}
+#zoom-controls        {z-index: 999}
 
 
 body{
@@ -31,6 +32,12 @@ h1:before {
 #ui p {
   margin: 0 0 0 40px;
 }
+
+h2 {
+  margin: 10px 0 0 30px;
+  font-size: 20px;
+}
+
 
 canvas{
 /*  background: #000;*/
@@ -57,10 +64,6 @@ canvas.overlay {
   position: absolute;
   top: 0;
   left: 0px;
-}
-
-#zoom-slider {
-  height: 200px;
 }
 
 #helpers {
@@ -128,4 +131,54 @@ canvas.overlay {
 #helpers input[type=radio][value=false]{
   color: red !important;
   background-color: red !important;
+}
+
+#zoom-in-button {
+  display:block;
+  width: 16px;
+  margin-bottom: 1px;
+
+}
+
+#zoom-out-button {
+  display:block;
+  width: 16px;
+  margin-top: 1px;
+}
+
+#zoom-slider {
+  height: 100px;
+}
+
+#zoom-controls {
+  position:absolute;
+  width: 20px;
+  padding: 2px 0 0 2px;
+}
+
+#stored-searches {
+  padding: 0 5px 0 0;
+  margin: 0 0 0 40px;
+  overflow: auto;
+  width: 180px;
+  height: 600px;
+  clip: rect(0, 0, auto, auto);
+}
+
+#stored-searches div {
+  cursor: pointer;
+}
+
+.token_data {
+  font-weight: bold;
+}
+
+.no_token_data {
+  color: #999;
+}
+
+.token_count {
+  color: #999;
+  font-size: smaller;
+  font-weight: normal;
 }

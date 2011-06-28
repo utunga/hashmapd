@@ -274,22 +274,6 @@ function make_colour_range_mountains(scale){
     return colours;
 }
 
-function add_label(ctx, text, x, y, size, colour, shadow){
-    //log.apply(undefined, arguments);
-    if (colour === undefined){
-        colour = "#000";
-    }
-    if (shadow && size > 8){
-        ctx.shadowColor = shadow;
-        ctx.shadowBlur = size * 0.25;
-    }
-    //ctx.globalAlpha = "0.6";
-    ctx.textAlign = "center";
-    ctx.font = size + "px sans-serif";
-    ctx.fillStyle = colour;
-    ctx.fillText(text, x, y);
-}
-
 
 function apply_density_map(src_ctx){
     var canvas = named_canvas("density_overlay", true);

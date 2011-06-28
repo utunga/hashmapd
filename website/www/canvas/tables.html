@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+  <head>
+    <title>hashmapd tables</title>
+  </head>
+
+  <body>
+<ul>
+<li><a href="all-tokens-token_relative.html">Where each token has its global maxima</a>. There may be several peaks of equal height.  Not all occupied cells have tokens.
+
+<!--<li><a href="all-tokens-token_total.html">broken</a>-->
+
+<li><a href="all-tokens-relative.html">relative popularity per cell</a> -- top 10 tokens that are unusually popular here.
+
+<li><a href="all-tokens-total.html">absolute popularity per cell</a> -- top 10 tokens used here (excluding stop words of course).
+
+<li><a href="all-tokens-adjusted.html">adjusted popularity per cell</a> -- relative popularity weighted by the log of the tokens global popularity.  Works against rare terms (slightly).
+
+<li><a href="users.html">just the user count</a>. This is the data that makes the landscape, but here you can see the actual numbers.
+
+</ul>
+
+<p>The globally most popular term is "Happy".
+
+<h2>key</h2>
+<p>The blue self-referential link show the quadtree coordinates for that cell.</p>
+
+<p>The grey number in the top right is the number of twitter users in the cell.</p>
+
+<p>The numbers beside the tokens are either raw counts, or arbitrarily scaled for readability.
+
+<p>The pale orange cells share at least one token with at least one neighbour.  The neighbours involved are indicated by the yellow cell borders.  There's no indication as to which tokens are shared.
+
+
+  </body>
+</html>

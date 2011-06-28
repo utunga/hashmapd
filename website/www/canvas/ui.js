@@ -134,14 +134,31 @@ function set_state(data){
     for (k in $state){
         copy[k] = $state[k];
     }
+    if (data.zoom !== undefined){
+        data.zoom = Math.min($const.MAX_ZOOM, Math.max(0, data.zoom));
+    }
+
     interpret_query($state, data);
     var h = window.history;
     var loc = window.location;
     var url = loc.href.split("?", 1)[0] + "?" +  $.param($state);
 
     if (url != loc.href){
-        h.replaceState($state, "Hashmapd", url);
+        /* a change in search term merits an addition in the page history,
+         * but merely zooming or panning does not.
+         *
+         * XXX this actually interacts a little strangely with the first
+         * loaded url, which does not get stored in history; and it ends up
+         * storing the last view of each search term, not the first.
+         */
+        if (copy['token'] != $state['token']){
+            h.pushState($state, "Hashmapd", url);
+        }
+        else{
+            h.replaceState($state, "Hashmapd", url);
+        }
     }
+
     /*make sure something changed */
     for (k in $state){
         if (copy[k] != $state[k]){
@@ -178,24 +195,27 @@ function set_ui(state){
 function construct_ui(){
     var slider = $("#zoom-slider");
     $(slider).slider({ orientation: 'vertical',
-                       max: 6,
+                       max: $const.MAX_ZOOM,
                        min: 0,
                        slide: function( event, ui ) {
                            set_state({'zoom': ui.value});
                        }
                      });
+
     var offset = $($page.canvas).offset();
-    offset.left -= 20;
-    slider.offset(offset);
+    $("#zoom-controls").offset(offset);
+    $("#zoom-out-button").click(function(){set_state({zoom: $state.zoom - 1})});
+    $("#zoom-in-button").click(function(){set_state({zoom: $state.zoom + 1})});
+
 
     $("#token_form").submit(
         function(e){
             e.preventDefault();
             e.stopPropagation();
-            var token = $("#token_input").val() || '';
-            token = normalise_token(token);
-            $("#token_input").val(token);
-            set_state({token: token});
+            var data = $("#token_input").val() || '';
+            data = sanitise_token_input(data);
+            $("#token_input").val(data);
+            set_state({token: data});
             return false;
         }
     );
@@ -205,19 +225,48 @@ function construct_ui(){
 
 /** normalise_token puts the token in the form expected by the backend.
  *
- * Most words are capitalised, but if you write in all caps, we'll
+ * Most words are capitalised, but if you write with some caps, we'll
  * assume you mean that.
  */
 function normalise_token(token){
-    var orig = token;
-    token = token.split(/\s/, 1)[0];
-    var uc = token.toUpperCase();
-    if (uc != token){
-        var lc = token.toLowerCase();
+    var lc = token.toLowerCase();
+    if (lc == token){
+        var uc = token.toUpperCase();
         token = uc.charAt(0) + lc.substr(1);
     }
-    log("converted", orig, "to", token);
     return token;
+}
+
+function sanitise_token_input(input){
+    var tokens = input.trim().split(/\s+/, 4);
+    var result;
+    if (tokens.length == 3 && tokens[1] in $const.DENSITY_OPS){
+        /*XXX should really have a proper parser */
+        result = [normalise_token(tokens[0]),
+                  tokens[1],
+                  normalise_token(tokens[2])];
+    }
+    else if (tokens.length == 2){
+        if (tokens[0] in $const.DENSITY_UNO_OPS){
+            /* a unary operator on tokens[1] */
+            result = [tokens[0], normalise_token(tokens[1])];
+        }
+        else if (tokens[0].match(/^>\d+$/)){
+            /* a limit on tokens[1] */
+            result = [tokens[0], normalise_token(tokens[1])];
+        }
+        else { /*two text tokens; give them an arbitrary operator */
+            result = [normalise_token(tokens[0]),
+                      '*',
+                      normalise_token(tokens[1])];
+        }
+    }
+    else {
+        result = [normalise_token(tokens[0])];
+    }
+    result = result.join(' ');
+    log("converted", input, "to", result);
+    return result;
 }
 
 
@@ -291,8 +340,36 @@ function enable_drag(){
     ui_grabber.mouseup(finish);
     ui_grabber.mouseout(finish);
     ui_grabber.dblclick(dblclick);
+
+    if ($const.KEY_CAPTURE){
+        $(document).keydown(key_events);
+    }
 }
 
+function key_events(e){
+    switch(e.keyCode){
+    case 37:/*left*/
+        pan_pixel_delta($const.width / 2, 0, 0);
+        break;
+    case 38:/*up*/
+        pan_pixel_delta(0, $const.height / 2, 0);
+        break;
+    case 39:/*right*/
+        pan_pixel_delta( -$const.width / 2, 0, 0);
+        break;
+    case 40:/*down*/
+        pan_pixel_delta(0, -$const.height / 2, 0);
+        break;
+    case 107:/* + keypad */
+    case 187:/* = */
+        pan_pixel_delta(0, 0, 1);
+        break;
+    case 109:/* - keypad */
+    case 189:/* - */
+        pan_pixel_delta(0, 0, -1);
+        break;
+    }
+}
 
 function temp_pan_delta(dx, dy){
     log("mouse_move", dx, dy);
@@ -346,4 +423,23 @@ function pan_pixel_delta(dx, dy, dz){
     x = Math.max($page.min_x + pad_x, Math.min($page.max_x - pad_x, x));
     y = Math.max($page.min_y + pad_y, Math.min($page.max_y - pad_y, y));
     set_state({x: parseInt(x), y: parseInt(y), zoom: zoom});
+}
+
+function add_known_token_to_ui(token){
+    var link;
+    var data = $page.token_data[token];
+    if (data.count){
+        link = $('<div class="token_data">' + token + ' <span class="token_count">' +
+                 data.count + "</span></div>");
+    }
+    else {
+        link = $('<div class="no_token_data">' + token +
+                 ' <span class="token_count">not mentioned</span></div>');
+    }
+
+    link.click(function(){
+                   set_state({token: token});
+               });
+    var div = $("#stored-searches");
+    div.append(link);
 }
