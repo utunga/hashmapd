@@ -88,7 +88,7 @@ function extract_density_maps(tokens, w, h, state){
         else {
             var data = $page.token_data[tokens[i]];
             var points = data.points;
-            html += (data.count + " recorded uses of <b>" + tokens[i] + "</b>.<br/>");
+            html += (data.count + " mentions of <br><b>'" + tokens[i] + "'</b>.<br/>");
             maps[i] = zoomed_fuzz_array(state.x, state.y, w, h, points,
                                         state.zoom, k, threshold);
         }
