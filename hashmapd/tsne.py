@@ -1,27 +1,14 @@
 #  Based on code Created by Laurens van der Maaten on 20-12-08.
 #  see point #4
 
-import sys, numpy
-
-try:
-    from .compiled import calc_dY
-    try:
-        from .compiled import version_info
-    except ImportError:
-        raise RuntimeError('Cython code need recompiling. "python setup.py build_ext -i"')
-except ImportError:
-    print >> sys.stderr, "No Cython"
-    # Use "python setup.py build_ext -i" to compile it
-    calc_dY = None
-
 import sys
-try:
-    import psyco
-    psyco.full()
-    print >> sys.stderr, "psyco is usable!"
-except:
-    pass # psyco doesn't matter given cython
-    #print >> sys.stderr, "No psyco"
+import numpy
+
+from . import compiled
+version = getattr(compiled, 'version_info', (0, 0))
+if version < (2, 0):
+    raise ImportError('Cython module "compiled" is too old, try "python setup.py build_ext -i"')
+cythonTSNE = compiled.TSNE
 
 
 class TSNE(object):
@@ -39,7 +26,6 @@ class TSNE(object):
         self.min_gain = 0.01
         self.tol = 1e-5
 
-        
 
     def initialize_with_codes(self, codes):
         self.codes = numpy.array(codes)
@@ -61,7 +47,6 @@ class TSNE(object):
         if (iterations==None):
             iterations = self.default_iterations
         
-#<<<<<<< HEAD:hashmapd/tsne.py
         if self.codes.dtype != "float32":
             print "Error: array of codes should have type float32.";
             return -1;
@@ -81,38 +66,11 @@ class TSNE(object):
         gains = numpy.ones((n, self.out_dims));
         
         # Compute P-values
-        P = self.x2p();
-        P = P + numpy.transpose(P);
-        P = P / numpy.sum(P);
-        P = P * 4;                                    # early exaggeration
-        P = numpy.maximum(P, 1e-12);
-#=======
-#        #print 'HBeta for D, beta ', D, beta
-#        # Compute P-row and corresponding perplexity
-#        P = numpy.exp(-D.copy() * beta);
-#        sumP = sum(P);
-#        H = numpy.log(sumP) + beta * numpy.sum(D * P) / sumP;
-#        P = P / sumP;
-#        return H, P;
-#>>>>>>> d749adedfcc2bfea5d666e92cdd171597a4c49d3:hashmapd/tsne.py
-        
-        # Run iterations
-        dY = numpy.zeros_like(Y)
-        Y2 = numpy.zeros_like(Y[:, 0])
-        num = numpy.zeros([n*(n-1)//2], float)
+        T = cythonTSNE(self.x2p())
+        T.scaleP(4, 1e-12) # early exaggeration
         
         for iter in range(iterations):
-            if calc_dY is None:
-                sum_Y = numpy.square(Y).sum(axis=1)
-                num = 1 / (1 + numpy.add(numpy.add(-2 * numpy.dot(Y, Y.T), sum_Y).T, sum_Y));
-                #num = 1/((-2 * numpy.dot(Y, Y.T)) + sum_Y + sum_Y[..., numpy.newaxis] + 1)
-                num[range(n), range(n)] = 0;
-                Q = num / numpy.sum(num);
-                Q = numpy.maximum(Q, 1e-12);
-                PQN = (P - Q) * num;
-                dY = ((Y[:,numpy.newaxis] - Y).transpose([2,0,1]) * PQN.T).sum(axis=-1).T
-            else:
-                dY = calc_dY(P, Y, num, Y2, dY)
+            dY = T.calc_dY(Y, dY)
             
             # Perform the update
             if iter < 20:
@@ -126,21 +84,17 @@ class TSNE(object):
             Y += iY;
             Y -= numpy.mean(Y, 0)
             
-            if iter < 10 or (iter < 100 and (iter+1) % 10 == 0) or (iter+1) % 100 == 0:
+            if (iter+1) % 10**int(numpy.log10(iter+1)) == 0:
                 # Compute current value of cost function
-                if calc_dY is None:
-                    cost = numpy.sum(P * numpy.log(P / Q))
-                else:
-                    cost = calc_dY(P, Y, num, Y2, None)
+                cost = T.calc_KL(Y)
                 print "TSNE Iteration {0:3} error is {1}".format(iter + 1, cost)
-                
+
             # Stop lying about P-values
             if iter == 100:
-                P /= 4;
+                T.scaleP(.25, 1e-12)
+
         # update solution
         self.coords = Y;
-                   
-
 
 
     def x2p(self):
