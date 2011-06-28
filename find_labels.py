@@ -3,11 +3,12 @@
 import sys, os
 import heapq
 import gzip
-#import json
+import json
 import cPickle
 from operator import itemgetter
+from collections import namedtuple
 
-USER_JSON = 'user-count.json'
+
 PICKLE = 'labels.pickle'
 USE_CACHE=True
 
@@ -43,50 +44,17 @@ def get_row_emitter(filename, has_token=True):
     end = - len(suffix)
     for line in f:
         if not line.startswith(prefix):
-            #log("ignoring", repr(line))
             continue
         line = line.strip()[start:]
-        #log(start, end, line)
         key, value = line.rsplit('],"value":', 1)
         if has_token:
             token, coords = key.rsplit('",', 1)
+            token = token.decode('unicode_escape').encode('utf-8')
         else:
             token, coords = None, key
-        token = repr(token).replace(r'\\u', r'\u').decode('unicode_escape').encode('utf-8')
-        #log(line)
         value = int(value.rsplit('}', 1)[0])
-        #log (token, coords, value)
         yield (token, coords, value)
     f.close()
-
-
-def save_as_text(locations, out_file, limit=100):
-    keys = sorted(locations.keys())
-    f = open(out_file, 'w')
-    for k in keys:
-        v = locations[k]
-        print >> f, k + ':'
-        v.sort()
-        v.reverse()
-        for rvalue, value, token in v[:limit]:
-            print >> f, "%r, %0.4f, %d; " % (token, rvalue, value),
-        print >> f
-
-def save_as_json(locations, out_file, limit=100):
-    keys = sorted(locations.keys())
-    f = open(out_file, 'w')
-    from math import log
-    f.write('{"rows":[\n')
-    for k in keys:
-        v = locations[k]
-        v.sort()
-        v.reverse()
-        for rvalue, value, token in v[:limit]:
-            adj = rvalue * 1000#int(100 * rvalue * (5 + log(value)))
-            token = repr(token).replace(r'\\u', r'\u')
-            s = '{"key":[%s,%s],"value":%d},\n' % (token, k, adj)
-            f.write(s)
-    f.write(']}\n')
 
 def group_by_token(rows):
     log("group_by_token")
@@ -113,20 +81,23 @@ def quad_to_xy(coords):
         y = (y << 1) + (n >> 1)
     return (x, y)
 
+def empty_cell(location=None):
+    return {'data':[],
+            'tokens': frozenset(),
+            'classes': [],
+            'users': '',
+            'location': location,
+            }
+
 def make_location_cells(locations, orderby, users=None, limit=10):
-    log("making cells, sets")
+    log("making location cells")
     coord = locations.iterkeys().next()
     cells = {}
     index = {}
     from math import log as mlog
     for k, v in locations.iteritems():
         if not k in index:
-            cell = {'data':[],
-                    'tokens': set(),
-                    'classes': [],
-                    'users': '',
-                    'location': k,
-                    }
+            cell = empty_cell(k)
             index[k] = cell
             cells[quad_to_xy(k)] = cell
         else:
@@ -135,17 +106,18 @@ def make_location_cells(locations, orderby, users=None, limit=10):
         v.reverse()
         for value, overall, token in v[:limit]:
             if orderby == 'adjusted':
-                adj = int(1000.0 * value / overall * (5 + mlog(overall)))
+                adj = int((10000.0 * value) / overall * (4 + mlog(overall)))
             elif orderby == 'total':
                 adj = value
-            else: #elif orderby == 'relative':
-                adj = int(1000.0 * value / overall)
+            else:
+                adj = int(10000.0 * value / overall)
             cell['data'].append((adj, token))
-            cell['tokens'].add(token)
 
     for cell in index.values():
         cell['data'].sort()
         cell['data'].reverse()
+        cell['tokens'] = frozenset(k for v, k in cell['data'])
+
 
     return cells, index
 
@@ -163,7 +135,20 @@ def find_common_tokens(cells):
             up['classes'].append('down')
     return cells
 
-def save_as_html(cells, out_file, orderby):
+
+def save_as_json(index, out_file, limit=2):
+    f = open(out_file, 'w')
+    rows = []
+    for coords, cell in index.iteritems():
+        coords = [int(x) for x in coords.split(',')]
+        for value, token in cell['data'][:limit]:
+            key = [token.decode('utf-8')] + coords
+            rows.append({'key': key, 'value': value})
+
+    json.dump({"rows": rows}, f, separators=(',', ':'), indent=None)
+    f.close()
+
+def save_as_html(cells, out_file):
     f = open(out_file, 'w')
     log("writing html")
     f.write('<html><meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
@@ -181,105 +166,203 @@ def save_as_html(cells, out_file, orderby):
             '.users {color: #aaa; font-size: 20px; float: right}'
             '</style>\n'
             '<table style="font: 10px sans-serif">\n')
-    for row in cells:
+
+    for cell in cells.itervalues(): # fake for loop to access arbitrary item
+        coords = cell['location']
+        precision = len(coords.split(','))
+        size = 1 << precision
+        break
+
+    for y in xrange(size):
         f.write('<tr>\n')
-        for cell in row:
+        for x in xrange(size):
+            cell = cells.get((x, y))
+            if cell is None:
+                f.write('<td class="sea">\n')
+                continue
             if cell['data']:
                 coords = cell['location']
-                ID = coords#.replace(',', '')
-                f.write('<td id="%s" class="%s">' % (ID, ' '.join(cell['classes'])))
-                f.write('<span class="users">%s</span>' % (cell['users']))
-                f.write('<a href="#%s">%s</a><br/>' % (ID, coords))
-
-                #cell.sort()
+                f.write('<td id="%s" class="%s">' % (coords, ' '.join(cell.get('classes', ()))))
+                f.write('<span class="users">%s</span>' % (cell.get('users', '')))
+                f.write('<a href="#%s">%s</a><br/>' % (coords, coords))
                 for tk in cell['data']:
                     f.write("%s: %s<br/>" % (tk[1], tk[0]))
-            elif cell['users']:
-                f.write('<td class="shallows"><span class="users">%s</span>\n' % (cell['users']))
+            elif cell.get('users'):
+                f.write('<td class="shallows"><span class="users">%s</span>\n' % (cell.get('users', '')))
             else:
-                f.write('<td class="sea">\n')
+                log("you should never see this unreachable message about the misformed cell ",
+                    (x, y), cell)
+                f.write('<td class="error"> %s' % cell)
+
 
     f.write('</table></html>\n')
+
+
+def add_users(index, cells, users):
+    if users:
+        for token, coords, value in users:
+            cell = index.get(coords, empty_cell())
+            if cell['location'] is None:
+                cell['location'] = coords
+                cells[quad_to_xy(coords)] = cell
+            cell['users'] = value
 
 
 def get_cached_data():
     log("unpickling rows, data")
     f = open(PICKLE)
-    rows, users = cPickle.load(f)
-    locations = calc_locations(rows)
+    tokens, users = cPickle.load(f)
     f.close()
-    return rows, users
+    return tokens, users
 
-def save_cached_data(rows, users):
+def save_cached_data(tokens, users):
     log("generating cache")
     f = open(PICKLE, 'w')
-    cPickle.dump((list(rows), list(users)), f)
+    cPickle.dump((tokens, list(users)), f)
     f.close()
-    return rows, users
 
+def really_get_data(token_json, user_json):
+    log("parsing json")
+    users = get_row_emitter(user_json, False)
+    rows = get_row_emitter(token_json)
+    tokens = group_by_token(rows)
+    return tokens, list(users)
 
-def get_data(json_file, use_cache=True):
+def get_data(token_json, user_json, use_cache=USE_CACHE):
     if use_cache:
         try:
-            rows, users = get_cached_data()
+            tokens, users = get_cached_data()
         except IOError:
-            users = list(get_row_emitter(USER_JSON, False))
-            rows = list(get_row_emitter(json_file))
-            save_cached_data(rows, users)
+            tokens, users = really_get_data(token_json, user_json)
+            save_cached_data(tokens, users)
     else:
-        log("parsing json")
-        users = get_row_emitter(USER_JSON, False)
-        rows = get_row_emitter(json_file)
-    return rows, users
+        tokens, users = really_get_data(token_json, user_json)
+    return tokens, users
 
-def by_location(json_file, out_file, orderby, use_cache=False):
-    rows, users = get_data(json_file, use_cache)
-    locations = calc_locations(rows)
+
+def by_location(token_json, user_json, out_file, orderby, use_cache=USE_CACHE):
+    tokens, users = get_data(token_json, user_json, use_cache=use_cache)
+    locations = calc_locations(tokens)
+    del tokens
     log("making cells")
-    cells = make_cells(locations, orderby, users, 10)
+    cells, index = make_location_cells(locations, orderby, 10)
+    add_users(index, cells, users)
 
     log("finding common tokens")
     find_common_tokens(cells)
+    save_as_html(cells, out_file)
 
-    save_as_html(cells, out_file, orderby)
 
-def by_token(json_file, out_file, orderby, use_cache=False):
-    rows, users = get_data(json_file, use_cache)
-    cells, index = make_empty_cells(users)
-    tokens = group_by_token(rows)
+def make_token_cells(tokens, orderby, limit=100):
+    log("making token cells")
+    cells = {}
+    index = {}
     #{token: [(value, coord), (value, coord),...]}
-    used_cells = []
     for token, locations in tokens.iteritems():
-        token = repr(token).replace(r'\\u', r'\u').decode('unicode_escape').encode('utf-8')
         if orderby == 'token_relative':
             mul = 1000.0 / sum(a for a, b in locations)
         else:
             mul = 1
-
         locations.sort()
         max_value = locations[-1][0]
         for v, coord in reversed(locations):
             if v != max_value:
                 break
-            cell = index[coord]
-            used_cells.append(cell)
-            cell['location'] = coord
-            cell['tokens'].add(token)
+            if coord in index:
+                cell = index[coord]
+            else:
+                cell = empty_cell(coord)
+                index[coord] = cell
+                cells[quad_to_xy(coord)] = cell
             cell['data'].append((int(v * mul), token))
 
-    for cell in used_cells:
+    for cell in index.itervalues():
         cell['data'].sort()
         cell['data'].reverse()
+        cell['data'] = cell['data'][:limit]
+        cell['tokens'] = frozenset(t for v, t in cell['data'])
+    return cells, index
 
+
+def by_token(token_json, user_json, out_file, orderby, use_cache=USE_CACHE):
+    tokens, users = get_data(token_json, user_json, use_cache=use_cache)
+    cells, index = make_token_cells(tokens, orderby)
+    add_users(index, cells, users)
     find_common_tokens(cells)
-    save_as_html(cells, out_file, orderby)
+    save_as_html(cells, out_file)
 
+def by_magic_heuristic(token_json, user_json, out_file, orderby, use_cache=USE_CACHE, limit=10):
+    tokens, users = get_data(token_json, user_json, use_cache=use_cache)
+    locations = calc_locations(tokens)
+    cells = {}
+    index = {}
+
+    cells, index = make_location_cells(locations, 'total', limit)
+    t_cells, t_index = make_token_cells(tokens, 'token_total', limit)
+
+    #cells, index should be complete; t_* not so,
+    # so import the latter into the former
+    for k, cell in index.iteritems():
+        if k in t_index:
+            tcell = t_index[k]
+            # data for each goes [(value, token)]
+            # to combine them, we sort with a schwartzian transform
+            # so identical tokens will be adjacent
+            everything = [(a, b) for b, a in cell['data'] + tcell['data']]
+            everything.sort()
+            combo = []
+            token = everything[0][0]
+            value = 0
+            for k, v in everything:
+                if k == token:
+                    #accumulate before adjusting
+                    value += v
+                    continue
+                combo.append((value, token))
+                token = k
+                value = v
+            cell['data'] = combo
+
+    for k, cell in index.iteritems():
+        d = cell['data']
+        fixed = []
+        for value, token in d:
+            #some heuristic adjustments
+            if len(token) > 8:
+                value = value * 8 / len(token)
+            if token.startswith('@'):
+                value = value / 10
+            elif token.startswith('http://'):
+                value = value / 10
+            if value > 0:
+                fixed.append((value, token))
+
+        fixed.sort()
+        fixed.reverse()
+        cell['data'] = fixed[:limit * 2]
+        cell['tokens'] = frozenset(t for v, t in cell['data'])
+
+    add_users(index, cells, users)
+    find_common_tokens(cells)
+    save_as_json(index, out_file[:-5] + '.json')
+    save_as_html(cells, out_file)
+
+
+
+USER_JSON = 'user-count.json'
 
 try:
-    orderby = sys.argv[3]
-    if orderby in ('token_total', 'token_relative'):
-        by_token(sys.argv[1], sys.argv[2], orderby)
+    orderby = sys.argv[4]
+    token_json = sys.argv[1]
+    user_json = sys.argv[2]
+    out_file = sys.argv[3]
+    if orderby in ('magic', ):
+        by_magic_heuristic(token_json, user_json, out_file, orderby)
+    elif orderby in ('token_total', 'token_relative'):
+        by_token(token_json, user_json, out_file, orderby)
     else:
-        by_location(sys.argv[1], sys.argv[2], orderby)
+        by_location(token_json, user_json, out_file, orderby)
 except IndexError:
     print "USAGE %s tokens.json outputfile {total, relative, adjusted}" % sys.argv[0]
+
+
