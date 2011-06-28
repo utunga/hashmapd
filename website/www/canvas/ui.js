@@ -144,7 +144,19 @@ function set_state(data){
     var url = loc.href.split("?", 1)[0] + "?" +  $.param($state);
 
     if (url != loc.href){
-        h.replaceState($state, "Hashmapd", url);
+        /* a change in search term merits an addition in the page history,
+         * but merely zooming or panning does not.
+         *
+         * XXX this actually interacts a little strangely with the first
+         * loaded url, which does not get stored in history; and it ends up
+         * storing the last view of each search term, not the first.
+         */
+        if (copy['token'] != $state['token']){
+            h.pushState($state, "Hashmapd", url);
+        }
+        else{
+            h.replaceState($state, "Hashmapd", url);
+        }
     }
 
     /*make sure something changed */
