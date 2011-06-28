@@ -51,9 +51,9 @@ function add_label(ctx, text, x, y, size, colour, shadow, angle){
     }
     if (shadow && size > 8){
         ctx.shadowColor = shadow;
-        ctx.shadowBlur = size * 0.125;
-        ctx.shadowOffsetX = 0.5 + size * 0.125;
-        ctx.shadowOffsetY = 0.5 + size * 0.125;
+        ctx.shadowBlur = size * 0.25;
+        //ctx.shadowOffsetX = 0.5 + size * 0.125;
+        //ctx.shadowOffsetY = 0.5 + size * 0.125;
     }
     //ctx.globalAlpha = "0.6";
     ctx.textAlign = "center";
@@ -86,7 +86,7 @@ function paint_labels_cleverly(){
         }
         var text = p[4];
         var n = p[2];
-        var size = Math.log(n) * (1.4 + $state.zoom);
+        var size = Math.log(n) * $const.LABEL_SCALE * (1.4 + $state.zoom);
         if (size < 8){
             continue;
         }
@@ -96,9 +96,10 @@ function paint_labels_cleverly(){
             var x = line[5];
             var y = line[6];
             var angle = line[7];
-            add_label(ctx, text, x, y, size, "#000"
-                      , undefined //"#fff"
-                      , angle
+            add_label(ctx, text, x, y, size,
+                      $const.LABEL_COLOUR,
+                      $const.LABEL_SHADOW,
+                      angle
             );
             lines.push(line);
         }

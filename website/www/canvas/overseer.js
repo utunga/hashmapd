@@ -12,6 +12,12 @@
 var $const = {
     DEBUG: (window.location.pathname.substr(-10) == 'debug.html'),
     BASE_DB_URL: 'http://couch.hashmapd.com/fd/',
+    LABEL_URL: 'labels.json',
+    //LABEL_URL: 'all-tokens-10-magic.json',
+    //LABEL_URL: 'pre-filtered-1.json',
+    LABEL_SCALE: 2.2, /* adjust to make labels the right size */
+    LABEL_COLOUR: '#000',
+    LABEL_SHADOW: '#fff', /* undefined for no shadow */
     //BASE_DB_URL: 'http://127.0.0.1:5984/frontend_dev/_design/user/_view/',
     SQUISH_INTO_CANVAS: false, /*if true, scale X and Y independently, losing map shape */
     USE_JSONP: true,
@@ -284,7 +290,7 @@ function get_token_json(token, precision, callbacks){
 
 function get_label_json(callback){
     log("getting labels");
-    var d = $.getJSON("pre-filtered-1.json", callback);
+    var d = $.getJSON($const.LABEL_URL, callback);
     //var d = $.getJSON("labels.json", callback);
     return d;
 };
