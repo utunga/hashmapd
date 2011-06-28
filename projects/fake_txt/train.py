@@ -1,8 +1,4 @@
 import os, sys, getopt
-import numpy, cPickle, gzip
-import theano
-
-import matplotlib.pyplot as plt
 
 def get_git_home():
     testpath = '.'
@@ -16,68 +12,8 @@ def get_git_home():
 HOME = get_git_home()
 sys.path.append(HOME)
 
-from hashmapd.load_config import LoadConfig, DefaultConfig
-from hashmapd.utils import tiled_array_image
-from hashmapd.SMH import SMH
-
-
-def load_data(dataset_file):
-    ''' Loads the dataset
-
-    :type dataset: string
-    :param dataset: the path to the dataset (here MNIST)
-    '''
-    print '... loading data from file ' + dataset_file
-    
-    if dataset_file.endswith('.npy'):
-        x = numpy.lib.format.open_memmap(dataset_file, mode='r')
-        assert x.dtype is numpy.dtype(theano.config.floatX), (x.dtype, theano.config.floatX)
-        x_sums = x.sum(axis=1)
-    else:
-        f = gzip.open(dataset_file, 'rb')
-        (x, x_sums, y) = cPickle.load(f)
-        x = numpy.asarray(x, dtype=theano.config.floatX)
-
-    # build a replcated 2d array of sums so operations can be performed efficiently   # HUH?
-    x_sums = numpy.asarray(numpy.array([x_sums]*(x.shape[1])).transpose(), dtype=theano.config.floatX)
-    
-    return (x, x_sums)
-
-
-def load_model(**kw):
-    numpy_rng = numpy.random.RandomState(212)
-    smh = SMH(numpy_rng = numpy_rng, **kw)
-    smh.unroll_layers(cost_method, 0); #need to unroll before loading model otherwise doesn't work
-    save_file=open(weights_file, 'rb')
-    smh_params = cPickle.load(save_file)
-    save_file.close()
-    smh.load_model(smh_params)
-    return smh
-
-
-def train_SMH(datadir="data", **kw):
-    for part in ['training', 'validation', 'testing']:
-        for suffix in ['.npy', '_0.pkl.gz']:
-            filename = os.path.join(datadir, part + '_data' + suffix)
-            print filename
-            if os.path.exists(filename):
-                kw[part+'_data'] =  load_data(filename)
-                break
-        else:
-            raise RuntimeError('No {0} data found in {1}/'.format(part, datadir))
-        
-    kw['mean_doc_size'] = kw['training_data'][1].mean()
-    
-    init_kw = {}
-    for arg in ['first_layer_type', 'mean_doc_size', 'inner_code_length', 'mid_layer_sizes', 'n_ins']:
-        if arg in kw:
-            init_kw[arg] = kw.pop(arg)
-    init_kw['numpy_rng'] = numpy.random.RandomState(123)
-    
-    smh = SMH(**init_kw) 
-    smh.train(**kw)
-
-    return smh
+from hashmapd.load_config import LoadConfig
+from hashmapd.SMH import train_SMH
 
 
 if __name__ == '__main__':
@@ -87,22 +23,29 @@ if __name__ == '__main__':
         help="Path of the config file to use")
     (options, args) = parser.parse_args()
     cfg = LoadConfig(options.config)
-    smh = train_SMH(
-            batch_size = cfg.train.train_batch_size, 
-            pretraining_epochs = cfg.train.pretraining_epochs,
-            training_epochs = cfg.train.training_epochs,
-            mid_layer_sizes = list(cfg.shape.mid_layer_sizes),
-            inner_code_length = cfg.shape.inner_code_length,
-            n_ins = cfg.shape.input_vector_length,
-            first_layer_type = cfg.train.first_layer_type,
-            method = cfg.train.method,
-            k = cfg.train.k,
-            noise_std_dev = cfg.train.noise_std_dev,
-            cost_method = cfg.train.cost,
-            skip_trace_images = cfg.train.skip_trace_images,
-            weights_file = cfg.train.weights_file)
-    
+    print "PARAMETERS"
+    for section in [cfg.shape, cfg.train]:
+        for (key, value) in section.iteritems():
+            print '  {0} = {1}'.format(key, value)
+    smh = train_SMH('data',
+            mid_layer_sizes = list(cfg.shape.mid_layer_sizes), 
+            inner_code_length = cfg.shape.inner_code_length, 
+            **cfg.train)
+
+
     #double check that save/load worked OK
+
+    #def load_model(**kw):
+    #    numpy_rng = numpy.random.RandomState(212)
+    #    smh = SMH(numpy_rng = numpy_rng, **kw)
+    #    smh.unroll_layers(cost_method, 0); #need to unroll before loading model otherwise doesn't work
+    #    save_file=open(weights_file, 'rb')
+    #    smh_params = cPickle.load(save_file)
+    #    save_file.close()
+    #    smh.load_model(smh_params)
+    #    return smh
+
+
     #info = LoadConfig('data')['info']
     #testing_data = load_data(info['testing_prefix']+'_0.pkl.gz')
     
