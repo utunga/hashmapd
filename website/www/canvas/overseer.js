@@ -12,6 +12,8 @@
 var $const = {
     DEBUG: (window.location.pathname.substr(-10) == 'debug.html'),
     BASE_DB_URL: 'http://couch.hashmapd.com/fd/',
+    PRELOADED_SEARCH_TOKENS: ['Android', 'Samsung', 'Kindle', 'Xbox',
+                              'Followers', 'Dat', "Chillin'"],
     LABEL_URL: 'labels.json',
     //LABEL_URL: 'all-tokens-10-magic.json',
     //LABEL_URL: 'pre-filtered-1.json',
@@ -187,11 +189,18 @@ function hm_setup(){
         function(){
             $page.ticker = window.setInterval(hm_tick, 1000/ $const.FPS);
         });
-    /*
-    if ($state.token){
-        $waiters.have_density = parse_density_query($state.token);
+
+    for (var i = 0; i < $const.PRELOADED_SEARCH_TOKENS.length; i++){
+        preload_token($const.PRELOADED_SEARCH_TOKENS[i]);
     }
-     */
+}
+
+function preload_token(token){
+    $.when($waiters.map_known).then(
+        function(){
+            maybe_get_token_json(token);
+        }
+    );
 }
 
 /** hm_draw_map draws the approriate map
@@ -703,6 +712,7 @@ function hm_on_token_density(data, req){
             count: count,
             points: points
         };
+        add_known_token_to_ui(token);
     }
 }
 

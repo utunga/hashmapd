@@ -424,3 +424,12 @@ function pan_pixel_delta(dx, dy, dz){
     y = Math.max($page.min_y + pad_y, Math.min($page.max_y - pad_y, y));
     set_state({x: parseInt(x), y: parseInt(y), zoom: zoom});
 }
+
+function add_known_token_to_ui(token){
+    var link = $("<div>" + token + "</div>");
+    link.click(function(){
+                   set_state({token: token});
+               });
+    var div = $("#stored-searches");
+    div.append(link);
+}
