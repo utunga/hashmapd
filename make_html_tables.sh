@@ -1,9 +1,12 @@
 #!/bin/bash -e
 
-#TOKEN_DATA=website/www/canvas/tokens/all-tokens-7.json.gz
-TOKEN_DATA=website/www/canvas/tokens/all-tokens-10.json.gz
-USER_DATA=website/www/canvas/tokens/users-9.json
+TOKEN_DATA=website/www/canvas/tokens/all-tokens-7.json
+USER_DATA=website/www/canvas/locations.json
+#TOKEN_DATA=website/www/canvas/tokens/all-tokens-10.json.gz
+#USER_DATA=website/www/canvas/tokens/users-9.json
 
+
+rm -f labels.pickle
 
 BASE=$(basename ${TOKEN_DATA%*.json*})
 

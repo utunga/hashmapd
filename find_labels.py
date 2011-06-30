@@ -6,8 +6,6 @@ import gzip
 import json
 import cPickle
 from operator import itemgetter
-from collections import namedtuple
-
 
 PICKLE = 'labels.pickle'
 USE_CACHE=True
@@ -136,7 +134,7 @@ def find_common_tokens(cells):
     return cells
 
 
-def save_as_json(index, out_file, limit=2):
+def save_as_json(index, out_file, limit=1):
     f = open(out_file, 'w')
     rows = []
     for coords, cell in index.iteritems():
@@ -250,6 +248,7 @@ def by_location(token_json, user_json, out_file, orderby, use_cache=USE_CACHE):
 
     log("finding common tokens")
     find_common_tokens(cells)
+    save_as_json(index, out_file[:-5] + '.json')
     save_as_html(cells, out_file)
 
 
@@ -289,6 +288,7 @@ def by_token(token_json, user_json, out_file, orderby, use_cache=USE_CACHE):
     cells, index = make_token_cells(tokens, orderby)
     add_users(index, cells, users)
     find_common_tokens(cells)
+    save_as_json(index, out_file[:-5] + '.json')
     save_as_html(cells, out_file)
 
 def by_magic_heuristic(token_json, user_json, out_file, orderby, use_cache=USE_CACHE, limit=10):

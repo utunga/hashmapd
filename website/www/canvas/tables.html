@@ -5,10 +5,11 @@
   </head>
 
   <body>
+<h2>Original 64 x 64 grid</h2>
 <ul>
-<li><a href="all-tokens-token_relative.html">Where each token has its global maxima</a>. There may be several peaks of equal height.  Not all occupied cells have tokens.
+<li><a href="all-tokens-token_relative.html">Where each token has its greatest density</a>. There may be several peaks of equal height.  Not all occupied cells have tokens.
 
-<!--<li><a href="all-tokens-token_total.html">broken</a>-->
+<li><a href="all-tokens-7-token_total.html">Where each token has its absolute global maxima</a>.
 
 <li><a href="all-tokens-relative.html">relative popularity per cell</a> -- top 10 tokens that are unusually popular here.
 
@@ -16,8 +17,24 @@
 
 <li><a href="all-tokens-adjusted.html">adjusted popularity per cell</a> -- relative popularity weighted by the log of the tokens global popularity.  Works against rare terms (slightly).
 
-<li><a href="users.html">just the user count</a>. This is the data that makes the landscape, but here you can see the actual numbers.
+<!--<li><a href="all-tokens-7-magic.html">heuristically adjusted labels</a> -- a combination of the above with bias against long tokens, urls and @tags.-->
 
+<li><a href="users.html">just the user count</a>. This is the data that makes the landscape, but here you can see the actual numbers.
+</ul>
+
+<h2>512 x 512 grid</h2>
+<ul>
+<li><a href="all-tokens-10-token_relative.html">Where each token has its greatest density</a>. There may be several peaks of equal height.  Not all occupied cells have tokens.
+
+<li><a href="all-tokens-10-token_total.html">Where each token has its absolute global maxima</a>.
+
+<li><a href="all-tokens-10-relative.html">relative popularity per cell</a> -- top 10 tokens that are unusually popular here.
+
+<li><a href="all-tokens-10-total.html">absolute popularity per cell</a> -- top 10 tokens used here (excluding stop words of course).
+
+<li><a href="all-tokens-10-adjusted.html">adjusted popularity per cell</a> -- relative popularity weighted by the log of the tokens global popularity.  Works against rare terms (slightly).
+
+<li><a href="all-tokens-10-magic.html">heuristically adjusted labels</a> -- a combination of the above with bias against long tokens, urls and @tags.
 </ul>
 
 <p>The globally most popular term is "Happy".
