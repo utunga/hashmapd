@@ -128,6 +128,9 @@ var $page = {
     min_y:  undefined,
     max_x:  undefined,
     max_y:  undefined,
+    label_zoom: -1,    /*invalid vaule so as trigger regeneration first up*/
+    label_x: undefined,
+    label_y: undefined,
     hillshade_luts: {},
     /*token_data is a cache of token density data, with a list of points for each
      * known token. Like so:
@@ -218,6 +221,9 @@ function hm_setup(){
     for (var i = 0; i < $const.PRELOADED_SEARCH_TOKENS.length; i++){
         preload_token($const.PRELOADED_SEARCH_TOKENS[i]);
     }
+    if ($state.labels){
+        $waiters.have_labels = get_label_json(hm_on_labels);
+    }
 }
 
 function preload_token(token){
@@ -248,10 +254,24 @@ function hm_draw_map(){
 
 function hm_draw_map2(){
     if ($state.labels){
-        $waiters.have_labels = get_label_json(hm_on_labels);
-        log($waiters.have_labels);
         $.when($waiters.have_labels,
-               $waiters.map_known).done(paint_labels_cleverly);
+               $waiters.map_known).done(
+                   function(){
+                       if ($page.label_zoom != $state.zoom ||
+                           $page.label_x != $state.x ||
+                           $page.label_y != $state.y){
+
+                           paint_labels_cleverly();
+
+                           $page.label_zoom = $state.zoom;
+                           $page.label_x = $state.x;
+                           $page.label_y = $state.y;
+                       }
+                       else {
+                           log("not repainting labels! nothing moved!");
+                       }
+                   }
+               );
     }
 
     $.when($waiters.map_known).done(paint_map);

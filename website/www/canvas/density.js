@@ -116,6 +116,7 @@ function paint_density_duo(tokens, op){
         paste_density(ctx, m0);
     }
     catch (e){
+        canvas.visibility = 'hidden';
         log(e);
     }
 }
@@ -161,6 +162,7 @@ function paint_density_uno(token, op){
             op(map, canvas.width, canvas.height);
         }
         catch (e){
+            canvas.visibility = 'hidden';
             log(e);
             return;
         }
