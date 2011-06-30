@@ -61,6 +61,31 @@ var $const = {
 
     HILL_LUT_CENTRE: 300,
     HILL_SHADE_FLATNESS: 16.0, /*8 is standard, higher means flatter hills */
+    DEFAULT_HILL_COLOURS: [
+      /* r, g, b are out of 100 */
+      /*   r    g    b  height  */
+        [ 57,  73,  74,   0],
+        [ 70,  90,  90,   1],
+        [ 95,  90,  20,   2],
+        [ 60, 105,  10,   8],
+        [ 50,  70,  10,  60],
+        [ 55,  50,   0, 100],
+        [ 55,  55,  45, 150],
+        [ 95,  95,  95, 160],
+        [100, 100, 100, 255]
+    ],
+    GREY_HILL_COLOURS: [
+      /* default colours transmuted thus (r * 2 + g * 5 + b) >> 3 */
+        [ 70,  70,  70,   0],
+        [ 85,  85,  85,   1],
+        [ 82,  82,  82,   2],
+        [ 81,  81,  81,   8],
+        [ 57,  57,  57,  60],
+        [ 45,  45,  45, 100],
+        [ 53,  53,  53, 150],
+        [ 95,  95,  95, 160],
+        [100, 100, 100, 255]
+    ],
     views : {  /* helps in interpreting various views. */
         locations: {},
         token_density: {precision_adjust: 1},
@@ -574,7 +599,8 @@ function make_full_map(){
     var ctx = canvas.getContext("2d");
     var height_map = $page.height_canvas;
     var height_ctx = height_map.getContext("2d");
-    hillshading(height_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4);
+    hillshading(height_ctx, ctx, 1, Math.PI * 1 / 4, Math.PI / 4,
+               $const.GREY_HILL_COLOURS);
     $page.full_map = canvas;
     $waiters.full_map_drawn.resolve();
     $timestamp("end make_full_map");

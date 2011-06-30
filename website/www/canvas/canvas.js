@@ -91,7 +91,11 @@ function overlay(canvas, hidden){
 /* Algorithm borrowed from John Barratt <http://www.langarson.com.au/>
  * as posted on Python Image-SIG in 2007.
  */
-function hillshading(map_ctx, target_ctx, scale, angle, alt){
+function hillshading(map_ctx, target_ctx, scale, angle, alt,
+                     colour_scheme){
+    if (colour_scheme === undefined){
+        colour_scheme = $const.DEFAULT_HILL_COLOURS;
+    }
     var canvas = target_ctx.canvas;
     var width = canvas.width;
     var height = canvas.height;
@@ -112,12 +116,16 @@ function hillshading(map_ctx, target_ctx, scale, angle, alt){
     $timestamp("made lut");
     var lut_offset = $const.HILL_LUT_CENTRE;
     /*colour in the sea in one go */
-    target_ctx.fillStyle = "rgb(147,187,189)";
+
+    var sea_colour = colour_scheme[0];
+    target_ctx.fillStyle = ("rgb(" + parseInt(sea_colour[0] * 2.55) + ","
+                            + parseInt(sea_colour[1] * 2.55) + ","
+                            + parseInt(sea_colour[2] * 2.55) + ")");
     target_ctx.fillRect(0, 0, width, height);
     var target_imgd = target_ctx.getImageData(0, 0, width, height);
     var target_pixels = target_imgd.data;
     var stride = width * 4;
-    var colours = make_colour_range_mountains(135);
+    var colours = make_colour_range_mountains(135, colour_scheme);
     var row = stride * padding; /*start on row 1, not row 0 */
     for (var y = padding, yend = height - padding; y < yend; y++){
         for (var x = padding * 4 + 3, xend = stride - padding * 4; x < xend; x += 4){
@@ -226,21 +234,8 @@ function _hillshade(_dx, _dy, scale, sin_alt, cos_alt, perpendicular){
  * then grey
  * ?
  */
-function make_colour_range_mountains(scale){
+function make_colour_range_mountains(scale, checkpoints){
     var colours = [];
-    var checkpoints = [
-      /* r, g, b are out of 100 */
-      /*   r    g    b  height  */
-        [ 80,  90,  90,   0],
-        [ 70,  90,  90,   1],
-        [ 95,  90,  20,   2],
-        [ 60, 105,  10,   8],
-        [ 50,  70,  10,  60],
-        [ 55,  50,   0, 100],
-        [ 55,  55,  45, 150],
-        [ 95,  95,  95, 160],
-        [100, 100, 100, 255]
-    ];
     var i = 0;
     for (var j = 0; j < checkpoints.length - 1; j++){
         var src = checkpoints[j];
