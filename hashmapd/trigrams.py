@@ -6,6 +6,8 @@ import gzip
 from math import log
 from collections import defaultdict
 
+MIN_TRIGRAM_COUNT = 0.1
+
 #drink the hose example:
 #{"friend_count": 1897, "statuses_count": 54759, "text": "ABC releases trailers for horror series The River and the dark fairy tale Once Upon A Time [Video]: \n\t\t\t\t\t\t\t\t\t\t\n... http://bit.ly/j2U0Ek", "profile_image_url": "http://a2.twimg.com/profile_images/1147470332/top_notched_logo_normal.JPG", "timezone": "Chennai", "geo": null, "id": 70579336008302592, "lang": "en", "screen_name": "Top_Notched", "created_at": "2011-05-17 19:59:59", "entities": {"user_mentions": [], "hashtags": [], "urls": [{"url": "http://bit.ly/j2U0Ek", "indices": [116, 136], "expanded_url": null}]}, "followers_count": 2225, "location": "Udaipur"}
 
@@ -148,7 +150,7 @@ class Trigram:
         self.norm = norm(self.lut)
         f.close()
 
-    def cosine_similarity(self, other, adaptive=False):
+    def cosine_similarity(self, other):
         """returns a number between 0 and 1 indicating similarity
         between this model and another trigram or string.
 
@@ -184,22 +186,27 @@ class Trigram:
 
         return float(total) / (self.norm * norm2)
 
-    def calculate_entropy(self):
+    def calculate_entropy(self, min_count=MIN_TRIGRAM_COUNT):
         all_tgms = 256 * 256 * 256
         known_tgms = len(self.lut)
         unknown_tgms = all_tgms - known_tgms
 
-        # all trigram values have 1 added to prevent log(0)
-        self.log_evidence = dict((k, log(v + 1, 2)) for k, v in self.lut.iteritems())
-        self.min_evidence = log(1, 2)
-
-        total_count = sum(self.lut.itervalues()) + all_tgms
-
+        # all trigram values have min_count added to prevent log(0)
+        total_count = sum(self.lut.itervalues()) + all_tgms * min_count
+        self.min_evidence = log(min_count, 2)
         self.uniform_evidence = log(float(total_count) / all_tgms, 2)
+        self.log_evidence = dict((k, log(v + min_count, 2) - self.uniform_evidence)
+                                 for k, v in self.lut.iteritems())
+        debug("min evidence is ", self.min_evidence,
+              "evidence('the')", self.log_evidence['the'],
+              "uniform evidence", self.uniform_evidence
+              )
 
-    def probable_similarity(self, other, adaptive=False):
-        """1 means an identical ratio of trigrams;
-        0 means no trigrams in common.
+
+    def probable_similarity(self, other):
+        """On average, how many bits if evidence are there per trigram
+        for the English hypothesis vs the uniform random string
+        hypothesis.
         """
         if self.log_evidence is None:
             self.calculate_entropy()
@@ -213,15 +220,14 @@ class Trigram:
         for k, v in lut2.iteritems():
             total += bitlut.get(k, self.min_evidence) * v
 
-        log_odds = total - len2 * self.uniform_evidence
-        return log_odds / len2
+        return total / len2
 
     def __sub__(self, other):
         """indicates difference between trigram sets; 1 is entirely
         different, 0 is entirely the same."""
         return 1 - self.cosine_similarity(other)
 
-    def filter_the_hose(self, infile, outfile, rejectfile=None, threshold=0.9, adaptive=False):
+    def filter_the_hose(self, infile, outfile, rejectfile=None, threshold=0.9):
         """Read the drink_the_hose json lines in infile and spit then
         out to outfile if they meet the threshold of similarity to
         this model's corpus."""
@@ -234,10 +240,6 @@ class Trigram:
             s = json.loads(line)['text'].encode('utf8')
             #p = self.cosine_similarity(s)
             p = self.probable_similarity(s)
-            #log(s, p)
-            if adaptive:
-                _threshold = threshold * min(1, (len(s) + 1) / 120.0)
-
             if p >= _threshold:
                 #fout.write(line)
                 fout.write("%5f %s\n" % (p, s))
@@ -326,7 +328,7 @@ def test():
     tg.filter_the_hose(os.path.join(root, "stash/drink-the-hose-2011051103.txt.gz"),
                        "/tmp/%s-good.txt" % mode,
                        "/tmp/%s-rejects.txt" % mode,
-                       threshold=threshold, adaptive=False)
+                       threshold=threshold)
 
     t2 = time.time()
     debug("filtered hose at %s" % (t2 - t,))
