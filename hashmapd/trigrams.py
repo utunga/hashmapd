@@ -6,10 +6,12 @@ import gzip
 from math import log
 from collections import defaultdict
 
-MIN_TRIGRAM_COUNT = 0.1
+TRIGRAM_COUNT_OFFSET = 0.5
 
 #drink the hose example:
 #{"friend_count": 1897, "statuses_count": 54759, "text": "ABC releases trailers for horror series The River and the dark fairy tale Once Upon A Time [Video]: \n\t\t\t\t\t\t\t\t\t\t\n... http://bit.ly/j2U0Ek", "profile_image_url": "http://a2.twimg.com/profile_images/1147470332/top_notched_logo_normal.JPG", "timezone": "Chennai", "geo": null, "id": 70579336008302592, "lang": "en", "screen_name": "Top_Notched", "created_at": "2011-05-17 19:59:59", "entities": {"user_mentions": [], "hashtags": [], "urls": [{"url": "http://bit.ly/j2U0Ek", "indices": [116, 136], "expanded_url": null}]}, "followers_count": 2225, "location": "Udaipur"}
+# The interesting bits:
+#{"text": "ABC releases ....", "id": 70579336008302592, "lang": "en", "screen_name": "Top_Notched"}
 
 def debug(*args):
     for x in args:
@@ -22,6 +24,11 @@ def open_maybe_gzip(filename, mode='rb'):
     else:
         return open(filename, mode)
 
+import re
+
+#ignore numbers, perhaps with dollar signs, or decimal points
+_number_re = re.compile(r'^-?\$?\d+\.?\d*$')
+
 def update_lut_lowercase(lut, s):
     """Fill a trigram Look Up Table with utf-8 byte trigrams of
     lowercase text with normalised whitespace.
@@ -32,7 +39,7 @@ def update_lut_lowercase(lut, s):
         s = s.encode('utf-8')
 
     s = ' '.join(x for x in s.lower().split() if not x[:4] == 'http' and not x[0] in '#@'
-                 and not x.isdigit())
+                 and not _number_re.match(x))
     size = len(s)
     if size == 0:
         return 0
@@ -43,7 +50,6 @@ def update_lut_lowercase(lut, s):
     return size
 
 
-import re
 _split_re = re.compile(r'[!@#$%^&*_+|}{;":?><,./ ]+')
 def update_lut_word_aware(lut, s):
     """Fill a trigram Look Up Table with utf-8 byte trigrams that
@@ -65,14 +71,16 @@ def update_lut_word_aware(lut, s):
     discarded.
 
     This format is used in An Crúbadán by Kevin P. Scannell
-    (http://borel.slu.edu/crubadan/).
+    (http://borel.slu.edu/crubadan/), and the trigram files are
+    interchangeable with its ones (though they are GPLv3).
 
-    #hash and @at tags and URLs are ignored.
+    #hash and @at tags and URLs and pure numbers are ignored.
     """
     if isinstance(s, unicode):
         s = s.encode('utf-8')
     #clear out urls before splitting on punctuation, otherwise url tails remain
-    s = ' '.join(x for x in s.split() if not x[:4] == 'http' and not x[0] in '#@')
+    s = ' '.join(x for x in s.split() if not x[:4] == 'http' and not x[0] in '#@'
+                 and not _number_re.match(x))
     #split on all non-words
     bits = _split_re.split(s)
     #print bits
@@ -86,6 +94,29 @@ def update_lut_word_aware(lut, s):
                 k = b[i : i + 3]
                 lut[k] += 1
     return trigrams
+
+def update_lut_word_aware_lc(lut, s):
+    """Like update_lut_word_aware, but putting everything in lowercase.
+    """
+    if isinstance(s, unicode):
+        s = s.encode('utf-8')
+    #clear out urls before splitting on punctuation, otherwise url tails remain
+    s = ' '.join(x for x in s.lower().split() if not x[:4] == 'http' and not x[0] in '#@'
+                 and not _number_re.match(x))
+    #split on all non-words
+    bits = _split_re.split(s)
+    #print bits
+    trigrams = 0
+    for b in bits:
+        if b:
+            size = len(b)
+            trigrams += size
+            b = '<' + b + '>'
+            for i in range(size):
+                k = b[i : i + 3]
+                lut[k] += 1
+    return trigrams
+
 
 def norm(lut):
     """Find the Euclidean length of a vector stored in a dictionary's
@@ -186,16 +217,16 @@ class Trigram:
 
         return float(total) / (self.norm * norm2)
 
-    def calculate_entropy(self, min_count=MIN_TRIGRAM_COUNT):
+    def calculate_entropy(self, count_offset=TRIGRAM_COUNT_OFFSET):
         all_tgms = 256 * 256 * 256
         known_tgms = len(self.lut)
         unknown_tgms = all_tgms - known_tgms
 
-        # all trigram values have min_count added to prevent log(0)
-        total_count = sum(self.lut.itervalues()) + all_tgms * min_count
-        self.min_evidence = log(min_count, 2)
+        # all trigram values have count_offset added to prevent log(0)
+        total_count = sum(self.lut.itervalues()) + all_tgms * count_offset
+        self.min_evidence = log(count_offset, 2)
         self.uniform_evidence = log(float(total_count) / all_tgms, 2)
-        self.log_evidence = dict((k, log(v + min_count, 2) - self.uniform_evidence)
+        self.log_evidence = dict((k, log(v + count_offset, 2) - self.uniform_evidence)
                                  for k, v in self.lut.iteritems())
         debug("min evidence is ", self.min_evidence,
               "evidence('the')", self.log_evidence['the'],
@@ -267,73 +298,84 @@ class Trigram:
         f.close()
         self.norm = norm(self.lut)
 
-def test():
+def text_to_trigrams(text_name, trigram_name, mode):
+    """save a text file in trigramised form"""
+    tg = Trigram(mode=mode)
+    tg.import_text(text_name)
+    tg.save_trigrams(trigram_name)
+
+
+DEFAULT_RAW_CORPI = (
+    "corpi/raw/17662317-A-Thousand-Tweets_merged_djvu.txt",
+    "corpi/raw/1933-Roosevelt.txt",
+    "corpi/raw/1961-Kennedy.txt",
+    "corpi/raw/2009-Obama.txt",
+    "corpi/raw/carroll-alice.txt",
+    "corpi/raw/dasher_training_english_GB.txt",
+    "corpi/raw/english-web.txt",
+    "corpi/raw/lulz.txt",
+    "corpi/raw/enron-sent.gz",
+    "corpi/raw/wikipedia.txt",
+    "corpi/raw/irc.txt.gz",
+    "corpi/raw/bash-org.txt",
+    )
+DEFAULT_TRIGRAM_CORPI = {
+    'lowercase':  {},
+    'word_aware': {
+        #"corpi/trigram/en-3grams.txt",
+        },
+    'word_aware_lc': {},
+    }
+
+
+def test(use_raw=False, save_trigrams=False):
+    from common import find_git_root
+    root = find_git_root()
+    import time
+    t = time.time()
+    def timer(*messages):
+        t2 = time.time()
+        debug(*(messages + ("at", t2 - t)))
     try:
         mode = sys.argv[1]
     except IndexError:
         mode = 'word_aware'
-    from subprocess import Popen, PIPE
-    p = Popen(["git", "rev-parse", "--show-toplevel"], stdout=PIPE)
-    root = p.communicate()[0].strip()
-    if p.returncode:
-        "Can't find the git tree"
-        sys.exit(1)
-    import time
-    t = time.time()
-    #http://ia600402.us.archive.org/5/items/myTweets/17662317-A-Thousand-Tweets_merged_djvu.txt
     tg = Trigram(mode=mode)
-    if 0:
-        for fn in (
-            "corpi/raw/17662317-A-Thousand-Tweets_merged_djvu.txt",
-            "corpi/raw/1933-Roosevelt.txt",
-            "corpi/raw/1961-Kennedy.txt",
-            "corpi/raw/2009-Obama.txt",
-            "corpi/raw/carroll-alice.txt",
-            "corpi/raw/dasher_training_english_GB.txt",
-            "corpi/raw/english-web.txt",
-            "corpi/raw/lulz.txt",
-            "corpi/raw/enron-sent.gz",
-            "corpi/raw/wikipedia.txt",
-            "corpi/raw/irc.txt.gz",
-            "corpi/raw/bash-org.txt",
-            ):
+    if use_raw:
+        for fn in DEFAULT_RAW_CORPI:
             fn = os.path.join(root, fn)
-            if True:
-                # save the corpus in trigramised form
-                tg2 = Trigram(mode=mode)
-                tg2.import_text(fn)
-                tg2.save_trigrams(fn.replace('raw/', 'trigram/')
-                                  .replace('.txt', '-%s.txt' % mode)
-                                  .replace('.gz', ''))
+            if save_trigrams:
+                #save the corpus as trigram for quick retrieval/ anonymisation
+                tg_name = (fn.replace('raw/', 'trigram/')
+                           .replace('.txt', '-%s.txt' % mode)
+                           .replace('.gz', ''))
+                text_to_trigrams(fn, tg_name, mode)
 
             tg.import_text(fn)
-            t2 = time.time()
-            debug("got %s at %s" % (fn, t2 - t))
-        if 0 and mode == 'word_aware':
-            for fn in (
-                "corpi/trigram/en-3grams.txt",
-                ):
-                tg.load_trigrams(fn)
-                t2 = time.time()
-                debug("got %s at %s" % (fn, t2 - t))
+            timer("got", fn)
+        for fn in DEFAULT_TRIGRAM_CORPI[mode]:
+            tg.load_trigrams(fn)
+            timer("got", fn)
+        #save the trigram for for next time
         tg.save_trigrams(os.path.join(root, 'corpi/trigram/trigrams-%s.txt' % mode))
     else:
         tg.load_trigrams(os.path.join(root, 'corpi/trigram/trigrams-%s.txt' % mode))
-        t2 = time.time()
-        debug("got %s trigrams at %s" % (mode, t2 -t))
+        timer("got trigram for", mode)
+
     threshold = {
         'lowercase':  10.5,
         'word_aware': 10.5,
+        'word_aware_lc': 10.5,
         }[mode]
+
     tg.filter_the_hose(os.path.join(root, "stash/drink-the-hose-2011051103.txt.gz"),
                        "/tmp/%s-good.txt" % mode,
                        "/tmp/%s-rejects.txt" % mode,
                        threshold=threshold)
 
-    t2 = time.time()
-    debug("filtered hose at %s" % (t2 - t,))
+    timer("filtered hose")
 
 
 
 if __name__ == '__main__':
-    test()
+    test(True, True)
