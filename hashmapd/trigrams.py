@@ -23,6 +23,7 @@ import re
 
 #ignore numbers, perhaps with dollar signs, or decimal points
 _number_re = re.compile(r'^-?\$?\d+\.?\d*$')
+_split_re = re.compile(r'[!@#$%^&*_+|}{;":?><,./ ]+')
 
 def update_lut_lowercase(lut, s):
     """Fill a trigram Look Up Table with utf-8 byte trigrams of
@@ -63,7 +64,6 @@ def update_lut_lowercase_depunctuated(lut, s):
     return size
 
 
-_split_re = re.compile(r'[!@#$%^&*_+|}{;":?><,./ ]+')
 def update_lut_word_aware(lut, s):
     """Fill a trigram Look Up Table with utf-8 byte trigrams that
     explicitly mark word boundaries.
@@ -151,6 +151,7 @@ class Trigram:
     def __init__(self, fn=None, mode='word_aware'):
         #XXX python2.7 and 3.1 have Counter(), which is an advancement on defaultdict(int)
         self.lut = defaultdict(int)
+        self.mode = mode
         if fn is not None:
             self.import_text(fn)
 
@@ -230,17 +231,50 @@ class Trigram:
 
         return float(total) / (self.norm * norm2)
 
-    def calculate_entropy(self, count_offset=TRIGRAM_COUNT_OFFSET):
+    def calculate_entropy(self, count_offset=TRIGRAM_COUNT_OFFSET,
+                          other=None, other_mix=0.5):
+        """Create and store a table indicating how many bits of
+        evidence each trigram contains for this hypothesis over the
+        alternative.  Where the alternative is indicated, the table
+        stores a negative number.
+
+        The default alternative hypothesis is a uniform distribution
+        with weights normalised as if it had the same number of
+        observed trigrams as this hypothesis, but evenly spread out
+        (this is arbitrary).
+
+        If other is given, it should be another Trigram to use as the
+        alternative model.  In that case, other_mix indicates a ratio
+        between other and the default flat model.  If other_mix is 1,
+        none of the default model is used.  If other_mix is 0, other
+        is not used at all.  In between you get a linear blend.
+
+        The count_offset parameter is added to all trigram count
+        values.  A lower number treats unknown trigrams as less
+        probable.  Zero is forbidden.
+        """
+        #the number of possible trigrams
         all_tgms = 256 * 256 * 256
         known_tgms = len(self.lut)
         unknown_tgms = all_tgms - known_tgms
 
-        # all trigram values have count_offset added to prevent log(0)
-        total_count = sum(self.lut.itervalues()) + all_tgms * count_offset
+        self.total_count = float(sum(self.lut.itervalues())) + all_tgms * count_offset
         self.min_evidence = log(count_offset, 2)
-        self.uniform_evidence = log(float(total_count) / all_tgms, 2)
+        self.uniform_evidence = log(self.total_count / all_tgms, 2)
         self.log_evidence = dict((k, log(v + count_offset, 2) - self.uniform_evidence)
-                                 for k, v in self.lut.iteritems())
+                                  for k, v in self.lut.iteritems())
+
+
+        if other is not None and other_mix != 0:
+            if other.log_evidence is None:
+                other.calculate_entropy(count_offset=count_offset)
+            u = self.uniform_evidence * (1.0 - other_mix)
+            for k, ov in other.log_evidence.iteritems():
+                sv = self.log_evidence.get(k, self.uniform_evidence)
+                v = sv + u - ov * other_mix
+                self.log_evidence[k] = v
+            self.uniform_evidence = u
+
         debug("min evidence is ", self.min_evidence,
               "evidence('the')", self.log_evidence['the'],
               "uniform evidence", self.uniform_evidence
@@ -262,7 +296,7 @@ class Trigram:
         bitlut = self.log_evidence
         total = 0.0
         for k, v in lut2.iteritems():
-            total += bitlut.get(k, self.min_evidence) * v
+            total += bitlut.get(k, self.min_evidence - self.uniform_evidence) * v
 
         return total / len2
 
