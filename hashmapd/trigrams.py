@@ -138,13 +138,6 @@ def update_lut_word_aware_lc(lut, s):
                 lut[k] += 1
     return trigrams
 
-
-def norm(lut):
-    """Find the Euclidean length of a vector stored in a dictionary's
-    values"""
-    return sum(x * x for x in lut.itervalues()) ** 0.5
-
-
 class Trigram:
     """From one or more text files, the frequency of three character
     sequences is calculated.  When treated as a vector, this information
@@ -153,7 +146,6 @@ class Trigram:
     complete similarity, and 0 for utter difference.  This is used to
     determine the language of a body of text.
     """
-    norm = 0
     trigrams = 0
     log_evidence = None
     def __init__(self, fn=None, mode='word_aware'):
@@ -182,7 +174,6 @@ class Trigram:
 
         f.close()
         self.trigrams += self.update_lut(self.lut, s)
-        self.norm = norm(self.lut)
 
     def import_json(self, fn, by_line=True):
         """Import JSON or drink_the_hose style pseudo-JSON.
@@ -200,44 +191,7 @@ class Trigram:
         for s in tweets:
             s = s.encode('utf8')
             self.trigrams += self.update_lut(self.lut, s)
-        self.norm = norm(self.lut)
         f.close()
-
-    def cosine_similarity(self, other):
-        """returns a number between 0 and 1 indicating similarity
-        between this model and another trigram or string.
-
-        1 means an identical ratio of trigrams;
-        0 means no trigrams in common.
-        """
-        if isinstance(other,  str):
-            lut2 = defaultdict(int)
-            trigrams2 = self.update_lut(lut2, other)
-            norm2 = norm(lut2)
-
-        elif isinstance(other, Trigram):
-            lut2 = other.lut
-            norm2 = other.norm
-            trigrams2 = other.trigrams
-
-        else:
-            raise TypeError("Can't compare Trigram with %s" % type(other))
-
-        if norm2 == 0:
-            return 0
-
-        lut1 = self.lut
-        # Iterate over smallest dictionary (probably the "other" one,
-        # but let's not presume).
-        if len(lut1) < len(lut2):
-            lut1, lut2 = lut2, lut1
-
-        total = 0
-        for k in lut2.keys():
-            if k in lut1:
-                total += lut1[k] * lut2[k]
-
-        return float(total) / (self.norm * norm2)
 
     def calculate_entropy(self, count_offset=TRIGRAM_COUNT_OFFSET,
                           other=None, other_mix=0.5):
@@ -308,11 +262,6 @@ class Trigram:
 
         return total / len2
 
-    def __sub__(self, other):
-        """indicates difference between trigram sets; 1 is entirely
-        different, 0 is entirely the same."""
-        return 1 - self.cosine_similarity(other)
-
     def hose_filter(self, infile):
         """Read the drink_the_hose json lines in infile and yield
         similarity."""
@@ -360,7 +309,6 @@ class Trigram:
             count, tg = line.rstrip('\n').split(' ', 1)
             self.lut[tg] += int(count)
         f.close()
-        self.norm = norm(self.lut)
 
 def text_to_trigrams(text_name, trigram_name, mode):
     """save a text file in trigramised form"""
