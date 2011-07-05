@@ -107,6 +107,11 @@ def get_anti_trigram(mode, use_raw=False):
                      )
     return tg
 
+def get_trigram_with_antimodel(mode, use_raw=False):
+    tg = get_trigram(mode, use_raw=use_raw)
+    atg = get_anti_trigram(tg.mode, use_raw=use_raw)
+    tg.calculate_entropy(other=atg, other_mix=0.7)
+    return tg
 
 def iter_stash():
     for fn in os.listdir(STASH_DIR):
@@ -127,40 +132,62 @@ def _filter_the_hose(tg):
                     threshold=threshold)
 
 
-def _group_by_user(tg):
+
+def _group_by_user(tg, verbose=False):
     users = {}
     for fn in iter_stash():
         print "doing %s" % fn
         group_by_user(tg, fn, users)
         print "%s users" % len(users)
-        counts = defaultdict(int)
-        for v in users.itervalues():
-            counts[len(v)] += 1
-        for k in range(1, max(counts.keys()) + 1):
-            print "%3d %s" % (k, counts.get(k, '.'))
+        if verbose:
+            _users_report(users)
+    return users
 
+def _users_report(users):
+    counts = defaultdict(int)
+    for v in users.itervalues():
+        counts[len(v)] += 1
+    for k in range(1, max(counts.keys()) + 1):
+        print "%3d %s" % (k, counts.get(k, '.'))
 
-def _filter_with_antimodel(tg, use_raw=False, threshold=8):
-    atg = get_anti_trigram(tg.mode, use_raw=use_raw)
-    tg.calculate_entropy(other=atg, other_mix=0.7)
+def partition_users(users, outfile, rejfile, threshold):
+    fout = open_maybe_gzip(outfile, 'w')
+    frej = open_maybe_gzip(rejfile, 'w')
+    for k, v in users.iteritems():
+        if len(v) == 1:
+            mean = v[0]
+        else:
+            mean = sum(v) / len(v)
+        f = (fout if mean >= threshold else frej)
+        #f.write("%4f %s - %s\n" % (mean, k, ' '.join("%4f" % x for x in v)))
+        f.write("%4f %s\n" % (mean, k))
+    fout.close()
+    frej.close()
+
+def _filter_with_antimodel(tg, use_raw=False, threshold=5.5):
     bisect_the_hose(tg, os.path.join(STASH_DIR, "drink-the-hose-2011051103.txt.gz"),
                     "/tmp/%s-good-anti.txt" % tg.mode,
                     "/tmp/%s-rejects-anti.txt" % tg.mode,
                     threshold=threshold)
 
 
+
 def main(argv):
     try:
         mode = argv[1]
     except IndexError:
-        mode = 'word_aware'
+        mode = 'word_aware_lc'
     use_raw=False
-    tg = get_trigram(mode, use_raw=use_raw)
-    _filter_with_antimodel(tg, use_raw=use_raw, threshold=5.4)
+    #for mode in MODES:
+    #    print mode, use_raw
+    #    tg = get_trigram_with_antimodel(mode, use_raw=use_raw)
+    #    _filter_with_antimodel(tg, use_raw=use_raw, threshold=5.45)
     #_filter_the_hose(tg)
-    #_group_by_user(tg)
+    tg = get_trigram_with_antimodel(mode, use_raw=use_raw)
+    users = _group_by_user(tg)
+    _users_report(users)
+    partition_users(users, '/tmp/good_users', '/tmp/bad_users', 5.45)
 
 if __name__ == '__main__':
     #pre_cook()
-    print sys.path
     main(sys.argv)

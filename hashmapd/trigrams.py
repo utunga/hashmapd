@@ -11,8 +11,12 @@ TRIGRAM_COUNT_OFFSET = 0.5
 
 #drink the hose example:
 #{"friend_count": 1897, "statuses_count": 54759, "text": "ABC releases trailers for horror series The River and the dark fairy tale Once Upon A Time [Video]: \n\t\t\t\t\t\t\t\t\t\t\n... http://bit.ly/j2U0Ek", "profile_image_url": "http://a2.twimg.com/profile_images/1147470332/top_notched_logo_normal.JPG", "timezone": "Chennai", "geo": null, "id": 70579336008302592, "lang": "en", "screen_name": "Top_Notched", "created_at": "2011-05-17 19:59:59", "entities": {"user_mentions": [], "hashtags": [], "urls": [{"url": "http://bit.ly/j2U0Ek", "indices": [116, 136], "expanded_url": null}]}, "followers_count": 2225, "location": "Udaipur"}
+#
 # The interesting bits:
+#
 #{"text": "ABC releases ....", "id": 70579336008302592, "lang": "en", "screen_name": "Top_Notched"}
+#
+# NB: not all rows have the id field.
 
 def debug(*args):
     for x in args:
