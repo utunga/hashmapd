@@ -29,7 +29,9 @@ def update_lut_lowercase(lut, s):
     """Fill a trigram Look Up Table with utf-8 byte trigrams of
     lowercase text with normalised whitespace.
 
-    #hash and @at tags and URLs are ignored.
+    'I am Pat!' => ' i ', 'i a', ' am', 'am ', 'm p', ' pa', 'pat', 'at!', 't! '
+
+    #hash and @at tags and URLs and numbers are ignored.
     """
     if isinstance(s, unicode):
         s = s.encode('utf-8')
@@ -87,7 +89,7 @@ def update_lut_word_aware(lut, s):
     (http://borel.slu.edu/crubadan/), and the trigram files are
     interchangeable with its ones (though they are GPLv3).
 
-    #hash and @at tags and URLs and pure numbers are ignored.
+    #hash and @at tags and URLs and numbers are ignored.
     """
     if isinstance(s, unicode):
         s = s.encode('utf-8')
@@ -110,6 +112,8 @@ def update_lut_word_aware(lut, s):
 
 def update_lut_word_aware_lc(lut, s):
     """Like update_lut_word_aware, but putting everything in lowercase.
+
+    'I am Pat!' => '<i>', '<am', 'am>', '<pa', 'pat', 'at>'
     """
     if isinstance(s, unicode):
         s = s.encode('utf-8')
@@ -305,30 +309,32 @@ class Trigram:
         different, 0 is entirely the same."""
         return 1 - self.cosine_similarity(other)
 
-    def filter_the_hose(self, infile, outfile, rejectfile=None, threshold=0.9):
-        """Read the drink_the_hose json lines in infile and spit then
-        out to outfile if they meet the threshold of similarity to
-        this model's corpus."""
-        f = open_maybe_gzip(infile)
-        fout = open_maybe_gzip(outfile, 'w')
-        if rejectfile is not None:
-            frej = open_maybe_gzip(rejectfile, 'w')
-        _threshold = threshold
+    def hose_filter(self, infile):
+        """Read the drink_the_hose json lines in infile and yield
+        similarity."""
+        if hasattr(infile, 'next'):
+            f = infile
+        else:
+            f = open_maybe_gzip(infile)
         for line in f:
-            s = json.loads(line)['text'].encode('utf8')
-            #p = self.cosine_similarity(s)
+            j = json.loads(line)
+            s = j['text'].encode('utf8')
             p = self.probable_similarity(s)
-            if p >= _threshold:
-                #fout.write(line)
-                fout.write("%5f %s\n" % (p, s))
-            elif rejectfile is not None:
-                #frej.write(line)
-                frej.write("%5f %s\n" % (p, s))
-
-        f.close()
-        fout.close()
+            yield {'score': p,
+                   'text': s,
+                   #'id': j['id'],
+                   'screen_name': j["screen_name"].encode('utf8')
+                   }
+        if f is not infile:
+            f.close()
 
     def save_trigrams(self, filename):
+        """Save the trigram data to a file.
+
+        The format of the file is specific to the trigram mode.
+
+        It is much quicker to load the trigrams from a trigram file
+        than to regenerate the model from raw text."""
         values = [(v, k) for k, v in self.lut.iteritems()]
         values.sort()
         values.reverse()
@@ -338,6 +344,13 @@ class Trigram:
         f.close()
 
     def load_trigrams(self, filename):
+        """Load model data from a text file where each formatted thus:
+
+        <number of occurances><space><the three bytes><end of line>
+
+        The format of the trigram is specific to the trigram mode, but
+        no attempt is made to ensure that it is right.
+        """
         f = open_maybe_gzip(filename)
         for line in f:
             count, tg = line.rstrip('\n').split(' ', 1)
@@ -352,77 +365,4 @@ def text_to_trigrams(text_name, trigram_name, mode):
     tg.save_trigrams(trigram_name)
 
 
-DEFAULT_RAW_CORPI = (
-    "corpi/raw/17662317-A-Thousand-Tweets_merged_djvu.txt",
-    "corpi/raw/1933-Roosevelt.txt",
-    "corpi/raw/1961-Kennedy.txt",
-    "corpi/raw/2009-Obama.txt",
-    "corpi/raw/carroll-alice.txt",
-    "corpi/raw/dasher_training_english_GB.txt",
-    "corpi/raw/english-web.txt",
-    "corpi/raw/lulz.txt",
-    "corpi/raw/enron-sent.gz",
-    "corpi/raw/wikipedia.txt",
-    "corpi/raw/irc.txt.gz",
-    "corpi/raw/bash-org.txt",
-    )
-DEFAULT_TRIGRAM_CORPI = {
-    'lowercase':  {},
-    'word_aware': {
-        #"corpi/trigram/en-3grams.txt",
-        },
-    'word_aware_lc': {},
-    }
-
-
-def test(use_raw=False, save_trigrams=False):
-    from common import find_git_root
-    root = find_git_root()
-    import time
-    t = time.time()
-    def timer(*messages):
-        t2 = time.time()
-        debug(*(messages + ("at", t2 - t)))
-    try:
-        mode = sys.argv[1]
-    except IndexError:
-        mode = 'word_aware'
-    tg = Trigram(mode=mode)
-    if use_raw:
-        for fn in DEFAULT_RAW_CORPI:
-            fn = os.path.join(root, fn)
-            if save_trigrams:
-                #save the corpus as trigram for quick retrieval/ anonymisation
-                tg_name = (fn.replace('raw/', 'trigram/')
-                           .replace('.txt', '-%s.txt' % mode)
-                           .replace('.gz', ''))
-                text_to_trigrams(fn, tg_name, mode)
-
-            tg.import_text(fn)
-            timer("got", fn)
-        for fn in DEFAULT_TRIGRAM_CORPI[mode]:
-            tg.load_trigrams(fn)
-            timer("got", fn)
-        #save the trigram for for next time
-        tg.save_trigrams(os.path.join(root, 'corpi/trigram/trigrams-%s.txt' % mode))
-    else:
-        tg.load_trigrams(os.path.join(root, 'corpi/trigram/trigrams-%s.txt' % mode))
-        timer("got trigram for", mode)
-
-    threshold = {
-        'lowercase':  10.5,
-        'word_aware': 10.5,
-        'word_aware_lc': 10.5,
-        }[mode]
-
-    tg.filter_the_hose(os.path.join(root, "stash/drink-the-hose-2011051103.txt.gz"),
-                       "/tmp/%s-good.txt" % mode,
-                       "/tmp/%s-rejects.txt" % mode,
-                       threshold=threshold)
-
-    timer("filtered hose")
-
-
-
-if __name__ == '__main__':
-    test(True, True)
+MODES = tuple(x[11:] for x in globals() if x.startswith('update_lut_'))
