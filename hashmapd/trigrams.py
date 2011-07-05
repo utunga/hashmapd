@@ -139,12 +139,8 @@ def update_lut_word_aware_lc(lut, s):
     return trigrams
 
 class Trigram:
-    """From one or more text files, the frequency of three character
-    sequences is calculated.  When treated as a vector, this information
-    can be compared to other trigrams, and the difference between them
-    seen as an angle.  The cosine of this angle varies between 1 for
-    complete similarity, and 0 for utter difference.  This is used to
-    determine the language of a body of text.
+    """Model a language based on the frequency of different three
+    character sequences.
     """
     trigrams = 0
     log_evidence = None
@@ -174,24 +170,6 @@ class Trigram:
 
         f.close()
         self.trigrams += self.update_lut(self.lut, s)
-
-    def import_json(self, fn, by_line=True):
-        """Import JSON or drink_the_hose style pseudo-JSON.
-        Drink_the_hose stores each tweet on its own line.
-        Real JSON would need them to be in square brackets and separated by commas.
-
-        @param by_line whether to use drink_the_hose style (True by default)
-        """
-        f = open_maybe_gzip(fn)
-        if by_line:
-            tweets = (json.loads(line)['text'] for line in f)
-        else:
-            tweets = (x['text'] for x in json.load(f))
-
-        for s in tweets:
-            s = s.encode('utf8')
-            self.trigrams += self.update_lut(self.lut, s)
-        f.close()
 
     def calculate_entropy(self, count_offset=TRIGRAM_COUNT_OFFSET,
                           other=None, other_mix=0.5):
