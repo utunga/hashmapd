@@ -36,12 +36,30 @@ def update_lut_lowercase(lut, s):
     s = ' '.join(x for x in s.lower().split() if not x[:4] == 'http' and not x[0] in '#@'
                  and not _number_re.match(x))
     size = len(s)
-    if size == 0:
-        return 0
-    s = ' ' + s + ' '
-    for i in range(size):
-        k = s[i : i + 3]
-        lut[k] += 1
+    if size != 0:
+        s = ' ' + s + ' '
+        for i in range(size):
+            k = s[i : i + 3]
+            lut[k] += 1
+    return size
+
+def update_lut_lowercase_depunctuated(lut, s):
+    """Like update_lut_lowercase, but with most punctuation removed.
+
+    'I am Pat!' => ' i ', 'i a', ' am', 'am ', 'm p', ' pa', 'pat', 'at '
+    """
+    if isinstance(s, unicode):
+        s = s.encode('utf-8')
+
+    s = ' '.join(x for x in s.lower().split() if not x[:4] == 'http' and not x[0] in '#@'
+                 and not _number_re.match(x))
+    s = ' '.join(x for x in _split_re.split(s) if x)
+    size = len(s)
+    if size != 0:
+        s = ' ' + s + ' '
+        for i in range(size):
+            k = s[i : i + 3]
+            lut[k] += 1
     return size
 
 
