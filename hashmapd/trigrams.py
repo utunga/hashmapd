@@ -5,6 +5,7 @@ import json
 import gzip
 from math import log
 from collections import defaultdict
+from common import open_maybe_gzip
 
 TRIGRAM_COUNT_OFFSET = 0.5
 
@@ -17,12 +18,6 @@ def debug(*args):
     for x in args:
         print >> sys.stderr, x,
     print >> sys.stderr
-
-def open_maybe_gzip(filename, mode='rb'):
-    if filename.endswith('.gz'):
-        return gzip.open(filename, mode)
-    else:
-        return open(filename, mode)
 
 import re
 
