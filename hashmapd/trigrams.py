@@ -29,6 +29,27 @@ import re
 _number_re = re.compile(r'^-?\$?\d+\.?\d*$')
 _split_re = re.compile(r'[!@#$%^&*_+|}{;":?><,./ ]+')
 
+def sanitise_string(s):
+    if isinstance(s, unicode):
+        s = s.encode('utf-8')
+    #clear out urls before splitting on punctuation, otherwise url tails remain
+    return ' '.join(x for x in s.split() if not x[:4] == 'http'
+                    and not x[0] in '#@'
+                    and not x == 'RT'
+                    and not _number_re.match(x))
+
+def sanitise_string_lc(s):
+    if isinstance(s, unicode):
+        s = s.encode('utf-8')
+    #clear out urls before splitting on punctuation, otherwise url tails remain
+    s = ' '.join(x for x in s.lower().split() if not x[:4] == 'http'
+                 and not x[0] in '#@'
+                 and not x == 'rt'            #not 'RT' because s.lower()
+                 and not _number_re.match(x))
+    s = s.replace('&lt;', '<').replace('&gt;', '>')
+    return s
+
+
 def update_lut_lowercase(lut, s):
     """Fill a trigram Look Up Table with utf-8 byte trigrams of
     lowercase text with normalised whitespace.
@@ -37,11 +58,7 @@ def update_lut_lowercase(lut, s):
 
     #hash and @at tags and URLs and numbers are ignored.
     """
-    if isinstance(s, unicode):
-        s = s.encode('utf-8')
-
-    s = ' '.join(x for x in s.lower().split() if not x[:4] == 'http' and not x[0] in '#@'
-                 and not _number_re.match(x))
+    s = sanitise_string_lc(s)
     size = len(s)
     if size != 0:
         s = ' ' + s + ' '
@@ -55,11 +72,7 @@ def update_lut_lowercase_depunctuated(lut, s):
 
     'I am Pat!' => ' i ', 'i a', ' am', 'am ', 'm p', ' pa', 'pat', 'at '
     """
-    if isinstance(s, unicode):
-        s = s.encode('utf-8')
-
-    s = ' '.join(x for x in s.lower().split() if not x[:4] == 'http' and not x[0] in '#@'
-                 and not _number_re.match(x))
+    s = sanitise_string_lc(s)
     s = ' '.join(x for x in _split_re.split(s) if x)
     size = len(s)
     if size != 0:
@@ -68,7 +81,6 @@ def update_lut_lowercase_depunctuated(lut, s):
             k = s[i : i + 3]
             lut[k] += 1
     return size
-
 
 def update_lut_word_aware(lut, s):
     """Fill a trigram Look Up Table with utf-8 byte trigrams that
@@ -95,14 +107,9 @@ def update_lut_word_aware(lut, s):
 
     #hash and @at tags and URLs and numbers are ignored.
     """
-    if isinstance(s, unicode):
-        s = s.encode('utf-8')
-    #clear out urls before splitting on punctuation, otherwise url tails remain
-    s = ' '.join(x for x in s.split() if not x[:4] == 'http' and not x[0] in '#@'
-                 and not _number_re.match(x))
+    s = sanitise_string(s)
     #split on all non-words
     bits = _split_re.split(s)
-    #print bits
     trigrams = 0
     for b in bits:
         if b:
@@ -119,14 +126,8 @@ def update_lut_word_aware_lc(lut, s):
 
     'I am Pat!' => '<i>', '<am', 'am>', '<pa', 'pat', 'at>'
     """
-    if isinstance(s, unicode):
-        s = s.encode('utf-8')
-    #clear out urls before splitting on punctuation, otherwise url tails remain
-    s = ' '.join(x for x in s.lower().split() if not x[:4] == 'http' and not x[0] in '#@'
-                 and not _number_re.match(x))
-    #split on all non-words
+    s = sanitise_string_lc(s)
     bits = _split_re.split(s)
-    #print bits
     trigrams = 0
     for b in bits:
         if b:
@@ -217,6 +218,7 @@ class Trigram:
 
         debug("min evidence is ", self.min_evidence,
               "evidence('the')", self.log_evidence['the'],
+              "evidence('los')", self.log_evidence['los'],
               "uniform evidence", self.uniform_evidence
               )
 

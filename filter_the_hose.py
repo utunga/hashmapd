@@ -14,6 +14,14 @@ TRIGRAM_MODEL_DIR = os.path.join(BASE_DIR, "corpi/compiled/")
 #this might not be so on other machines
 STASH_DIR = os.path.join(BASE_DIR, "stash")
 
+TEST_FILE_1 = os.path.join(STASH_DIR, "drink-the-hose-2011051103.txt.gz")
+TEST_FILE_2 = os.path.join(STASH_DIR, "drink-the-hose-2011050811.txt.gz")
+
+DEFAULT_MODE = 'word_aware_lc'
+DEFAULT_THRESHOLD = 5.2
+
+
+
 CORPI = (#name, gzipped, pre-trigrammised
     ("17662317-A-Thousand-Tweets_merged_djvu", None, False),
     ("1933-Roosevelt", None, False),
@@ -51,6 +59,10 @@ def pre_cook(modes=MODES, corpi=CORPI):
             src = raw_corpi_path(base, gz)
             text_to_trigrams(src, dest, mode)
 
+def pre_cook_full(modes=MODES, corpi=CORPI):
+    for mode in modes:
+        print mode
+        tg = get_trigram_with_antimodel(mode, use_raw=True, corpi=corpi)
 
 def load_corpi(mode, corpi=CORPI):
     if isinstance(mode, Trigram):
@@ -84,6 +96,20 @@ def bisect_the_hose(trigram, infile, goodfile, rejectfile, threshold):
     fgood.close()
     frej.close()
 
+def order_the_hose(trigram, infile, outfile):
+    f = open_maybe_gzip(infile)
+    fout = open_maybe_gzip(outfile, 'w')
+
+    hose_filter = trigram.hose_filter(f)
+    rows = [(d['score'], d['text']) for d in hose_filter]
+    rows.sort()
+    for r in rows:
+        fout.write("%5f %s\n" % r)
+
+    f.close()
+    fout.close()
+
+
 def group_by_user(trigram, infile, users=None):
     if users is None:
         users = {}
@@ -107,8 +133,8 @@ def get_anti_trigram(mode, use_raw=False):
                      )
     return tg
 
-def get_trigram_with_antimodel(mode, use_raw=False):
-    tg = get_trigram(mode, use_raw=use_raw)
+def get_trigram_with_antimodel(mode, use_raw=False, corpi=CORPI):
+    tg = get_trigram(mode, use_raw=use_raw, corpi=corpi)
     atg = get_anti_trigram(tg.mode, use_raw=use_raw)
     tg.calculate_entropy(other=atg, other_mix=0.7)
     return tg
@@ -119,18 +145,26 @@ def iter_stash():
             yield(os.path.join(STASH_DIR, fn))
 
 
-def _filter_the_hose(tg):
-    threshold = {
-        'lowercase':  10.5,
-        'word_aware': 10.5,
-        'word_aware_lc': 10.5,
-        }[tg.mode]
-
-    bisect_the_hose(tg, os.path.join(STASH_DIR, "drink-the-hose-2011051103.txt.gz"),
-                    "/tmp/%s-good.txt" % tg.mode,
-                    "/tmp/%s-rejects.txt" % tg.mode,
+def _filter_the_hose(tg, threshold=DEFAULT_THRESHOLD, suffix='', src=TEST_FILE_1):
+    bisect_the_hose(tg, os.path.join(src),
+                    "/tmp/%s-good%s.txt" % (tg.mode, suffix),
+                    "/tmp/%s-rejects%s.txt" % (tg.mode, suffix),
                     threshold=threshold)
 
+
+def _filter_all_modes(suffix=''):
+    for mode in MODES:
+        tg = get_trigram_with_antimodel(mode)
+        _filter_the_hose(tg)
+
+
+def _order_the_hose(tg, suffix='', src=TEST_FILE_1):
+    order_the_hose(tg, src, "/tmp/%s-sorted%s.txt" % (tg.mode, suffix))
+
+def _order_all_modes(modes=MODES, suffix=''):
+    for mode in modes:
+        tg = get_trigram_with_antimodel(mode)
+        _order_the_hose(tg, suffix)
 
 
 def _group_by_user(tg, verbose=False):
@@ -164,30 +198,25 @@ def partition_users(users, outfile, rejfile, threshold):
     fout.close()
     frej.close()
 
-def _filter_with_antimodel(tg, use_raw=False, threshold=5.5):
-    bisect_the_hose(tg, os.path.join(STASH_DIR, "drink-the-hose-2011051103.txt.gz"),
-                    "/tmp/%s-good-anti.txt" % tg.mode,
-                    "/tmp/%s-rejects-anti.txt" % tg.mode,
-                    threshold=threshold)
-
 
 
 def main(argv):
     try:
         mode = argv[1]
     except IndexError:
-        mode = 'word_aware_lc'
-    use_raw=False
-    #for mode in MODES:
-    #    print mode, use_raw
-    #    tg = get_trigram_with_antimodel(mode, use_raw=use_raw)
-    #    _filter_with_antimodel(tg, use_raw=use_raw, threshold=5.45)
-    #_filter_the_hose(tg)
-    tg = get_trigram_with_antimodel(mode, use_raw=use_raw)
-    users = _group_by_user(tg)
-    _users_report(users)
-    partition_users(users, '/tmp/good_users', '/tmp/bad_users', 5.45)
+        mode = DEFAULT_MODE
+    tg = get_trigram_with_antimodel(mode)
+    if 1:
+        _filter_the_hose(tg)
+    else:
+        users = _group_by_user(tg)
+        _users_report(users)
+        partition_users(users, '/tmp/good_users', '/tmp/bad_users', DEFAULT_THRESHOLD)
 
 if __name__ == '__main__':
-    #pre_cook()
-    main(sys.argv)
+    _modes = [DEFAULT_MODE]
+    #pre_cook(modes=_modes)
+    #pre_cook_full(modes=_modes)
+    #main(sys.argv)
+    #_filter_all_modes()
+    _order_all_modes(modes=_modes)
