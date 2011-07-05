@@ -23,22 +23,22 @@ DEFAULT_THRESHOLD = 5.2
 
 
 CORPI = (#name, gzipped, pre-trigrammised
-    ("17662317-A-Thousand-Tweets_merged_djvu", None, False),
-    ("1933-Roosevelt", None, False),
-    ("1961-Kennedy", None, False),
-    ("2009-Obama", None, False),
-    ("carroll-alice", None, False),
-    ("dasher_training_english_GB", None, False),
-    ("english-web", None, False),
-    ("lulz", None, False),
-    ("enron-sent", "gz", False),
-    ("wikipedia", None, False),
-    ("irc", "gz", False),
-    ("bash-org", None, False),
+    ("presidents", False, False),
+    ("carroll-alice", False, False),
+    ("dasher_training_english_GB", False, False),
+    ("english-web", False, False),
+    ("lulz", False, False),
+    ("enron-sent", True, False),
+    ("wikipedia", False, False),
+    ("irc", True, False),
+    ("bash-org", False, False),
+    ("borderline", False, False),
+    ("borderline", False, False),
     )
 
 ANTI_CORPI = (
-    ("anti-english", None, False),
+    ("anti-english", False, False),
+    ("near-english", False, False),
 )
 
 def raw_corpi_path(base, gz):
