@@ -1,9 +1,12 @@
 #!/bin/bash -e
 
-TOKEN_DATA=website/www/canvas/tokens/all-tokens-7.json
-USER_DATA=website/www/canvas/locations.json
-#TOKEN_DATA=website/www/canvas/tokens/all-tokens-10.json.gz
-#USER_DATA=website/www/canvas/tokens/users-9.json
+GIT_ROOT=$(git rev-parse --show-toplevel)
+CANVAS_DIR=$GIT_ROOT/website/www/canvas
+
+TOKEN_DATA=$CANVAS_DIR/tokens/all-tokens-7.json
+USER_DATA=$CANVAS_DIR/locations.json
+#TOKEN_DATA=$CANVAS_DIR/tokens/all-tokens-10.json.gz
+#USER_DATA=$CANVAS_DIR/tokens/users-9.json
 
 
 rm -f labels.pickle
@@ -18,5 +21,5 @@ fi
 
 for x in $TARGETS; do
     echo $BASE-$x.html
-    time ./find_labels.py $TOKEN_DATA $USER_DATA website/www/canvas/$BASE-$x.html $x
+    time ./find_labels.py $TOKEN_DATA $USER_DATA $CANVAS_DIR/$BASE-$x.html $x
 done

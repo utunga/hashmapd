@@ -216,7 +216,7 @@ def get_cached_data():
 def save_cached_data(tokens, users):
     log("generating cache")
     f = open(PICKLE, 'w')
-    cPickle.dump((tokens, list(users)), f)
+    cPickle.dump((tokens, list(users)), f, -1)
     f.close()
 
 def really_get_data(token_json, user_json):
