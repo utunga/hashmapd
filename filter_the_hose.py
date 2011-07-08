@@ -23,21 +23,20 @@ DEFAULT_THRESHOLD = 5.2
 
 
 CORPI = (#name, gzipped, pre-trigrammised
-    ("presidents", False, False),
-    ("carroll-alice", False, False),
-    ("dasher_training_english_GB", False, False),
-    ("english-web", False, False),
-    ("lulz", False, False),
-    ("enron-sent", True, False),
-    ("wikipedia", False, False),
-    ("irc", True, False),
-    ("bash-org", False, False),
-    ("borderline", False, False),
-    ("borderline", False, False),
+    ("presidents", False, True),
+    ("carroll-alice", False, True),
+    ("dasher_training_english_GB", False, True),
+    ("english-web", False, True),
+    ("lulz", False, True),
+    ("enron-sent", True, True),
+    ("wikipedia", False, True),
+    ("irc", True, True),
+    ("bash-org", False, True),
+    ("barely-english", False, False),
     )
 
 ANTI_CORPI = (
-    ("anti-english", False, False),
+    ("anti-english", False, True),
     ("near-english", False, False),
 )
 
@@ -55,7 +54,7 @@ def pre_cook(modes=MODES, corpi=CORPI):
         modes = [mode]
     for mode in modes:
         for base, gz, precooked in corpi:
-            dest = cooked_corpi_path(base, mode)
+            dest = cooked_corpi_path(base, mode, gz)
             src = raw_corpi_path(base, gz)
             text_to_trigrams(src, dest, mode)
 
