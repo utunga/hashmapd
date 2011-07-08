@@ -14,6 +14,7 @@ TRIGRAM_MODEL_DIR = os.path.join(BASE_DIR, "corpi/compiled/")
 #this might not be so on other machines
 STASH_DIR = os.path.join(BASE_DIR, "stash")
 
+TEST_FILE_3 = os.path.join(STASH_DIR, "drink-the-hose-2011051203.txt.gz")
 TEST_FILE_1 = os.path.join(STASH_DIR, "drink-the-hose-2011051103.txt.gz")
 TEST_FILE_2 = os.path.join(STASH_DIR, "drink-the-hose-2011050811.txt.gz")
 
@@ -197,20 +198,25 @@ def partition_users(users, outfile, rejfile, threshold):
     fout.close()
     frej.close()
 
-
+def dump_users(users, outfile):
+    fout = open_maybe_gzip(outfile, 'w')
+    for k, v in users.iteritems():
+        mean = sum(v) / len(v)
+        fout.write("%4f %s\n" % (mean, k))
+    fout.close()
 
 def main(argv):
+    parser = OptionParser()
+
     try:
         mode = argv[1]
     except IndexError:
         mode = DEFAULT_MODE
     tg = get_trigram_with_antimodel(mode)
-    if 1:
-        _filter_the_hose(tg)
-    else:
-        users = _group_by_user(tg)
-        _users_report(users)
-        partition_users(users, '/tmp/good_users', '/tmp/bad_users', DEFAULT_THRESHOLD)
+    users = _group_by_user(tg)
+    _users_report(users)
+    partition_users(users, '/tmp/good_users', '/tmp/bad_users', DEFAULT_THRESHOLD)
+    dump_users(users, '/tmp/all_users')
 
 if __name__ == '__main__':
     _modes = [DEFAULT_MODE]
