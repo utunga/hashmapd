@@ -7,7 +7,9 @@ from math import log
 from collections import defaultdict
 from common import open_maybe_gzip
 
-TRIGRAM_COUNT_OFFSET = 0.5
+#Multiplied by mean trigram weight and added to each, to give unseen trigrams a chance
+TRIGRAM_OFFSET_FACTOR = 0.5
+ANTI_TRIGRAM_OFFSET_FACTOR = 1.0
 
 #drink the hose example:
 #{"friend_count": 1897, "statuses_count": 54759, "text": "ABC releases trailers for horror series The River and the dark fairy tale Once Upon A Time [Video]: \n\t\t\t\t\t\t\t\t\t\t\n... http://bit.ly/j2U0Ek", "profile_image_url": "http://a2.twimg.com/profile_images/1147470332/top_notched_logo_normal.JPG", "timezone": "Chennai", "geo": null, "id": 70579336008302592, "lang": "en", "screen_name": "Top_Notched", "created_at": "2011-05-17 19:59:59", "entities": {"user_mentions": [], "hashtags": [], "urls": [{"url": "http://bit.ly/j2U0Ek", "indices": [116, 136], "expanded_url": null}]}, "followers_count": 2225, "location": "Udaipur"}
@@ -172,8 +174,8 @@ class Trigram:
         f.close()
         self.trigrams += self.update_lut(self.lut, s)
 
-    def calculate_entropy(self, count_offset=TRIGRAM_COUNT_OFFSET,
-                          other=None, other_mix=0.5):
+    def calculate_entropy(self, offset_factor=TRIGRAM_OFFSET_FACTOR,
+                          other=None, other_offset_factor=ANTI_TRIGRAM_OFFSET_FACTOR):
         """Create and store a table indicating how many bits of
         evidence each trigram contains for this hypothesis over the
         alternative.  Where the alternative is indicated, the table
@@ -181,45 +183,73 @@ class Trigram:
 
         The default alternative hypothesis is a uniform distribution
         with weights normalised as if it had the same number of
-        observed trigrams as this hypothesis, but evenly spread out
-        (this is arbitrary).
+        observed trigrams as this hypothesis scaled by
+        other_offset_factor, and evenly spread out.
+
+        The offset_factor parameter is added to all trigram count
+        values.  A lower number treats unknown trigrams as less
+        probable.  Zero is forbidden, unless all 16M possible trigrams
+        have been counted at least once.  The higher this number is,
+        the less surprising an unseen trigram is to the model.  It is
+        the background noise.
 
         If other is given, it should be another Trigram to use as the
-        alternative model.  In that case, other_mix indicates a ratio
-        between other and the default flat model.  If other_mix is 1,
-        none of the default model is used.  If other_mix is 0, other
-        is not used at all.  In between you get a linear blend.
-
-        The count_offset parameter is added to all trigram count
-        values.  A lower number treats unknown trigrams as less
-        probable.  Zero is forbidden.
+        alternative model.  If that Trigram hasn't had
+        calculate_entropy called, that is done with the offset_factor
+        set to other_offset_factor.  Typically, other_offset_factor
+        would be higher than offset_factor, which would make random
+        trigrams more attractive to the other Trigram.
         """
         #the number of possible trigrams
         all_tgms = 256 * 256 * 256
         known_tgms = len(self.lut)
         unknown_tgms = all_tgms - known_tgms
 
-        self.total_count = float(sum(self.lut.itervalues())) + all_tgms * count_offset
-        self.min_evidence = log(count_offset, 2)
-        self.uniform_evidence = log(self.total_count / all_tgms, 2)
-        self.log_evidence = dict((k, log(v + count_offset, 2) - self.uniform_evidence)
-                                  for k, v in self.lut.iteritems())
+        total_count = float(sum(self.lut.itervalues()))
+        mean_count = total_count / all_tgms
+        count_offset = mean_count * offset_factor
+        adj_count = total_count + all_tgms * count_offset
+        adj_mean = mean_count + count_offset
+        log_norm = log(1.0 / adj_count, 2)
+        self.min_evidence = log(count_offset, 2) + log_norm
 
-
-        if other is not None and other_mix != 0:
+        if other is None:
+            # The opposing hypothesis is uniform noise
+            if other_offset_factor == 0:
+                #no opposition
+                noise = 0
+            else:
+                noise = log(adj_mean * other_offset_factor, 2) + log_norm
+            debug("noise is ", noise)
+            self.default_evidence = self.min_evidence - noise
+            self.log_evidence = dict((k, log(v + count_offset, 2) - noise + log_norm)
+                                     for k, v in self.lut.iteritems())
+        else:
+            #if the other one already has its entropy set up, we use that
+            #and other_offset_factor is ignored.
             if other.log_evidence is None:
-                other.calculate_entropy(count_offset=count_offset)
-            u = self.uniform_evidence * (1.0 - other_mix)
-            for k, ov in other.log_evidence.iteritems():
-                sv = self.log_evidence.get(k, self.uniform_evidence)
-                v = sv + u - ov * other_mix
-                self.log_evidence[k] = v
-            self.uniform_evidence = u
+                other.calculate_entropy(offset_factor=other_offset_factor,
+                                        other_offset_factor=0)
 
-        debug("min evidence is ", self.min_evidence,
+            #the unopposed evidence for this hypothesis
+            log_evidence = dict((k, log(v + count_offset, 2) + log_norm)
+                                for k, v in self.lut.iteritems())
+
+            self.default_evidence = self.min_evidence - other.min_evidence
+            self.log_evidence = {}
+            for k in set(other.log_evidence.keys()) | set(log_evidence.keys()):
+                ov = other.log_evidence.get(k, other.min_evidence)
+                sv = log_evidence.get(k, self.min_evidence)
+                self.log_evidence[k] = sv - ov
+
+
+        debug("log_norm is ", log_norm, "len is ", len(self.lut))
+        debug("total count is ", total_count)
+        debug("adjusted count is ", adj_count, "average is", adj_count / all_tgms)
+        debug("min evidence is ", self.min_evidence,)
+        debug("default evidence is ", self.default_evidence,
               "evidence('the')", self.log_evidence['the'],
               "evidence('los')", self.log_evidence['los'],
-              "uniform evidence", self.uniform_evidence
               )
 
 
@@ -236,9 +266,10 @@ class Trigram:
             return 0
 
         bitlut = self.log_evidence
+        default = self.default_evidence
         total = 0.0
         for k, v in lut2.iteritems():
-            total += bitlut.get(k, self.min_evidence - self.uniform_evidence) * v
+            total += bitlut.get(k, default) * v
 
         return total / len2
 

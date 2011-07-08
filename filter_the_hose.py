@@ -18,7 +18,7 @@ TEST_FILE_1 = os.path.join(STASH_DIR, "drink-the-hose-2011051103.txt.gz")
 TEST_FILE_2 = os.path.join(STASH_DIR, "drink-the-hose-2011050811.txt.gz")
 
 DEFAULT_MODE = 'word_aware_lc'
-DEFAULT_THRESHOLD = 5.2
+DEFAULT_THRESHOLD = 0.5
 
 
 
@@ -135,7 +135,7 @@ def get_anti_trigram(mode, use_raw=False):
 def get_trigram_with_antimodel(mode, use_raw=False, corpi=CORPI):
     tg = get_trigram(mode, use_raw=use_raw, corpi=corpi)
     atg = get_anti_trigram(tg.mode, use_raw=use_raw)
-    tg.calculate_entropy(other=atg, other_mix=0.7)
+    tg.calculate_entropy(other=atg)
     return tg
 
 def iter_stash():
