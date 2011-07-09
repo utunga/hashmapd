@@ -19,7 +19,8 @@ TEST_FILE_1 = os.path.join(STASH_DIR, "drink-the-hose-2011051103.txt.gz")
 TEST_FILE_2 = os.path.join(STASH_DIR, "drink-the-hose-2011050811.txt.gz")
 
 DEFAULT_MODE = 'word_aware_lc'
-DEFAULT_THRESHOLD = 0.5
+#DEFAULT_THRESHOLD = 0.5
+DEFAULT_THRESHOLD = "LOL"
 
 
 
@@ -83,11 +84,14 @@ def bisect_the_hose(trigram, infile, goodfile, rejectfile, threshold):
     f = open_maybe_gzip(infile)
     fgood = open_maybe_gzip(goodfile, 'w')
     frej = open_maybe_gzip(rejectfile, 'w')
+    if isinstance(threshold, str):
+        threshold = trigram.probable_similarity(threshold)
+        debug("threshold is", threshold)
 
     hose_filter = trigram.hose_filter(f)
 
     for d in hose_filter:
-        if d['score'] > threshold:
+        if d['score'] >= threshold:
             fgood.write("%(score)5f %(text)s\n" % d)
         else:
             frej.write("%(score)5f %(text)s\n" % d)
@@ -152,8 +156,8 @@ def _filter_the_hose(tg, threshold=DEFAULT_THRESHOLD, suffix='', src=TEST_FILE_1
                     threshold=threshold)
 
 
-def _filter_all_modes(suffix=''):
-    for mode in MODES:
+def _filter_all_modes(suffix='', modes=MODES):
+    for mode in modes:
         tg = get_trigram_with_antimodel(mode)
         _filter_the_hose(tg)
 
@@ -185,6 +189,8 @@ def _users_report(users):
         print "%3d %s" % (k, counts.get(k, '.'))
 
 def partition_users(users, outfile, rejfile, threshold):
+    if isinstance(threshold, str):
+        threshold = trigram.probable_similarity(threshold)
     fout = open_maybe_gzip(outfile, 'w')
     frej = open_maybe_gzip(rejfile, 'w')
     for k, v in users.iteritems():
