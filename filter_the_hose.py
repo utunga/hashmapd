@@ -10,9 +10,9 @@ from hashmapd.trigrams import TRIGRAM_OFFSET_FACTOR, ANTI_TRIGRAM_OFFSET_FACTOR
 from hashmapd.common import find_git_root, open_maybe_gzip
 BASE_DIR = find_git_root()
 
-RAW_CORPI_DIR = os.path.join(BASE_DIR, "corpi/raw/")
-COOKED_CORPI_DIR = os.path.join(BASE_DIR, "corpi/trigram/")
-TRIGRAM_MODEL_DIR = os.path.join(BASE_DIR, "corpi/compiled/")
+RAW_CORPI_DIR = os.path.join(BASE_DIR, "corpora/raw/")
+COOKED_CORPI_DIR = os.path.join(BASE_DIR, "corpora/trigram/")
+TRIGRAM_MODEL_DIR = os.path.join(BASE_DIR, "corpora/compiled/")
 
 #this might not be so on other machines
 STASH_DIR = os.path.join(BASE_DIR, "stash")
