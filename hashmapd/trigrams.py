@@ -31,6 +31,9 @@ import re
 _number_re = re.compile(r'^-?\$?\d+\.?\d*$')
 _split_re = re.compile(r'[!@#$%^&*_+|}{;":?><,./ ]+')
 
+#match 4 or more repetitions of one or two characters ("hahahaha", "okkkkkkaaay")
+_repeat_re = re.compile(r'(..??)\1\1\1+')
+
 def sanitise_string(s):
     if isinstance(s, unicode):
         s = s.encode('utf-8')
@@ -49,6 +52,7 @@ def sanitise_string_lc(s):
                  and not x == 'rt'            #not 'RT' because s.lower()
                  and not _number_re.match(x))
     s = s.replace('&lt;', '<').replace('&gt;', '>')
+    s = _repeat_re.sub(r"\1\1\1", s)
     return s
 
 
