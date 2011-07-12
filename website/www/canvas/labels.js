@@ -64,6 +64,7 @@ function paint_labels_cleverly(){
         }
         var max_jitter = size / 2 + $state.zoom;
         var line = fit_label(ctx, lines, text, d.x, d.y, size, max_jitter);
+        //$timestamp("label: " + text + " " + size);
         if (line){
             var x = line[5];
             var y = line[6];
