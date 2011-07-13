@@ -83,7 +83,7 @@ function make_fuzz_array(points, k, threshold,
     var lut = make_fuzz_table_1d(k, threshold);
     var len = lut.length;
     var radius = parseInt(len / 2);
-    log(k, threshold, radius);
+    //log(k, threshold, radius);
     var x, y, i;
     var map = zeroed_2d_array(width, height);
     var row;
@@ -147,7 +147,7 @@ function make_fuzz_array(points, k, threshold,
         }
         cols += 1;
     }
-    log(count, "expansions;", cols, "columns;", width, "width");
+    //log(count, "expansions;", cols, "columns;", width, "width");
     return map;
 }
 
