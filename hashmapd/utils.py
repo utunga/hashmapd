@@ -63,8 +63,9 @@ def tiled_array_image(A):
         (row, col) = divmod(tile, X)
         out_array[row*yp:row*yp+y, col*xp:col*xp+x] = A[tile].reshape(img_shape)
     
-    image = PIL.Image.fromarray(255*numpy.nan_to_num(out_array)).convert("L")
-    mask = PIL.Image.fromarray(255-255*(numpy.isnan(out_array))).convert("L")
+    image = PIL.Image.fromarray((255*numpy.nan_to_num(out_array)).astype('uint8'))
+    mask = PIL.Image.fromarray((255*(1-numpy.isnan(out_array))).astype('uint8'))
+    
     image.putalpha(mask)
     scale = 300 // max(image.size)
     if scale > 1:
