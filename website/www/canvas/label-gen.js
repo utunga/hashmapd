@@ -8,12 +8,12 @@ var $labels = {
     JSON_URL: "tokens/all-tokens-8-part-011.json",
     JSON_URL_TEMPLATE: "tokens/all-tokens-8-part-$$$.json",
     JSON_URL_COUNT: 48,
-    //JSON_URL_COUNT: 3,
+    //JSON_URL_COUNT: 5,
     BITS: 7,
     THRESHOLD: 400,
     FUZZ_DENSITY_CONSTANT: -0.005,
     FUZZ_DENSITY_THRESHOLD: 0.001,
-    VOTE_THRESHOLD: 100,
+    VOTE_THRESHOLD: 200,
 
     token_stack: [],
     json_rows: [],
@@ -96,38 +96,30 @@ function maybe_store_token(token, count, points){
         || (token.substr(0,4) == 'http')
         || (token.length > 15))
         return;
-
-    $page.token_data[token] = {
-        count: count,
-        points: points
-    };
-    $labels.token_stack.push(token);
+    $labels.token_stack.push([token, points, count]);
 }
 
 
 function on_label_json(data){
-    log("in on_label_json");
-    var points = decode_points(data.rows);
+    var all_points = decode_points(data.rows);
     //XXX may need to sort the points.
     var i, p;
-    var cache = $page.token_data;
     //point: [x_coord, y_coord, value, precision, extra]
     var token = '';
-    var count = 0, points2 = [];
-    for (i = 0; i < points.length; i++){
-        p = points[i];
+    var count = 0, points = [];
+    for (i = 0; i < all_points.length; i++){
+        p = all_points[i];
         var t = p.pop()[0];
         if (t != token){
-            //log(token, count);
-            maybe_store_token(token, count, points2);
+            maybe_store_token(token, count, points);
             count = 0;
-            points2 = [];
+            points = [];
             token = t;
         }
-        points2.push(p);
+        points.push(p);
         count += p[2];
     }
-    maybe_store_token(token, count, points2);
+    maybe_store_token(token, count, points);
 }
 
 function label_pixel_to_qt(x, y){
@@ -142,15 +134,18 @@ function label_pixel_to_qt(x, y){
 
 
 function calculate_labels(){
-    log("in calculate_labels");
-    log("with", $labels.token_stack.length, "tokens");
+    $timestamp("calculating" + $labels.token_stack.length + "tokens");
     window.setTimeout(calc_one_label, 1);
 }
 
 function calc_one_label(){
-    var token = $labels.token_stack.pop();
-    log(token, $labels.token_stack.length, $page.token_data[token].count);
-    var peaks = find_label_peaks($page.token_data[token]);
+    var d = $labels.token_stack.pop();
+    var token = d[0];
+    var points = d[1];
+    var count = d[2];
+
+    log(token, count);
+    var peaks = find_label_peaks(points, count);
     var rows = $labels.json_rows;
     for (var i = 0; i < peaks.length; i++){
         var p = peaks[i];
@@ -170,7 +165,7 @@ function calc_one_label(){
 }
 
 function finish_calc_labels(){
-    log("in finish_calc_labels");
+    $timestamp("finished calculating tokens");
     $("#content").append('<a id="label-json">download json</a>');
     $("#label-json").attr('href', 'data:'
                           + ','
@@ -179,11 +174,9 @@ function finish_calc_labels(){
 }
 
 
-function find_label_peaks(data){
-    //var points = data.points;
-    //var count = data.count;
+function find_label_peaks(points, count){
     //$timestamp("making label map");
-    var map = make_fuzz_array(data.points,
+    var map = make_fuzz_array(points,
                               $labels.FUZZ_DENSITY_CONSTANT,
                               $labels.FUZZ_DENSITY_THRESHOLD,
                               $labels.WIDTH, $labels.HEIGHT,
@@ -293,7 +286,7 @@ function find_label_peaks(data){
 
     for (i in votes){
         p = locations[i];
-        var score = votes[i] * Math.log(map[p[1]][p[0]]);
+        var score = votes[i] * Math.log(map[p[1]][p[0]]) * Math.log(count);
         if (score >= $labels.VOTE_THRESHOLD){
             labels.push([p[0], p[1], score]);
         }
