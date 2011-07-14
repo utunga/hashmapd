@@ -7,7 +7,8 @@ $const.DEBUG = true;
 var $labels = {
     JSON_URL: "tokens/all-tokens-8-part-011.json",
     JSON_URL_TEMPLATE: "tokens/all-tokens-8-part-$$$.json",
-    JSON_URL_COUNT: 48,
+    JSON_URL_COUNT_START: 1,
+    JSON_URL_COUNT_STOP: 48,
     //JSON_URL_COUNT: 2,
     BITS: 7,
     THRESHOLD: 400,
@@ -18,15 +19,16 @@ var $labels = {
 
     token_stack: [],
     json_rows: [],
-    descend_dont_climb: true,
+    descend_dont_climb: false,
 
     WIDTH: 128,
     HEIGHT: 128,
     x_scale: undefined,
     y_scale: undefined,
 
-    draw_map: true,
-    stop_after_one: true,
+    draw_map: false,
+    draw_map_for: '',
+    stop_after_one: false,
 
     tokens_known: undefined
 };
@@ -57,7 +59,7 @@ function get_all_label_json(){
      *
      * ... try the latter first.
      */
-    get_next_label_json(1);
+    get_next_label_json($labels.JSON_URL_COUNT_START);
 }
 
 function get_next_label_json(n){
@@ -68,7 +70,7 @@ function get_next_label_json(n){
     var d = $.getJSON(url, on_label_json);
 
     var cb;
-    if (n < $labels.JSON_URL_COUNT){
+    if (n < $labels.JSON_URL_COUNT_STOP){
         cb = function(){
             get_next_label_json(n + 1);
         };
@@ -148,11 +150,14 @@ function calc_one_label(){
     var count = d[2];
 
     log(token, count);
+    if($labels.draw_map_for != ''){
+        $labels.draw_map = ($labels.draw_map_for == token);
+    }
     var peaks;
     if ($labels.descend_dont_climb)
-        peaks = find_label_peaks(points, count);
+        peaks = find_label_peaks_descend(points, count);
     else
-        peaks = find_label_peaks2(points, count);
+        peaks = find_label_peaks_climb(points, count);
     var rows = $labels.json_rows;
     for (var i = 0; i < peaks.length; i++){
         var p = peaks[i];
@@ -290,7 +295,7 @@ function score_peak(peak){
 }
 
 
-function find_label_peaks(points, count){
+function find_label_peaks_descend(points, count){
     //$timestamp("making label map");
     var labels = [];
     var i, j, x, y;
@@ -387,7 +392,7 @@ function make_label_fuzz_map(points){
 }
 
 
-function find_label_peaks2(points, count){
+function find_label_peaks_climb(points, count){
     var i, j, x, y;
     var ymax = $labels.HEIGHT - 1;
     var xmax = $labels.WIDTH - 1;
@@ -530,18 +535,4 @@ function find_label_peaks2(points, count){
     }
     var n = Math.min(peaks.length, 5);
     return format_peaks_as_labels(peaks, n);
-}
-
-/* shuffle an array in place */
-function shuffle(array) {
-    var tmp, current;
-    var top = array.length;
-    if (top == 0)
-        return;
-    while(--top){
-        current = Math.floor(Math.random() * (top + 1));
-        tmp = array[current];
-        array[current] = array[top];
-        array[top] = tmp;
-    }
 }
