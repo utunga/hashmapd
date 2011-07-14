@@ -14,6 +14,7 @@ var $labels = {
     FUZZ_DENSITY_CONSTANT: -0.012,
     FUZZ_DENSITY_THRESHOLD: 0.001,
     VOTE_THRESHOLD: 200,
+    MIN_HEIGHT: 1.0,
 
     token_stack: [],
     json_rows: [],
@@ -155,10 +156,10 @@ function calc_one_label(){
     var rows = $labels.json_rows;
     for (var i = 0; i < peaks.length; i++){
         var p = peaks[i];
-        var coords = label_pixel_to_qt(p[0], p[1]);
+        var coords = label_pixel_to_qt(p.x, p.y);
         coords.unshift(token);
         rows.push({key: coords,
-                   value: p[2]
+                   value: p.score
                   });
     }
 
@@ -185,6 +186,8 @@ function find_peak(map){
     var pv = -1;
     var px = 0;
     var py = 0;
+    /*XXX would be quicker to scan more sparsely and futz
+     * around with an exact search at the end (given smooth landscape)*/
     for (var y = 0, ybound = $labels.HEIGHT; y < ybound; y++){
         for (var x = 0, xbound = $labels.WIDTH; x < xbound; x++){
             if (pv < map[y][x]){
@@ -194,7 +197,6 @@ function find_peak(map){
             }
         }
     }
-
     return {
         value: pv,
         x: px,
@@ -209,7 +211,8 @@ function descend_peak(map, peak, colour_pix){
     var xmax = $labels.WIDTH - 1;
     var sum = 0;
     var count = 0;
-    var threshold = 0.05;
+    var threshold = $labels.MIN_HEIGHT;
+
     //var gravity_x = 0;
     //var gravity_y = 0;
     var centre_x = 0.0;
@@ -293,14 +296,7 @@ function find_label_peaks(points, count){
     var i, j, x, y;
     var ymax = $labels.HEIGHT - 1;
     var xmax = $labels.WIDTH - 1;
-    var map = make_fuzz_array(points,
-                              $labels.FUZZ_DENSITY_CONSTANT,
-                              $labels.FUZZ_DENSITY_THRESHOLD,
-                              $labels.WIDTH, $labels.HEIGHT,
-                              $page.min_x, $page.min_y,
-                              $labels.x_scale,
-                              $labels.y_scale
-                             );
+    var map = make_label_fuzz_map(points);
     var pixels2;
     if ($labels.draw_map){
         $timestamp("made fuzz");
@@ -329,33 +325,47 @@ function find_label_peaks(points, count){
 
     if ($labels.draw_map){
         ctx2.putImageData(imgd2, 0, 0);
-
-        var imgd = ctx.getImageData(0, 0, $labels.WIDTH, $labels.HEIGHT);
-        var pixels = imgd.data;
-        for (i = 0; i < peaks.length; i++){
-            var peak = peaks[i];
-            var a = (peak.y * $labels.WIDTH + peak.x) * 4;
-            log(peak.x, peak.y, peak.centre_x, peak.centre_y);
-            var b = (parseInt(peak.centre_y) * $labels.WIDTH + parseInt(peak.centre_x)) * 4;
-            pixels[a] = 255;
-            pixels[a + 1] = 127;
-            pixels[a + 3] = 255;
-            pixels[b] = 125;
-            pixels[b + 1] = 255;
-            pixels[b + 3] = 255;
-        }
-        ctx.putImageData(imgd, 0, 0);
+        colour_peaks(ctx, peaks);
     }
 
     var n = Math.min(peaks.length, 5);
-    for (i = 0; i < n; i++){
+    return format_peaks_as_labels(peaks, n);
+}
+
+function format_peaks_as_labels(peaks, n){
+    var labels = [];
+    //XXX meddles with peaks elsewhere
+    peaks.sort(function(a, b){return b.score - a.score});
+    for (var i = 0; i < n; i++){
         var peak = peaks[i];
-        y = (peak.y + peak.centre_y + 0.5) * 0.5;
-        x = (peak.x + peak.centre_x + 0.5) * 0.5;
-        //log(peak.x, peak.centre_x, x, peak.y, peak.centre_y, y);
-        labels.push([x, y, peak.score]);
+        if (peak.score < $labels.VOTE_THRESHOLD){
+            break;
+        }
+        labels.push({x: (peak.x + peak.centre_x + 0.5) * 0.5,
+                     y: (peak.y + peak.centre_y + 0.5) * 0.5,
+                     score: peak.score});
     }
     return labels;
+}
+
+
+function colour_peaks(ctx, peaks){
+    var imgd = ctx.getImageData(0, 0, $labels.WIDTH, $labels.HEIGHT);
+    var pixels = imgd.data;
+    for (var i = 0; i < peaks.length; i++){
+        var peak = peaks[i];
+        var a = (peak.y * $labels.WIDTH + peak.x) * 4;
+        log(peak.x, peak.y, peak.centre_x, peak.centre_y);
+        var b = (parseInt(peak.centre_y + 0.5) * $labels.WIDTH + parseInt(peak.centre_x + 0.5)) * 4;
+        pixels[a] = 255;
+        pixels[a + 1] = 127;
+        pixels[a + 3] = 255;
+        /*greeny for centre of gravity */
+        pixels[b] = 125;
+        pixels[b + 1] = 255;
+        pixels[b + 3] = 255;
+    }
+    ctx.putImageData(imgd, 0, 0);
 }
 
 function colour_peak(peak){
@@ -364,13 +374,7 @@ function colour_peak(peak){
     peak.b = parseInt(Math.random() * 255.9);
 }
 
-
-function find_label_peaks2(points, count){
-    var labels = [];
-    var i, j, x, y;
-    var ymax = $labels.HEIGHT - 1;
-    var xmax = $labels.WIDTH - 1;
-
+function make_label_fuzz_map(points){
     var map = make_fuzz_array(points,
                               $labels.FUZZ_DENSITY_CONSTANT,
                               $labels.FUZZ_DENSITY_THRESHOLD,
@@ -379,6 +383,15 @@ function find_label_peaks2(points, count){
                               $page.x_scale * $labels.WIDTH / $const.width,
                               $page.y_scale * $labels.HEIGHT / $const.height
                              );
+    return map;
+}
+
+
+function find_label_peaks2(points, count){
+    var i, j, x, y;
+    var ymax = $labels.HEIGHT - 1;
+    var xmax = $labels.WIDTH - 1;
+    var map = make_label_fuzz_map(points);
 
     if ($labels.draw_map){
         var canvas = named_canvas("label_peaks", false, $labels.WIDTH / $const.width);
@@ -386,126 +399,122 @@ function find_label_peaks2(points, count){
         paste_fuzz_array(ctx, map, $const.ARRAY_FUZZ_DENSITY_SCALE_ARGS);
     }
 
-    var locations = [];
-    for (y = 1; y < ymax; y += 4){
-        for (x = 1; x < xmax; x += 4){
-            if (map[y][x] > 0.05){
-                locations.push(
-                    {
-                        x: x,
-                        y: y,
-                        sum: map[y][x],
-                        count: 1
-                    });
-            }
-        }
+    var pathmap = [];
+    for (y = 0; y < $labels.HEIGHT; y++){
+        pathmap[y] = [];
     }
-    shuffle(locations);
 
     var paths = [];
-    for (y = 0; y < $labels.HEIGHT; y++){
-        paths[y] = [];
-    }
+    var peaks = [];
+    i = -1;
+    var ix, iy;
+    var min_height = $labels.MIN_HEIGHT;
+    for (iy = 1; iy < ymax; iy += 1){
+        for (ix = 1; ix < xmax; ix += 1){
+            if (pathmap[iy][ix] === undefined && map[iy][ix] > min_height){
+                i++;
+                x = ix;
+                y = iy;
+                var p = {
+                    //x: x,
+                    //y: y,
+                    weighted_x: 0.0,
+                    weighted_y: 0.0,
+                    sum: 0.0,
+                    count: 1,
+                    delegate: i
+                    };
+                paths[i] = p;
+                while(1){
+                    /*claim this point */
+                    var current = map[y][x];
+                    p.sum += current;
+                    p.weighted_x += current * x;
+                    p.weighted_y += current * y;
+                    pathmap[y][x] = i;
+                    /*now look for steepest uphill direction. In case of ties, the first
+                     * checked direction wins, but ties are probably rare.*/
+                    var dx, dy;
+                    var best = current;
+                    if (map[y - 1][x] > best){
+                        dy = -1;
+                        dx = 0;
+                        best = map[y - 1][x];
+                    }
+                    if (map[y + 1][x] > best){
+                        dy = 1;
+                        dx = 0;
+                        best = map[y + 1][x];
+                    }
+                    if (map[y][x - 1] > best){
+                        dy = 0;
+                        dx = -1;
+                        best = map[y][x - 1];
+                    }
+                    if (map[y][x + 1] > best){
+                        dy = 0;
+                        dx = 1;
+                        best = map[y][x + 1];
+                    }
+                    if (best == current){
+                        /* this is a peak! */
+                        p.x = x;
+                        p.y = y;
+                        peaks.push(p);
+                        break;
+                    }
+                    y += dy;
+                    x += dx;
 
-    var len = locations.length;
-
-    for (i = 0; i < len; i++){
-        var p = locations[i];
-        x = p.x;
-        y = p.y;
-        p.delegate = i;
-        p.id = i;
-        while(1){
-            if (y == 0 || y == ymax || x == 0 || x == xmax){
-                /*abandon path when it reaches the edge. it just shouldn't. */
-                log("edge point", x, y, "is uphill from somewhere");
-                break;
+                    /*is this new point already part of a path? */
+                    var path = pathmap[y][x];
+                    if (path !== undefined){
+                        var q = paths[path];
+                        p.delegate = q.delegate;
+                        p.x = q.x;
+                        p.y = q.y;
+                        var r = paths[q.delegate];
+                        r.sum += p.sum;
+                        r.weighted_x += p.weighted_x;
+                        r.weighted_y += p.weighted_y;
+                        r.count += p.count;
+                        break;
+                    }
+                    /*abandon path if it reaches the edge. it just shouldn't do that. */
+                    if (y == 0 || y == ymax || x == 0 || x == xmax){
+                        log("edge point", x, y, "is uphill from somewhere");
+                        break;
+                    }
+                }
             }
-            var loc = paths[y][x];
-            if (loc){
-                var q = locations[loc];
-                p.delegate = q.delegate;
-                q.sum += p.sum;
-                q.count += p.count;
-                break;
-            }
-            paths[y][x] = i;
-            var current = map[y][x];
-            var dx = 0, dy = 0;
-            var best = current;
-            if (map[y - 1][x] > best){
-                dy = -1;
-                dx = 0;
-                best = map[y - 1][x];
-            }
-            if (map[y + 1][x] > best){
-                dy = 1;
-                dx = 0;
-                best = map[y + 1][x];
-            }
-            if (map[y][x - 1] > best){
-                dy = 0;
-                dx = -1;
-                best = map[y][x - 1];
-            }
-            if (map[y][x + 1] > best){
-                dy = 0;
-                dx = 1;
-                best = map[y][x + 1];
-            }
-            if (best == current){
-                /* this is a peak! */
-                p.x = x;
-                p.y = y;
-                break;
-            }
-            p.sum += best;
-            y += dy;
-            x += dx;
         }
     }
 
-    var votes = {};
-    var p;
-    for (i = 0; i < len; i++){
-        p = locations[i];
-        var q = p.delegate;
-        votes[q] = (votes[q] || 0.0) + p.sum;
-    }
-    //$timestamp("counted votes");
-    var _keys = [];
-    for (var k in votes) _keys.push(k);
-    log(_keys);
-    for (i in votes){
-        p = locations[i];
-        log(len, i, p);
-        var score = votes[i] * Math.log(map[p.y][p.x]) * Math.log(count);
-        if (score >= $labels.VOTE_THRESHOLD){
-            labels.push([p.x, p.y, score]);
-        }
+
+    var len = paths.length;
+    for (i = 0; i < peaks.length; i++){
+        var p = peaks[i];
+        p.score = p.count * p.sum * Math.log(map[p.y][p.x]) / Math.log(count);
+        p.centre_x = p.weighted_x / p.sum;
+        p.centre_y = p.weighted_y / p.sum;
     }
 
     if ($labels.draw_map){
-        var w = $labels.WIDTH;
-        var stride = w * 4;
-        var imgd = ctx.getImageData(0, 0, w, $labels.HEIGHT);
-        var pixels = imgd.data;
-
-
+        var stride = $labels.WIDTH * 4;
         var canvas2 = named_canvas("colour_paths", false, $labels.WIDTH / $const.width);
         var ctx2 = canvas2.getContext("2d");
         var imgd2 = ctx2.getImageData(0, 0, $labels.WIDTH, $labels.HEIGHT);
         var pixels2 = imgd2.data;
 
-        for (i in votes){
-            colour_peak(locations[i]);
+        for (i = 0; i < peaks.length; i++){
+            colour_peak(peaks[i]);
         }
         for (y = 0; y <= ymax; y++){
             for (x = 0; x <= xmax; x++){
-                i = paths[y][x];
+                i = pathmap[y][x];
                 if (i !== undefined){
-                    p = locations[i];
-                    var q = locations[p.delegate];
+                    var p = paths[i];
+                    var q = paths[p.delegate];
                     var a = y * stride + x * 4;
                     pixels2[a] = q.r;
                     pixels2[a + 1] = q.g;
@@ -516,16 +525,11 @@ function find_label_peaks2(points, count){
         }
         ctx2.putImageData(imgd2, 0, 0);
 
-        for (i in votes){
-            p = locations[i];
-            var score = votes[i] * Math.log(map[p.y][p.x]) * Math.log(count);
-            log(parseInt(score), p.x, p.y, votes[i], map[p.y][p.x]);
-            pixels[p.y * stride + p.x * 4] = 255;
-            pixels[p.y * stride + p.x * 4 + 3] = 255;
-        }
-        ctx.putImageData(imgd, 0, 0);
+        colour_peaks(ctx, peaks);
+        colour_peaks(ctx2, peaks);
     }
-    return labels;
+    var n = Math.min(peaks.length, 5);
+    return format_peaks_as_labels(peaks, n);
 }
 
 /* shuffle an array in place */
