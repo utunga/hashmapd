@@ -19,7 +19,7 @@ var $const = {
     //LABEL_URL: 'conspiracy-labels.json',
     //LABEL_URL: 'all-tokens-10-magic.json',
     //LABEL_URL: 'pre-filtered-1.json',
-    LABEL_SCALE: 0.7, /* adjust to make labels the right size */
+    LABEL_SCALE: 0.5, /* adjust to make labels the right size */
     LABEL_COLOUR: '#000',
     //LABEL_SHADOW: '#fff', /* undefined for no shadow */
     LABEL_SHADOW: undefined,
