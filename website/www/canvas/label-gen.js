@@ -14,8 +14,10 @@ var $labels = {
     THRESHOLD: 400,
     FUZZ_DENSITY_CONSTANT: -0.012,
     FUZZ_DENSITY_THRESHOLD: 0.001,
-    VOTE_THRESHOLD: 200,
+    SIGNIFICANCE_THRESHOLD: 5,
     MIN_HEIGHT: 1.0,
+    MAX_LABELS_PER_TOKEN: 5,
+    DESIRED_JSON_ROWS: 20000,
 
     token_stack: [],
     json_rows: [],
@@ -128,12 +130,10 @@ function on_label_json(data){
 }
 
 function label_pixel_to_qt(x, y){
-    //log(x, y);
     x /= $labels.x_scale;
     y /= $labels.y_scale;
     x += $page.min_x;
     y += $page.min_y;
-    //log(x, y);
     return encode_point(x, y);
 }
 
@@ -164,7 +164,8 @@ function calc_one_label(){
         var coords = label_pixel_to_qt(p.x, p.y);
         coords.unshift(token);
         rows.push({key: coords,
-                   value: p.score
+                   value: p.size,
+                   significance: p.significance
                   });
     }
 
@@ -178,12 +179,33 @@ function calc_one_label(){
 }
 
 function finish_calc_labels(){
+    winnow_rows();
     $timestamp("finished calculating tokens");
     $("#content").append('<a id="label-json">download json</a>');
     $("#label-json").attr('href', 'data:'
                           //+ ','
                           + 'application/json;charset=utf-8,'
                           + JSON.stringify({rows: $labels.json_rows}));
+}
+
+function winnow_rows(){
+    $timestamp("winnowing rows");
+    var i;
+    var rows = $labels.json_rows;
+    var target = $labels.DESIRED_JSON_ROWS;
+    log("want", target, "got", rows.length);
+    rows.sort(function(a, b){return a.significance - b.significance});
+    /*simple reduction: take potshots */
+    while(rows.length > target){
+        i = parseInt(Math.random() * Math.random() * rows.length);
+        rows.splice(i, 1);
+    };
+    for (i = 0; i < rows.length; i++){
+        delete rows[i].significance;
+    }
+    rows.reverse();
+    $timestamp("finished winnowing rows");
+
 }
 
 
@@ -272,10 +294,8 @@ function descend_peak(map, peak, colour_pix){
         }
 
         if (colour_pix !== undefined){
-            //log("colouring", current.length, peak.r, peak.g, peak.b);
             for (i = 1, len = current.length; i < len; i += 3){
                 var a = (current[i + 1] * $labels.WIDTH + current[i]) * 4;
-                //log(a);
                 colour_pix[a] = peak.r;
                 colour_pix[a + 1] = peak.g;
                 colour_pix[a + 2] = peak.b;
@@ -290,8 +310,9 @@ function descend_peak(map, peak, colour_pix){
     peak.count = count;
 }
 
-function score_peak(peak){
-    peak.score = peak.sum * peak.count * Math.log(peak.value);
+function score_peak(peak, count){
+    peak.significance = peak.sum * Math.sqrt(peak.value) / count;
+    peak.size = Math.pow(peak.significance * Math.log(peak.sum), 3);
 }
 
 
@@ -323,7 +344,7 @@ function find_label_peaks_descend(points, count){
             break;
         colour_peak(peak);
         descend_peak(map, peak, pixels2);
-        score_peak(peak);
+        score_peak(peak, count);
         //$timestamp("found peak " + j + " " + peak.x +',' + peak.y + ':' + peak.value);
         peaks.push(peak);
     }
@@ -333,22 +354,25 @@ function find_label_peaks_descend(points, count){
         colour_peaks(ctx, peaks);
     }
 
-    var n = Math.min(peaks.length, 5);
+    var n = Math.min(peaks.length, $labels.MAX_LABELS_PER_TOKEN);
     return format_peaks_as_labels(peaks, n);
 }
 
 function format_peaks_as_labels(peaks, n){
     var labels = [];
     //XXX meddles with peaks elsewhere
-    peaks.sort(function(a, b){return b.score - a.score});
+    peaks.sort(function(a, b){return b.significance - a.significance});
     for (var i = 0; i < n; i++){
         var peak = peaks[i];
-        if (peak.score < $labels.VOTE_THRESHOLD){
+        if (peak.significance < $labels.VOTE_THRESHOLD){
             break;
         }
-        labels.push({x: (peak.x + peak.centre_x + 0.5) * 0.5,
-                     y: (peak.y + peak.centre_y + 0.5) * 0.5,
-                     score: peak.score});
+        /* two thirds found peak, 1 third centre of gravity */
+        labels.push({x: (peak.x * 2 + peak.centre_x + 0.5) / 3,
+                     y: (peak.y * 2 + peak.centre_y + 0.5) / 3,
+                     size: peak.size,
+                     significance: peak.significance
+                    });
     }
     return labels;
 }
@@ -360,7 +384,7 @@ function colour_peaks(ctx, peaks){
     for (var i = 0; i < peaks.length; i++){
         var peak = peaks[i];
         var a = (peak.y * $labels.WIDTH + peak.x) * 4;
-        log(peak.x, peak.y, peak.centre_x, peak.centre_y);
+        //log(peak.x, peak.y, peak.centre_x, peak.centre_y);
         var b = (parseInt(peak.centre_y + 0.5) * $labels.WIDTH + parseInt(peak.centre_x + 0.5)) * 4;
         pixels[a] = 255;
         pixels[a + 1] = 127;
@@ -465,6 +489,7 @@ function find_label_peaks_climb(points, count){
                         /* this is a peak! */
                         p.x = x;
                         p.y = y;
+                        p.value = current;
                         peaks.push(p);
                         break;
                     }
@@ -499,7 +524,8 @@ function find_label_peaks_climb(points, count){
     var len = paths.length;
     for (i = 0; i < peaks.length; i++){
         var p = peaks[i];
-        p.score = p.count * p.sum * Math.log(map[p.y][p.x]) / Math.log(count);
+        score_peak(p, count);
+        //log(p.size, p.significance, count);
         p.centre_x = p.weighted_x / p.sum;
         p.centre_y = p.weighted_y / p.sum;
     }
@@ -533,6 +559,27 @@ function find_label_peaks_climb(points, count){
         colour_peaks(ctx, peaks);
         colour_peaks(ctx2, peaks);
     }
-    var n = Math.min(peaks.length, 5);
+    var n = Math.min(peaks.length, $labels.MAX_LABELS_PER_TOKEN);
+    blend_close_peaks(peaks);
     return format_peaks_as_labels(peaks, n);
+}
+
+function blend_close_peaks(peaks){
+    var i, j;
+
+    //for now
+    return peaks;
+
+    for (i = 0; i < peaks.length; i++){
+        var x = peaks[i].x;
+        var y = peaks[i].y;
+        for (j = i; j < peaks.length; j++){
+            if ((x - peaks[j].x) * (x - peaks[j].x) +
+                (y - peaks[j].y) * (y - peaks[j].y) < threshold){
+
+
+            }
+        }
+    }
+
 }
