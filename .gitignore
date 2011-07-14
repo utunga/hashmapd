@@ -27,3 +27,5 @@ amazon/credentials.csv
 amazon/ec2-bashrc
 .emacs.*
 website/www/canvas/junk
+/stash
+corpora/compiled/
