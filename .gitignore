@@ -27,5 +27,8 @@ amazon/credentials.csv
 amazon/ec2-bashrc
 .emacs.*
 website/www/canvas/junk
+website/www/canvas/tokens/all-tokens*
+website/www/canvas/all-tokens*
 /stash
 corpora/compiled/
+/hose-data/
