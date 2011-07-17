@@ -319,31 +319,6 @@ function zoomed_paint(ctx, points, zoom, k, threshold, scale_args, max_height){
     return max_height;
 }
 
-/** find_median_point_value
- *
- * There are quicker algorithms than sorting for finding the median,
- * but in practical terms they may not be faster in javascript.
- *
- * @param points is a list of points
- * @return the median value
- */
-function find_median_point_value(points){
-    var len = points.length;
-    if (len == 0){
-        return undefined;
-    }
-    var points2 = points.slice();
-    points2.sort(function(a, b){return a[2] - b[2]});
-    if ((len & 1) == 0){
-        /* even numbers, average of 2 centre points */
-        var mid1 = len / 2;
-        var mid2 = mid1 - 1;
-        return (points2[mid1][2] + points2[mid2][2]) / 2;
-    }
-    var middle = parseInt(len / 2);
-    return points2[middle][2];
-}
-
 /** find_top_n_points
  *
  * @param points is a list of points
