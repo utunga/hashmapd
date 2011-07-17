@@ -11,13 +11,13 @@ var $labels = {
     JSON_URL_COUNT_STOP: 48,
     //JSON_URL_COUNT: 2,
     BITS: 7,
-    THRESHOLD: 400,
+    THRESHOLD: 200,
     FUZZ_DENSITY_CONSTANT: -0.012,
     FUZZ_DENSITY_THRESHOLD: 0.001,
     SIGNIFICANCE_THRESHOLD: 5,
     MIN_HEIGHT: 1.0,
     MAX_LABELS_PER_TOKEN: 5,
-    DESIRED_JSON_ROWS: 20000,
+    DESIRED_JSON_ROWS: 10000,
 
     token_stack: [],
     json_rows: [],
@@ -194,6 +194,9 @@ function winnow_rows(){
     var rows = $labels.json_rows;
     var target = $labels.DESIRED_JSON_ROWS;
     log("want", target, "got", rows.length);
+
+    //var label_density = make_label_fuzz_map(rows);
+
     rows.sort(function(a, b){return a.significance - b.significance});
     /*simple reduction: take potshots */
     while(rows.length > target){
@@ -254,8 +257,6 @@ function descend_peak(map, peak, colour_pix){
             sum += v;
             var x = current[i++];
             var y = current[i++];
-            //gravity_x += v / (x - peak.x);
-            //gravity_y += v / (y - peak.y);
             centre_x += x * v;
             centre_y += y * v;
 
@@ -312,7 +313,7 @@ function descend_peak(map, peak, colour_pix){
 
 function score_peak(peak, count){
     peak.significance = peak.sum * Math.sqrt(peak.value) / count;
-    peak.size = Math.pow(peak.significance * Math.log(peak.sum), 3);
+    peak.size = parseInt(Math.pow(peak.significance * Math.log(peak.sum), 2));
 }
 
 

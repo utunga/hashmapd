@@ -58,7 +58,7 @@ function paint_labels_cleverly(){
         }
         var text = p[4];
         var n = p[2];
-        var size = Math.log(n) * $const.LABEL_SCALE * (1.4 + $state.zoom);
+        var size = Math.pow(Math.log(n), 2) * $const.LABEL_SCALE * (1.4 + $state.zoom);
         if (size < 8){
             continue;
         }
