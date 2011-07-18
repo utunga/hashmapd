@@ -81,7 +81,7 @@ if __name__ == '__main__':
     from optparse import OptionParser
 
     parser = OptionParser()
-    parser.add_option("-f", "--file", dest="config", default="config",
+    parser.add_option("-f", "--file", dest="config", default="synth_config",
         help="Path of the config file to use")
     (options, args) = parser.parse_args()
 
