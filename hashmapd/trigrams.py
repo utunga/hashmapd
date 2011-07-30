@@ -5,7 +5,7 @@ import json
 import gzip
 from math import log
 from collections import defaultdict
-from common import open_maybe_gzip
+from common import open_maybe_gzip, debug
 
 #Multiplied by mean trigram weight and added to each, to give unseen trigrams a chance
 TRIGRAM_OFFSET_FACTOR = 0.5
@@ -19,11 +19,6 @@ ANTI_TRIGRAM_OFFSET_FACTOR = 1.0
 #{"text": "ABC releases ....", "id": 70579336008302592, "lang": "en", "screen_name": "Top_Notched"}
 #
 # NB: not all rows have the id field.
-
-def debug(*args):
-    for x in args:
-        print >> sys.stderr, x,
-    print >> sys.stderr
 
 import re
 
