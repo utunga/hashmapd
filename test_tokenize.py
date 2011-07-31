@@ -1,6 +1,6 @@
 from optparse import OptionParser
 import os, sys, time
-from collections import Counter
+from collections import defaultdict
 import csv
 from hashmapd.csv_unicode_helpers import UnicodeWriter
 from hashmapd.tokenize import TweetTokenizer
@@ -26,12 +26,13 @@ def main():
     tweets_dir = options.basedir if (options.basedir) else TWEETS_DIR
     tokenizer = TweetTokenizer(tweets_dir)
 
-    counter = Counter()
+    #counter = Counter()
+    counter = defaultdict(int)
 
     if (options.input):
         for (username, token) in tokenizer.get_tokens_from_file(options.input):
             counter[token] += 1
-
+            
     if (options.all):
         for (username, token) in tokenizer.get_tokens_from_all_files():
             counter[token] += 1
@@ -41,7 +42,8 @@ def main():
 
     print 'writing coordinates to csv'
     writer = UnicodeWriter(open(RAW_COUNTS_FILE, 'wb'))
-    for (token, count) in counter.most_common():
+    #for (token, count) in counter.most_common():
+    for token, count in sorted(counter.iteritems()):
         writer.writerow([token, "%i"%count])
         
 if __name__ == '__main__':
