@@ -1,13 +1,15 @@
 from optparse import OptionParser
 import os, sys, time
 from collections import Counter
-
+import csv
+from hashmapd.csv_unicode_helpers import UnicodeWriter
 from hashmapd.tokenize import TweetTokenizer
 
 from hashmapd.common import find_git_root, debug
 BASE_DIR = find_git_root()
 DEFAULT_PATH = "projects/word_vectors/tweets/"
 TWEETS_DIR = os.path.join(BASE_DIR, DEFAULT_PATH)
+RAW_COUNTS_FILE = 'raw_counts.csv'
 
 def main():
     parser = OptionParser()
@@ -34,8 +36,13 @@ def main():
         for (username, token) in tokenizer.get_tokens_from_all_files():
             counter[token] += 1
 
-    for (token, count) in counter.most_common(200):
-        print token, count
-    
+    #for (token, count) in counter.most_common(200):
+    #    print token, count
+
+    print 'writing coordinates to csv'
+    writer = UnicodeWriter(open(RAW_COUNTS_FILE, 'wb'))
+    for (token, count) in counter.most_common():
+        writer.writerow([token, "%i"%count])
+        
 if __name__ == '__main__':
     main()
