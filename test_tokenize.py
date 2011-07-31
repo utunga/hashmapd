@@ -1,6 +1,7 @@
 from optparse import OptionParser
 import os, sys, time
 from collections import defaultdict
+from operator import itemgetter
 import csv
 from hashmapd.csv_unicode_helpers import UnicodeWriter
 from hashmapd.tokenize import TweetTokenizer
@@ -43,7 +44,7 @@ def main():
     print 'writing coordinates to csv'
     writer = UnicodeWriter(open(RAW_COUNTS_FILE, 'wb'))
     #for (token, count) in counter.most_common():
-    for token, count in sorted(counter.iteritems()):
+    for token, count in sorted(counter.iteritems(), key=itemgetter(1), reverse=True):
         writer.writerow([token, "%i"%count])
         
 if __name__ == '__main__':
