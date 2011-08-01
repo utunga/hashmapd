@@ -18,8 +18,16 @@ _simple_wordsplitter_re = re.compile(r'[^\w]+')
 def get_domain(s):
     hostname = urlparse(s).hostname
     if (hostname):
-        return "http://"+ ".".join(part for part in hostname.split(".") if not part=='www')
+        return "http://"+ ".".join(part for part in hostname.lower().split(".") if not part=='www')
     return None
+
+def get_domains(s):
+    hostname = urlparse(s).hostname
+    if (hostname):
+        parts = [part for part in hostname.lower().split(".") if not part=="www"]
+        return ["http://"+ ".".join(parts[-i:]) for i in xrange(len(parts)+1) if i >1]
+    # get_domains("http://www.foo.bar.com/asdf
+    # gives ['http://bar.com', 'http://foo.bar.com']
 
 def strip_sanitize_lc(s):
     s = s.replace('&lt;', '<').replace('&gt;', '>')
@@ -84,21 +92,23 @@ class TweetTokenizer:
         
         # get entities mentioned
         for mention in entities['user_mentions']:
-            yield '@'+mention['screen_name']
+            yield '@'+mention['screen_name'].lower()
         for hashtag in entities['hashtags']:
-            yield '#' + hashtag['text']
+            yield '#' + hashtag['text'].lower()
         for url in entities['urls']:
             short_url = url['url']
             expanded_url = url['expanded_url']
             # return both expanded and short url form
             # as well as 'just the domain' for each
-            if (expanded_url):
-                yield expanded_url.encode('utf8')
-                yield get_domain(expanded_url)
             yield short_url
-            yield get_domain(short_url)
-
-
+            if (expanded_url):
+                yield expanded_url
+                for part_domain in get_domains(expanded_url):
+                    yield part_domain
+                yield get_domain(short_url)
+            else:
+                for part_domain in get_domains(short_url):
+                    yield part_domain
         # get other words
         text = strip_sanitize_lc(raw)
         for token in _simple_wordsplitter_re.split(text):
@@ -113,7 +123,7 @@ class TweetTokenizer:
         #yield entities
         if (entities):
             for entity in entities:
-                yield entity
+                yield entity.lower()
 
         #strip out entities then yield the 'normal words'
         text = strip_sanitize_lc(raw)

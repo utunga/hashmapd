@@ -41,7 +41,7 @@ def main():
     #for (token, count) in counter.most_common(200):
     #    print token, count
 
-    print 'writing coordinates to csv'
+    print 'writing raw token counts to csv'
     writer = UnicodeWriter(open(RAW_COUNTS_FILE, 'wb'))
     #for (token, count) in counter.most_common():
     for token, count in sorted(counter.iteritems(), key=itemgetter(1), reverse=True):
