@@ -77,7 +77,7 @@ class TweetTokenizer:
                     yield (screen_name.lower(), token)
 
             elif doc_type == 'csharp_munged_tweet':
-                screen_name = j['screen_name']
+                screen_name = "@" + j['screen_name']
                 for token in self.get_tokens_from_csharp_munged_tweet(j):
                     yield (screen_name.lower(), token)
                     
