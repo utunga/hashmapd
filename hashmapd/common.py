@@ -1,5 +1,6 @@
 from subprocess import Popen, PIPE
 import gzip
+import sys
 
 def find_git_root():
     p = Popen(["git", "rev-parse", "--show-toplevel"], stdout=PIPE)
@@ -9,9 +10,13 @@ def find_git_root():
                          p.returncode)
     return root
 
-
 def open_maybe_gzip(filename, mode='rb'):
     if filename.endswith('.gz'):
         return gzip.open(filename, mode)
     else:
         return open(filename, mode)
+
+def debug(*args):
+    for x in args:
+        print >> sys.stderr, x,
+    print >> sys.stderr

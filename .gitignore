@@ -32,3 +32,4 @@ website/www/canvas/all-tokens*
 /stash
 corpora/compiled/
 /hose-data/
+.idea/*

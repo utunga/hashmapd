@@ -1,0 +1,22 @@
+{
+  "env": {
+    "couchio" : {
+      "db" : "http://hashmapd:xxxxx@hashmapd.couchone.com/frontend_dev"
+    },
+    "default" : {
+      "db" : "http://localhost:5984/frontend_dev"
+    },
+    "ceres" : {
+      "db" : "http://chch:xxxxx@chchneeds.org.nz/cdb/hashmapd"
+    },
+    "hashmapd_local" : {
+      "db" : "http://localhost:5984/hashmapd"
+    },	
+    "hashmapd_bak" : {
+      "db" : "http://localhost:5984/hashmapd_bak"
+    },
+    "amazon_frontend" : {
+      "db" : "http://localhost:5994/frontend_dev"
+    }
+  }
+}
