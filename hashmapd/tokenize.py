@@ -3,8 +3,6 @@ import json
 import re
 from urlparse import urlparse
 from common import open_maybe_gzip
-from trigrams import debug
-
 #ignore numbers, perhaps with dollar signs, or decimal points
 _number_re = re.compile(r'^-?\$?\d+\.?\d*$')
 _split_re = re.compile(r'[!@#$%^&*_+|}{;":?><,./ ]+')

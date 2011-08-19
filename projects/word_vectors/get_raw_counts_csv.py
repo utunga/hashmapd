@@ -30,20 +30,20 @@ ALL_USER_TOKEN_COUNTS_FILE = 'all_user_token_counts.csv'
 
 def write_token_counts(infile, username, token_user_counts):
     for token, count in sorted(token_user_counts.iteritems(), key=itemgetter(1), reverse=True):
-        infile.write(unicode(username +","+ token +","+ str(count) +"\r\n"))
+        infile.write("'%s','%s',%i\n"%(unicode(username),unicode(token), count))
 
 def write_user_totals(user_totals):
     debug('writing ' + ALL_USER_TOTALS_FILE)
     user_totals_file = codecs.open(ALL_USER_TOTALS_FILE, encoding="utf-8",mode= "w")
     for username, count in sorted(user_totals.iteritems(), key=itemgetter(1), reverse=True):
-        user_totals_file.write(unicode(username +","+ str(count) +"\r\n"))
+        user_totals_file.write("'%s',%i\n"%(unicode(username), count))
     user_totals_file.close()
 
 def write_token_totals(token_totals):
     debug('writing ' + ALL_TOKEN_COUNTS_FILE)
     token_counts_file = codecs.open(ALL_TOKEN_COUNTS_FILE, encoding="utf-8",mode= "w")
     for token, count in sorted(token_totals.iteritems(), key=itemgetter(1), reverse=True):
-        token_counts_file.write(unicode(token +","+ str(count) +"\r\n"))
+        token_counts_file.write("'%s',%i\n"%(unicode(token), count))
     token_counts_file.close()
 
 def main():
@@ -51,6 +51,7 @@ def main():
     parser.add_option("-i", "--input", help="input json file to parse (.gz or not)")
     parser.add_option("-a", "--all", help="tokenize all json files from the base dir",action="store_true", default=False)
     parser.add_option("-d", "--basedir", help="base dir to use, defaults to $git_root/" + DEFAULT_PATH)
+    parser.add_option("-M","--max", help="set maximum number of rows to parse - for testing", type="int")
 
     (options, args) = parser.parse_args()
 
@@ -61,6 +62,10 @@ def main():
     tweets_dir = options.basedir if (options.basedir) else TWEETS_DIR
     tokenizer = TweetTokenizer(tweets_dir)
 
+    #if (options.max):
+    #    print options.max>1
+    #exit()
+    
     #counter = Counter()
 
     if (options.input):
@@ -75,6 +80,7 @@ def main():
         debug('opening ' + ALL_USER_TOKEN_COUNTS_FILE)
         user_token_file = codecs.open(ALL_USER_TOKEN_COUNTS_FILE, encoding="utf-8",mode= "w")
         last_username = None
+        row=0
         for (username, token) in tokenizer.get_tokens_from_all_files():
             if ((last_username) and last_username!=username):
                 write_token_counts(user_token_file, last_username, token_user_counts)
@@ -83,8 +89,10 @@ def main():
             token_user_counts[token] += 1
             overall_token_counts[token] += 1
             user_totals[username] += 1
-
-        #don't forget to write counts for that last user
+            row += 1
+            if (options.max and row>options.max):
+                break
+        #don't forget to write out the counts for that last user
         write_token_counts(user_token_file, last_username, token_user_counts)
         debug("closing " + ALL_USER_TOKEN_COUNTS_FILE)
         user_token_file.close()
