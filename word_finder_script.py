@@ -5,26 +5,35 @@ from math import log
 from hashmapd.common import debug
 from hashmapd.token_counts import TokenCounts
 
+min_token_count=10 #minimum number of times a token must have been used
+max_token_count=340000 #FIXME obviously, and unfortunately, highly data dependent
+min_user_total=300 #minimum number of words per user
+max_percent_cover=0.5 #maximum fraction of users to use a token (at least once)
+min_token_len = 5
+data_dir = 'amdata' #'projects/word_vectors'
 
-data = TokenCounts(data_dir = 'projects/word_vectors/')
-data.load_from_csv()
+data = TokenCounts(data_dir = data_dir)
+data.load_from_csv(min_token_count=min_token_count, max_token_count=max_token_count, min_user_total=min_user_total)
 
 #find the max probability
 
 def token_filter(token):
-    if (len(token)<4):
+    if (len(token)<min_token_len):
         return False
 
-    if (data.token_totals[token] < 5):
+    if (data.token_totals[token] < min_token_count):
         return False
 
-    if (data.percent_cover(token)>.5):
+    if (data.token_totals[token] > max_token_count):
+        return False
+
+    if (data.percent_cover(token)>max_percent_cover):
         return False
 
     return True
 
 def user_filter(user):
-    if (data.user_totals[user]<100):
+    if (data.user_totals[user]<min_user_total):
         return False
     return True
 
@@ -37,7 +46,7 @@ data.load_from_csv(file_prefix='stage0_')
 # arrange bucket sizes so they are small for small values
 # large for larger values
 num_buckets=10
-buckets = [0.0, 0.0001, 0.0002, 0.0005, 0.001, 0.002,0.005,0.01,0.02,0.1]
+buckets = [0.0, 0.0001, 0.0005, 0.001, 0.002,0.005,0.01,0.02,0.05,0.1]
 def bucket(val):
     for pos in xrange(len(buckets)-1):
         if buckets[pos+1]>val:

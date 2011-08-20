@@ -43,67 +43,93 @@ class TokenCounts:
             self.token_totals_file = os.path.join(self.data_dir, self.file_prefix + 'token_counts.csv' )
             self.user_totals_file = os.path.join(self.data_dir, self.file_prefix + 'user_totals.csv' )
 
-    def load_from_csv(self, file_prefix=None, data_dir=None):
-
+    def load_from_csv(self, file_prefix=None, data_dir=None, min_token_count=None, max_token_count=None, min_user_total=None):
+    #fixme need to support filter on load also 
         self.init_data()
         self.set_data_dir(data_dir)
         self.set_prefix(file_prefix)
 
         debug("loading user totals from %s.."%(self.user_totals_file))
         reader = UnicodeReader(open(self.user_totals_file), quotechar="'")
+        users = []
+        user_ids = {}
         user_totals = {}
         idx = 0
         for [user, countstr] in reader:
             count = int(countstr)
+            if ((min_user_total and count<min_user_total)):
+                #debug("skipping %s"%(user))
+                continue
             user_totals[user] = count
-            idx += 1
-            if (idx % 1000==0):
-                debug('.. %i rows'%idx)
-        debug('..done')
-        self.user_totals = user_totals
-
-        debug("loading token totals from %s.."%(self.token_totals_file))
-        reader = UnicodeReader(open(self.token_totals_file), quotechar="'")
-        token_totals = {}
-        idx = 0
-        for [token, countstr] in reader:
-            count = int(countstr)
-            token_totals[token] = count
-            idx += 1
-            if (idx % 10000==0):
-                debug('.. %i rows'%idx)
-        debug('..done')
-        self.token_totals = token_totals
-
-        #load user_token_counts.csv
-        self.num_users = len(self.user_totals)
-        self.num_tokens = len(self.token_totals)
-
-        debug("loading user token counts from %s.."%(self.user_token_counts_file))
-        reader = UnicodeReader(open(self.user_token_counts_file), quotechar="'")
-
-        idx = 0
-        users = []
-        tokens = []
-        user_ids = {}
-        token_ids = {}
-        distinct_users_per_token = defaultdict(int)
-        user_token_counts = []
-        for [user, token, countstr] in reader:
-            count = int(countstr)
-            if (not token_ids.has_key(token)):
-                tokens.append(token)
-                token_ids[token] = len(tokens)-1
-
             if (not user_ids.has_key(user)):
                 users.append(user)
                 user_ids[user] = len(users)-1
-            token_user_prob = float(count) / self.user_totals[user]
-            user_token_counts.append((user_ids[user], token_ids[token], count, token_user_prob))
-            distinct_users_per_token[token] += 1
             idx += 1
-            if (idx % 100000==0):
-                debug('.. %i rows'%idx)
+            if (idx % 10000==0):
+                debug('.. %i users'%idx)
+
+        debug('.. %i users'%idx)
+        debug('..done')
+        self.users = users
+        self.user_ids = user_ids
+        self.user_totals = user_totals
+        self.num_users = len(users)
+
+        debug("loading token totals from %s.."%(self.token_totals_file))
+        reader = UnicodeReader(open(self.token_totals_file), quotechar="'")
+        tokens = []
+        token_ids = {}
+        token_totals = {}
+        idx = 0
+        for row in reader:
+            if (len(row) == 2):
+                [token, countstr] = row
+                count = int(countstr)
+                if ((min_token_count and count<min_token_count) or
+                (max_token_count and count>max_token_count)):
+                    #debug("skipping '%s': count not within range"%(token))
+                    continue
+
+                token_totals[token] = count
+                if (not token_ids.has_key(token)):
+                    tokens.append(token)
+                    token_ids[token] = len(tokens)-1
+                idx += 1
+                if (idx % 10000==0):
+                    debug('.. %i tokens'%idx)
+
+            else:
+                debug("skipping '%s' incorrect row format"%(token))
+                #raise Exception('unexpected input:',row)
+        debug('.. %i tokens'%idx)
+        debug('..done')
+        self.tokens = tokens
+        self.token_ids = token_ids
+        self.token_totals = token_totals
+        self.num_tokens = len(tokens)
+
+
+        #load user_token_counts.csv
+
+
+        debug("loading user token counts from %s.."%(self.user_token_counts_file))
+        reader = UnicodeReader(open(self.user_token_counts_file), quotechar="'")
+        idx = 0
+        distinct_users_per_token = defaultdict(int)
+        user_token_counts = []
+        for row in reader:
+            if (len(row)==3):
+                [user, token, countstr] = row
+                count = int(countstr)
+                if (token_ids.has_key(token) and user_ids.has_key(user)):
+                    token_user_prob = float(count) / self.user_totals[user]
+                    user_token_counts.append((user_ids[user], token_ids[token], count, token_user_prob))
+                    distinct_users_per_token[token] += 1
+                    idx += 1
+                    if (idx % 100000==0):
+                        debug('.. %i user token counts'%idx)
+            #else:
+                #just skip this row, for now
 
         #want to do this, but.. it ruins the numpy operation happiness
         #        self.user_token_counts = np.array(user_token_counts,
@@ -113,11 +139,8 @@ class TokenCounts:
         #                                        ('prob', np.float32)]))
 
         self.user_token_counts = np.array(user_token_counts, dtype=np.float32)
-        self.users = users
-        self.tokens = tokens
-        self.user_ids = user_ids
-        self.token_ids = token_ids
         self.distinct_users_per_token = distinct_users_per_token
+        debug('.. %i user token counts'%idx)
         debug('..done')
 
     def pass_anything_fun(self, user_or_token):
