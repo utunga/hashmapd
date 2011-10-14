@@ -42,9 +42,15 @@ class TokenCounts:
             self.user_token_counts_file = os.path.join(self.data_dir, self.file_prefix + 'user_token_counts.csv' )
             self.token_totals_file = os.path.join(self.data_dir, self.file_prefix + 'token_counts.csv' )
             self.user_totals_file = os.path.join(self.data_dir, self.file_prefix + 'user_totals.csv' )
+            self.users_file = os.path.join(self.data_dir, self.file_prefix + 'users.csv' )
+            self.tokens_file = os.path.join(self.data_dir, self.file_prefix + 'tokens.csv' )
 
-    def load_from_csv(self, file_prefix=None, data_dir=None, min_token_count=None, max_token_count=None, min_user_total=None):
-    #fixme need to support filter on load also 
+    def load_from_csv(self, file_prefix=None, data_dir=None,
+                      min_token_count=None, 
+                      skip_common_tokens_cutoff=None,
+                      min_user_total=None):
+
+        #fixme need to support filter on load also
         self.init_data()
         self.set_data_dir(data_dir)
         self.set_prefix(file_prefix)
@@ -75,6 +81,29 @@ class TokenCounts:
         self.user_totals = user_totals
         self.num_users = len(users)
 
+        #to work out max count, based on what % of most common data to skip we have to read the totals file twice
+        max_token_count = None
+        if (skip_common_tokens_cutoff):
+            debug("pre-loading token totals from %s.."%(self.token_totals_file))
+            reader = UnicodeReader(open(self.token_totals_file), quotechar="'")
+            token_totals = {}
+            idx=0
+            for row in reader:
+                if (len(row) == 2):
+                    [token, countstr] = row
+                    count = int(countstr)
+                    token_totals[token] = count
+                    idx += 1
+                    if (idx % 10000==0):
+                        debug('.. %i tokens'%idx)
+                else:
+                    debug("skipping '%s' incorrect row format"%(token))
+
+            cut_off = int(len(token_totals) * skip_common_tokens_cutoff)
+            max_token_count = token_totals[sorted(token_totals, key=token_totals.get, reverse=True)[cut_off]]
+            max_token_count 
+            debug("max token count %s " %(max_token_count))
+
         debug("loading token totals from %s.."%(self.token_totals_file))
         reader = UnicodeReader(open(self.token_totals_file), quotechar="'")
         tokens = []
@@ -85,9 +114,12 @@ class TokenCounts:
             if (len(row) == 2):
                 [token, countstr] = row
                 count = int(countstr)
-                if ((min_token_count and count<min_token_count) or
-                (max_token_count and count>max_token_count)):
-                    #debug("skipping '%s': count not within range"%(token))
+                if (min_token_count and count < min_token_count):
+                    #debug("skipping '%s': count below min - %i"%(token, min_token_count))
+                    continue
+
+                if (max_token_count and count>max_token_count):
+                    debug("skipping '%s': count above max count - %i"%(token, max_token_count))
                     continue
 
                 token_totals[token] = count
@@ -110,8 +142,6 @@ class TokenCounts:
 
 
         #load user_token_counts.csv
-
-
         debug("loading user token counts from %s.."%(self.user_token_counts_file))
         reader = UnicodeReader(open(self.user_token_counts_file), quotechar="'")
         idx = 0
@@ -131,13 +161,6 @@ class TokenCounts:
             #else:
                 #just skip this row, for now
 
-        #want to do this, but.. it ruins the numpy operation happiness
-        #        self.user_token_counts = np.array(user_token_counts,
-        #                        dtype=np.dtype([('user_id', np.int32),
-        #                                        ('token_id', np.int32),
-        #                                        ('count', np.int32),
-        #                                        ('prob', np.float32)]))
-
         self.user_token_counts = np.array(user_token_counts, dtype=np.float32)
         self.distinct_users_per_token = distinct_users_per_token
         debug('.. %i user token counts'%idx)
@@ -148,6 +171,9 @@ class TokenCounts:
 
     def percent_cover(self, token):
         return float(self.distinct_users_per_token[token]) / self.num_users
+
+    def distinct_users(self, token):
+        return self.distinct_users_per_token[token]
 
     def write_to_csv(self, file_prefix=None, data_dir=None, user_filter_fun=None, token_filter_fun=None):
         self.set_data_dir(data_dir)
@@ -187,3 +213,43 @@ class TokenCounts:
             token_totals_file.write("'%s',%i\n"%(unicode(token), count))
         token_totals_file.close()
         debug("done")
+
+    def write_to_training_csv(self):
+        "write to csv using only the user_id and token_id form"
+        self.set_prefix('train_')
+
+        debug('writing  %s ..'%(self.user_token_counts_file))
+        idx =0
+        outfile = codecs.open(self.user_token_counts_file, encoding="utf-8",mode= "w")
+        outfile.write("user_id,token_id,count\n")
+        for [user_id, token_id, count, prob] in self.user_token_counts:
+            outfile.write("%i,%s,%i\n"%(int(user_id),int(token_id), int(count)))
+            idx += 1
+            if (idx % 100000==0):
+                debug('..  %i token counts'%idx)
+
+        debug('.. wrote %i token counts'%idx)
+        outfile.close()
+        debug("done")
+
+        debug('writing %s ..'%(self.users_file))
+        users_file = codecs.open(self.users_file, encoding="utf-8",mode= "w")
+        users_file.write("user_id,user\n")
+        for user, user_id in sorted(self.user_ids.iteritems(), key=itemgetter(1)):
+            users_file.write("%i, '%s'\n"%(int(user_id), unicode(user)))
+        users_file.close()
+        debug("done")
+
+        debug('writing %s ..'%(self.tokens_file))
+        tokens_file = codecs.open(self.tokens_file, encoding="utf-8",mode= "w")
+        tokens_file.write("token_id,token\n")
+        for token, token_id in sorted(self.token_ids.iteritems(), key=itemgetter(1)):
+            tokens_file.write("%i, '%s'\n"%(int(token_id), unicode(token)))
+        tokens_file.close()
+        debug("done")
+
+    def truncate(self, num_users):
+        "truncate data at specified number of rows"
+        if (num_users<self.num_users):
+            num_users = self.num_users
+

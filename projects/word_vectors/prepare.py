@@ -42,9 +42,9 @@ def read_user_word_counts(cfg):
             print 'reading row '+ str(iter) + '..'
         iter += 1
         user_id = int(row['user_id'])-1
-        word_id = int(row['word_id'])-1
+        token_id = int(row['token_id'])-1
         count = int(row['count'])
-        raw_counts[user_id,word_id] = count
+        raw_counts[user_id,token_id] = count
     
     print 'done reading input'
     return raw_counts
@@ -63,7 +63,7 @@ def read_user_labels(cfg):
             print 'reading row '+ str(iter) + '..'
         iter += 1
         user_id = int(row['user_id'])
-        user_name = row['screen_name']
+        user_name = row['user']
         users.append((user_id, user_name))
     
     print 'done reading input'
