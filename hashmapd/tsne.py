@@ -25,6 +25,7 @@ class TSNE(object):
         self.sigma_iterations = 50 # number of iterations to try when finding sigma that matches perplexity *for each row of P, for every iteration* 
         self.min_gain = 0.01
         self.tol = 1e-5
+        self.last_cost = -1;
 
 
     def initialize_with_codes(self, codes):
@@ -66,7 +67,7 @@ class TSNE(object):
         gains = numpy.ones((n, self.out_dims));
         
         # Compute P-values
-        T = cythonTSNE(self.x2p())
+        T = cythonTSNE(self.x2p(), self.out_dims)
         T.scaleP(4, 1e-12) # early exaggeration
         
         for iter in range(iterations):
@@ -95,6 +96,7 @@ class TSNE(object):
 
         # update solution
         self.coords = Y;
+        self.last_cost = cost;
 
 
     def x2p(self):
@@ -113,11 +115,13 @@ class TSNE(object):
         
         # Loop over all datapoints
         for i in range(n):
-        
+
+            #print X[i]
             distances_to_i = D[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))];
+
             #print distances_to_i
             thisP, sigma = self.get_row_of_P(distances_to_i,self.perplexity)
-            
+
             # Set the row of P we just worked out
             P[i, numpy.concatenate((numpy.r_[0:i], numpy.r_[i+1:n]))] = thisP;
             sigmas.append(sigma)
@@ -125,7 +129,8 @@ class TSNE(object):
             # Print progress
             if i % 50 == 0:
                 print "Computed P-values for point ", i, " of ", n,"  sigma: ",sigma
-            
+            #print "Computed P-values for point ", i, " of ", n,"  sigma: ",sigma
+
             
         # Return final P-matrix
         print "Mean value of sigma: ", numpy.mean(sigmas)
@@ -138,6 +143,12 @@ class TSNE(object):
         # Compute P-row and corresponding perplexity
         P = numpy.exp(D * -beta);
         sumP = P.sum()
+        while (sumP==0):
+            # if we dont fix this problem now it leads to divide by zero problems later, so need to at least do this
+            beta = beta*0.1
+            P = numpy.exp(D * -beta);
+            sumP = P.sum()
+            #raise RuntimeError("Cannot proceed during computation of Hbeta found a row with P all zero, need a smaller initial beta?")
         P /= sumP
         H = numpy.log(sumP) + beta * numpy.inner(D, P)
         return H, P;
@@ -151,7 +162,7 @@ class TSNE(object):
         # perplexity. Then returns the corresponding P-vector.
         betamin = -numpy.inf; 
         betamax =  numpy.inf;
-        beta = 1.0 #star guess
+        beta = 0.01 #star guess
         
         #print 'computing gaussian kernal'
         # Compute the Gaussian kernel and entropy for the current beta
@@ -183,7 +194,7 @@ class TSNE(object):
             (H, thisP) = self.Hbeta(distances, beta)
             Hdiff = H - log_perplexity
             tries = tries + 1
-
+            
         sigma = numpy.sqrt(1.0 / beta)
         return thisP, sigma
     
