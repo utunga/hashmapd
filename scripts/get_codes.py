@@ -16,7 +16,7 @@ sys.path.append(HOME)
 
 from hashmapd.load_config import LoadConfig, DefaultConfig
 from hashmapd.SMH import SMH
-from hashmapd.utils import load_data
+from hashmapd.utils import load_data_from_file
 
     
 def load_data_with_multi_labels(dataset):
@@ -62,7 +62,6 @@ def load_model(cost_method, n_ins=784,  mid_layer_sizes = [200],
 
 def get_output_codes(smh, data_x):
     print 'running input data forward through smh..'
-    
     output_codes = smh.output_codes_given_x(data_x)
     return output_codes; #a 2d array consisting of 'smh' representation of each input row as a row of floats
     
@@ -74,7 +73,7 @@ def write_csv_labels(labels, output_file="out/labels.csv"):
         csv_writer.writerow([str(label),]) 
 
 def write_csv_codes(codes, output_file = "out/codes.csv"):
-    print 'writing output codes to csv'
+    print 'writing output codes to %s'%output_file
     
     csv_writer = csv.writer(open(output_file, 'wb'), delimiter=',')
     for row_id in xrange(len(codes)):
@@ -92,9 +91,8 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
     cfg = LoadConfig(options.config)
 
-    
     #load data (and labels) to generate codes for
-    dataset_x, dataset_labels = load_data("data/render_data")
+    dataset_x, dataset_labels = load_data_from_file(cfg.input.render_data)
  
     # write labels
     labels_file = cfg.output.labels_file
@@ -113,7 +111,10 @@ if __name__ == '__main__':
      
     # run the input data forward through the smh
     codes = get_output_codes(smh, dataset_x)
-    
+
+    render_x = dataset_x[0:20]
+    smh.output_trace_info(render_x,'render_data',False)
+
     # write output codes
     codes_file = cfg.output.codes_file
     write_csv_codes(codes, codes_file)

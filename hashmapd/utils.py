@@ -99,10 +99,11 @@ def load_data_from_file(dataset_file):
 
 
 def load_data(file_prefix):
+    print file_prefix
     """Try any known file formats in which the array might be stored"""
     for file_suffix in ['.npy', '_0.pkl.gz']:
         filename = file_prefix + file_suffix
         if os.path.exists(filename):
             return load_data_from_file(filename)
-    raise RuntimeError('No {0} data found in {1}/'.format(part, datadir))
+    raise RuntimeError('Missing data file - neither {0}.npy or {0}_0.pkl.gz found - do you need to run prepare.py?'.format(file_prefix))
 
