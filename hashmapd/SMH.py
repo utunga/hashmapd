@@ -75,7 +75,7 @@ class SMH(object):
         if (theano.config.floatX == "float32"):
             self.x  = T.matrix('x')  #
             self.x_sums = T.matrix('x_sums')
-            self.y  = T.matrix('y') # the output (after finetuning) should look the same as the input
+            self.y  = T.matrix('y') # the output (after finetuning) should /look the same as the input
         else:
             if (theano.config.floatX == "float64"):
                 self.x  = T.dmatrix('x')  #
@@ -429,7 +429,7 @@ class SMH(object):
         save_file.close()
 
     def train(self, training_data, validation_data, testing_data, 
-                finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.01, training_epochs = 100, 
+                finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.001, training_epochs = 100,
                 method = 'cd', k = 1, noise_std_dev = 0, cost_method = 'squared_diff', 
                 batch_size = 10,  
                 skip_trace_images=False, weights_file=None):
@@ -453,6 +453,7 @@ class SMH(object):
                 costs = _batched_apply(_pretrain, training_data, batch_size)
 
                 if (epoch < 100 and epoch % 10 == 0) or epoch % 100 == 0:
+                    self.output_trace_info(testing_data[0],'epoch_%i_'%(epoch),skip_trace_images)
                     print 'Pre-training layer {0}, epoch {1:3}, cost {2}'.format(
                             i, epoch, numpy.mean(costs))
     
@@ -478,10 +479,10 @@ class SMH(object):
         print >>sys.stderr, '... finetuning the model'
         
         # early-stopping parameters
-        patience              = 4     # look as this many examples regardless
+        patience              = 4    # look as this many examples regardless
         patience_increase     = 2    # wait this much longer when a new best is 
                                       # found
-        improvement_threshold = 0.9995 # a relative improvement of this much is 
+        improvement_threshold = 0.995 # a relative improvement of this much is
                                       # considered significant
     
         best_params          = None
@@ -509,7 +510,7 @@ class SMH(object):
             
                 # go through the test set
                 test_losses = _batched_apply(test_model_i, testing_data, batch_size)
-                test_score = numpy.mean(test_losses)   # NEVER USED
+                #test_score = numpy.mean(test_losses)   # NEVER USED
 
             if (epoch < 100 and epoch % 10 == 0) or epoch % 100 == 0:
                 print "epoch {0:>4}/{1:>4} validation error {2:%} test error of best model {3:%}".format(
