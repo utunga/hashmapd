@@ -19,7 +19,7 @@ from hashmapd.load_config import LoadConfig
 def generate(USERS, WORDS):
     random = numpy.random.RandomState(seed=1)
     DISTINCT = True
-    TOPICS = 2
+    TOPICS = 5
     SAMPLES = WORDS * 100
 
     probabilities = random.uniform(size=[WORDS, TOPICS])
@@ -27,9 +27,10 @@ def generate(USERS, WORDS):
     # normalize so sum of P(word|topic) over all words == 1
     probabilities /= probabilities.sum(axis=0)
 
-    # Order so that trace images are a smooth gradient
-    probabilities = list(probabilities)
-    probabilities.sort(key=lambda (a,b):a/(a+b))
+    if TOPICS == 2:
+        # Order so that trace images are a smooth gradient
+        probabilities = list(probabilities)
+        probabilities.sort(key=lambda (a,b):a/(a+b))
     probabilities = numpy.array(probabilities)
 
     partitions = numpy.add.accumulate(probabilities, axis=0)
@@ -56,8 +57,9 @@ def generate(USERS, WORDS):
             for x in numpy.random.uniform(size=[SAMPLES]):
                 word = bisect.bisect_left(partition, x)
                 counts[user, word] += 1
-    
-            labels.append(int(interests[1] *10 / interests.sum()))
+            
+            order = numpy.argsort(interests)[::-1]
+            labels.append(''.join(str(i) for i in order[:3]))
 
     return (counts, labels)
 
