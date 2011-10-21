@@ -29,11 +29,7 @@ def tiled_array_image(A):
     # where X*Y = tiles and x*y = pixels
     # in an [X*x, Y*y] image, plus padding.
     
-    A = A.T
     (tiles, pixels) = A.shape
-    if tiles >= pixels:
-        A = A.T
-        (tiles, pixels) = (pixels, tiles)
     x = int(numpy.sqrt(pixels))
     y = (pixels-1) // x + 1
     img_shape = (y, x)

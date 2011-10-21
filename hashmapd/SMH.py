@@ -74,12 +74,12 @@ class SMH(object):
         
         if (theano.config.floatX == "float32"):
             self.x  = T.matrix('x')  #
-            self.x_sums = T.matrix('x_sums')
+            self.x_sums = T.col('x_sums')
             self.y  = T.matrix('y') # the output (after finetuning) should /look the same as the input
         else:
             if (theano.config.floatX == "float64"):
                 self.x  = T.dmatrix('x')  #
-                self.x_sums = T.dmatrix('x_sums')
+                self.x_sums = T.dcol('x_sums')
                 self.y  = T.dmatrix('y') # the output (after finetuning) should look the same as the input
             else:        
                 raise Exception #not sure whats up here..
@@ -102,60 +102,44 @@ class SMH(object):
         
         # middle layer/layers
         num_hidden = len(hidden_layer_sizes)
-        for i in xrange(num_hidden):
-            # the input is x if we are on the first layer, otherwise input to this layer is output of layer below
-            n_out = hidden_layer_sizes[i]
-            
-            if i == 0 and self.first_layer_type == 'poisson':
-                n_in = self.n_ins
-                layer_input = self.x
-                sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
+        n_in = self.n_ins
+        layer_input = self.x
+        poisson_layer = self.first_layer_type == 'poisson'
+        for n_out in hidden_layer_sizes:
+            sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
                                         input = layer_input, 
-                                        poisson_layer = True,
+                                        poisson_layer = poisson_layer,
                                         mean_doc_size = self.mean_doc_size,
                                         n_in  = n_in, 
                                         n_out = n_out,
                                         activation = T.nnet.sigmoid)
+            
+            # Construct an RBM that shared weights with this layer
+            if poisson_layer:
+                rbm_class = RBM_Poisson
+                distribution_kwargs = dict(
+                        input_sums=self.x_sums, mean_doc_size=self.mean_doc_size)
             else:
-                if i == 0:
-                    n_in = self.n_ins
-                    layer_input = self.x
-                else:
-                    n_in = hidden_layer_sizes[i-1]
-                    layer_input = self.sigmoid_layers[-1].output
-                sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
-                                        input = layer_input, 
-                                        n_in  = n_in, 
-                                        n_out = n_out,
-                                        activation = T.nnet.sigmoid)
-
+                rbm_class = RBM
+                distribution_kwargs = {}
+            rbm_layer = rbm_class(numpy_rng = self.numpy_rng,
+                                theano_rng = self.theano_rng, 
+                                input = layer_input, 
+                                n_visible = n_in, 
+                                n_hidden  = n_out,
+                                W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
+                                hbias = sigmoid_layer.b, 
+                                **distribution_kwargs)
             
             #print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)            
             self.sigmoid_layers.append(sigmoid_layer)
             self.params.extend(sigmoid_layer.params)
-            
-            # Construct an RBM that shared weights with this layer (first layer is Poisson)
-            if i == 0 and self.first_layer_type == 'poisson':
-                rbm_layer = RBM_Poisson(numpy_rng = self.numpy_rng,
-                                theano_rng = self.theano_rng, 
-                                input = layer_input, 
-                                input_sums = self.x_sums,
-                                mean_doc_size = self.mean_doc_size,
-                                n_visible = n_in, 
-                                n_hidden  = n_out,
-                                W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
-                                hbias = sigmoid_layer.b)
-            else :
-                rbm_layer = RBM(numpy_rng = self.numpy_rng,
-                                theano_rng = self.theano_rng, 
-                                input = layer_input, 
-                                n_visible = n_in, 
-                                n_hidden  = n_out,
-                                W = sigmoid_layer.W, #NB data is shared between the RBM and the sigmoid layer
-                                hbias = sigmoid_layer.b)
-            
             #print 'created rbm (n_in:%d n_out:%d)'%(rbm_layer.n_in,rbm_layer.n_out)                  
             self.rbm_layers.append(rbm_layer)
+
+            layer_input = sigmoid_layer.output
+            n_in = n_out
+            poisson_layer = False
         
         self.hash_code_layer = self.sigmoid_layers[-1]
     
@@ -188,7 +172,8 @@ class SMH(object):
                                   n_in  = mirror_layer.n_out,
                                   n_out = mirror_layer.n_in,
                                   init_W = mirror_layer.W.value.T,
-                                  activation = T.nnet.softmax)
+                                  activation = T.nnet.softmax,
+                                  mirroring = True)
             else:
                 sigmoid_layer = HiddenLayer(rng   = self.numpy_rng, 
                                         input = layer_input, 
@@ -196,7 +181,8 @@ class SMH(object):
                                         n_out = mirror_layer.n_in,
                                         init_W = mirror_layer.W.get_value().T,
                                         #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1), #cant for the life of me think of a good default for this 
-                                        activation = T.nnet.sigmoid)
+                                        activation = T.nnet.sigmoid,
+                                        mirroring = True)
             
             #print 'created layer(n_in:%d n_out:%d)'%(sigmoid_layer.n_in,sigmoid_layer.n_out)
             self.sigmoid_layers.append(sigmoid_layer)
@@ -303,7 +289,7 @@ class SMH(object):
         
         learning_rate = T.scalar('lr')    # learning rate to use
         train_set_x = T.matrix('train_set_x')
-        train_set_x_sums = T.matrix('train_set_x_sums')
+        train_set_x_sums = T.col('train_set_x_sums')
         
         pretrain_fns = []
         for rbm in self.rbm_layers:
@@ -382,11 +368,11 @@ class SMH(object):
         '''
         
         train_set_x = T.matrix('train_set_x')
-        train_set_x_sums = T.matrix('train_set_x_sums')
+        train_set_x_sums = T.col('train_set_x_sums')
         valid_set_x = T.matrix('valid_set_x')
-        valid_set_x_sums = T.matrix('valid_set_x_sums')
+        valid_set_x_sums = T.col('valid_set_x_sums')
         test_set_x = T.matrix('test_set_x')
-        test_set_x_sums = T.matrix('test_set_x_sums')
+        test_set_x_sums = T.col('test_set_x_sums')
         
         # compute the gradients with respect to the model parameters
         gparams = T.grad(self.finetune_cost, self.params)
@@ -419,9 +405,10 @@ class SMH(object):
         return joint_params
     
     def load_model(self, inpt_params):
-        for i in xrange(len(inpt_params)):
-            #print 'loading layer %i'%i
-            self.sigmoid_layers[i].load_model(inpt_params[i])
+        layers, stored = len(self.sigmoid_layers), len(inpt_params)
+        assert layers == stored, (layers, stored)
+        for (layer, data) in zip(self.sigmoid_layers, inpt_params):
+            layer.load_model(data)
 
     def save_model(self, weights_file):
         save_file=open(weights_file,'wb')
@@ -510,7 +497,7 @@ class SMH(object):
             
                 # go through the test set
                 test_losses = _batched_apply(test_model_i, testing_data, batch_size)
-                #test_score = numpy.mean(test_losses)   # NEVER USED
+                test_score = numpy.mean(test_losses)   # NEVER USED
 
             if (epoch < 100 and epoch % 10 == 0) or epoch % 100 == 0:
                 print "epoch {0:>4}/{1:>4} validation error {2:%} test error of best model {3:%}".format(
@@ -604,7 +591,8 @@ def load_training_arrays(datadir, input_vector_length=None):
     return result
 
 
-def train_SMH(datadir, mid_layer_sizes, inner_code_length, first_layer_type, **kw):
+def train_SMH(datadir, mid_layer_sizes, inner_code_length, first_layer_type, 
+        postpone=False, **kw):
     """Create a SMH and train it with the data in 'datadir'"""
         
     for (alternate_name, suggest) in [
@@ -633,7 +621,9 @@ def train_SMH(datadir, mid_layer_sizes, inner_code_length, first_layer_type, **k
             mid_layer_sizes = mid_layer_sizes,
             inner_code_length = inner_code_length,
             )
-            
-    smh.train(training_data, validation_data, training_data, **kw)
-
-    return smh
+    
+    if postpone:
+        return (smh, data)
+    else:
+        smh.train(training_data, validation_data, training_data, **kw)
+        return smh

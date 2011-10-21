@@ -6,7 +6,9 @@ from utils import tiled_array_image
 from logistic_sgd import LogisticRegression
 
 class HiddenLayer(object):
-    def __init__(self,  rng, poisson_layer=False, mean_doc_size=1, input=None, n_in=784, n_out=500, init_W=None, init_b=None, activation = T.tanh):
+    def __init__(self,  rng, poisson_layer=False, mean_doc_size=1, input=None, 
+            n_in=784, n_out=500, init_W=None, init_b=None, activation = T.tanh,
+            mirroring=False):
         """
         Typical hidden layer of a MLP: units are fully-connected and have
         sigmoidal activation function. Weight matrix W is of shape (n_in,n_out)
@@ -35,6 +37,7 @@ class HiddenLayer(object):
         self.n_in = n_in
         self.n_out = n_out
         self.input = input
+        self.mirroring = mirroring
         T.pprint(self.input)
         if not input:
             raise Exception
@@ -80,5 +83,8 @@ class HiddenLayer(object):
         
     def export_weights_image(self, file_name):
         # Construct image from the weight matrix        
-        image = tiled_array_image(self.W.get_value())
+        array = self.W.get_value()
+        if not self.mirroring:
+            array = array.T
+        image = tiled_array_image(array)
         image.save(file_name)

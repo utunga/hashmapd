@@ -89,7 +89,7 @@ class RBM_Poisson(object):
         self.input_sums = input_sums
         if not input:
             self.input = T.matrix('input')
-            self.input_sums = T.matrix('input_sums')
+            self.input_sums = T.col('input_sums')
 
         self.binomial_approx_val = theano.shared(value = float(100000), name = 'binomial_approx_val')
 
@@ -360,7 +360,7 @@ class RBM_Poisson(object):
 #    
 #    index  = T.lscalar()    # index to a [mini]batch
 #    x      = T.matrix('input')  # the data is presented as rasterized images
-#    x_sums = T.matrix('input_sums')
+#    x_sums = T.col('input_sums')
 #    
 #    p_rbm = RBM_Poisson(numpy_rng = numpy_rng,
 #            theano_rng = theano_rng, 
