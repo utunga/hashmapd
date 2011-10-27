@@ -1,17 +1,4 @@
 import os, sys, getopt
-
-def get_git_home():
-    testpath = '.'
-    while not '.git' in os.listdir(testpath) and not os.path.abspath(testpath) == '/':
-        testpath = os.path.sep.join(('..', testpath))
-    if not os.path.abspath(testpath) == '/':
-        return os.path.abspath(testpath)
-    else:
-        raise ValueError, "Not in git repository"
-
-HOME = get_git_home()
-sys.path.append(HOME)
-
 from hashmapd.load_config import LoadConfig, DefaultConfig
 from hashmapd.render import Render
 
