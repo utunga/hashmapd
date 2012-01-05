@@ -1,19 +1,6 @@
 import os, sys, getopt
 import numpy, time, cPickle, gzip, PIL.Image
 import csv
-
-def get_git_home():
-    testpath = '.'
-    while not '.git' in os.listdir(testpath) and not os.path.abspath(testpath) == '/':
-        testpath = os.path.sep.join(('..', testpath))
-    if not os.path.abspath(testpath) == '/':
-        return os.path.abspath(testpath)
-    else:
-        raise ValueError, "Not in git repository"
-
-HOME = get_git_home()
-sys.path.append(HOME)
-
 from hashmapd.load_config import LoadConfig, DefaultConfig
 from hashmapd.SMH import SMH
 from hashmapd.utils import load_data_from_file
@@ -104,7 +91,7 @@ if __name__ == '__main__':
     input_vector_length = cfg.shape.input_vector_length
     mid_layer_sizes = list(cfg.shape.mid_layer_sizes)
     inner_code_length = cfg.shape.inner_code_length
-    cost_method = cfg.train.cost;
+    cost_method = cfg.train.cost_method;
 
     smh = load_model(cost_method, n_ins=input_vector_length,  mid_layer_sizes = mid_layer_sizes,
                     inner_code_length = inner_code_length, weights_file=weights_file)

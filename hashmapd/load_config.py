@@ -1,20 +1,10 @@
 import os
 from config import Config, ConfigMerger
 
-def get_git_home():
-    testpath = '.'
-    while not '.git' in os.listdir(testpath) and not os.path.abspath(testpath) == '/':
-        testpath = os.path.sep.join(('..', testpath))
-    if not os.path.abspath(testpath) == '/':
-        return os.path.abspath(testpath)
-    else:
-        raise ValueError, "Not in git repository"
-BASEPATH = os.path.join(get_git_home(), 'config')
-
 class ConfigLoader(object):
     """Loads configs in a clever way"""
 
-    def __init__(self, base_path=BASEPATH):
+    def __init__(self, base_path):
         self.BASE_PATH = base_path
 
     def merge_by_overwrite(self, cfg1, cfg2, key):
@@ -41,7 +31,7 @@ def DefaultConfig():
     return ConfigLoader().load_default()
     
 def LoadConfig(config_name):
-    return ConfigLoader().load(config_name);
+    return ConfigLoader('..').load(config_name);
 
 def dict_to_cfg(dictionary, section, filename):
     f = open(filename, 'w')

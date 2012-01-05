@@ -13,7 +13,6 @@ from rbm_poisson_vis import RBM_Poisson
 from logistic_sgd import LogisticRegression
 from utils import tiled_array_image, load_data
 
-    
 def _batched_apply(f, data, batch_size):
     """[ f(*data[0][batch], data[1][batch]) for each batch ]"""
     length = len(data[0])
@@ -23,7 +22,6 @@ def _batched_apply(f, data, batch_size):
         batch = [arg[offset:offset+batch_size] for arg in data]
         result.append(f(*batch))
     return result
-
 
 class SMH(object):
     """semantic hasher - based on the SMH code
@@ -117,6 +115,8 @@ class SMH(object):
             # Construct an RBM that shared weights with this layer
             if poisson_layer:
                 rbm_class = RBM_Poisson
+                print self.mean_doc_size
+                print self.x_sums
                 distribution_kwargs = dict(
                         input_sums=self.x_sums, mean_doc_size=self.mean_doc_size)
             else:
@@ -146,7 +146,7 @@ class SMH(object):
         self.n_rbm_layers = len(self.rbm_layers)
         self.n_sigmoid_layers = len(self.sigmoid_layers)
     
-    def unroll_layers(self, cost, noise_std_dev):
+    def unroll_layers(self, cost_method, noise_std_dev):
     
         inner_code_length = self.inner_code_length
         hidden_layer_sizes = self.mid_layer_sizes + [inner_code_length]
@@ -164,9 +164,9 @@ class SMH(object):
                 layer_input = self.sigmoid_layers[-1].output+srng.normal(self.sigmoid_layers[-1].output.shape,avg=0.0,std=noise_std_dev);
             else:
                 layer_input = self.sigmoid_layers[-1].output
-            
+
             # create the relevant layer (last layer is a softmax layer which we calculate the cross entropy error of during fine tuning)
-            if i == num_hidden and cost == 'cross_entropy':
+            if i == num_hidden and cost_method == 'cross_entropy':
                 self.logRegressionLayer = HiddenLayer(
                                   input = layer_input,
                                   n_in  = mirror_layer.n_out,
@@ -180,7 +180,7 @@ class SMH(object):
                                         n_in  = mirror_layer.n_out, 
                                         n_out = mirror_layer.n_in,
                                         init_W = mirror_layer.W.get_value().T,
-                                        #init_b = mirror_layer.b.value.reshape(mirror_layer.b.value.shape[0],1), #cant for the life of me think of a good default for this 
+                                        #init_b = mirror_layer.b.get_value().reshape(mirror_layer.b.get_value().shape[0],1), #cant for the life of me think of a good default for this
                                         activation = T.nnet.sigmoid,
                                         mirroring = True)
             
@@ -193,7 +193,7 @@ class SMH(object):
         
         # compute the cost (cross entropy) for second phase of training
         # can't get nll to work so just use squared diff to get something working! (MKT)
-        if cost == 'cross_entropy':
+        if cost_method == 'cross_entropy':
             self.finetune_cost = self.cross_entropy_error()
         else:
             self.finetune_cost = self.squared_diff_cost()
@@ -267,14 +267,17 @@ class SMH(object):
         return output_fn();
 
     def output_codes_given_x(self, data_x):
-        #print theano.pprint(self.x), len(data_x), data_x[0].shape, data_x[1].shape, data_x[2].shape 
+        #print theano.pprint(self.x), len(data_x), data_x[0].shape, data_x[1].shape, data_x[2].shape
         output_fn = theano.function( [],
                outputs =  self.hash_code_layer.output, 
                givens  = {self.x : data_x})
-        
+
+        y = output_fn();
+        for i in range(5):
+            print data_x[i], sum(data_x[i]), y[i]
         return output_fn();
 
-    def pretraining_functions(self, batch_size, method, k):
+    def pretraining_functions(self, batch_size, method, pretrain_lr, k):
         ''' Generates a list of functions, for performing one step of gradient descent at a
         given layer. The function will require as input a minibatch of data, and to train an
         RBM you just need to iterate, calling the corresponding function on all minibatches.
@@ -285,12 +288,18 @@ class SMH(object):
         :param method: type of Gibbs sampling to perform: 'cd' (default) or 'pcd'
         :type k: int
         :param k: number of Gibbs steps to do in CD-k / PCD-k
+        ;type finetune_lr: float
+        ;param finetune_lr: the 'learning rate' to use during finetuning phase
         '''
-        
+
         learning_rate = T.scalar('lr')    # learning rate to use
+        #learning_rate.value = pretrain_lr
+
+        # i *think* the following is equivalent to above.. doing this because i can't see where lr gets a value at all
+        #learning_rate = theano.shared(pretrain_lr, 'learning_rate')
         train_set_x = T.matrix('train_set_x')
         train_set_x_sums = T.col('train_set_x_sums')
-        
+
         pretrain_fns = []
         for rbm in self.rbm_layers:
             if method == 'pcd':
@@ -300,7 +309,7 @@ class SMH(object):
                 cost,updates = rbm.get_cost_updates(lr=learning_rate, persistent=persistent_chain, k=k)
             else:
                 # default = use CD instead
-                cost,updates = rbm.get_cost_updates(lr=learning_rate, persistent=None, k=k)
+                cost,updates = rbm.get_cost_updates(lr=learning_rate)
             
             # compile the theano function    
             fn = theano.function(inputs = [train_set_x,train_set_x_sums,
@@ -415,23 +424,34 @@ class SMH(object):
         cPickle.dump(self.export_model(), save_file, cPickle.HIGHEST_PROTOCOL)
         save_file.close()
 
-    def train(self, training_data, validation_data, testing_data, 
-                finetune_lr = 0.3, pretraining_epochs = 100, pretrain_lr = 0.001, training_epochs = 100,
-                method = 'cd', k = 1, noise_std_dev = 0, cost_method = 'squared_diff', 
+    def train(self, training_data, validation_data, testing_data,
+                noise_std_dev = 0, 
                 batch_size = 10,  
-                skip_trace_images=False, weights_file=None):
-    
+                skip_trace_images=False,
+                weights_file=None,
+                **train_cfg):
+
+
+        pretrain_lr = train_cfg['pretrain_lr']
+        finetune_lr = train_cfg['finetune_lr']
+        method = train_cfg['method']
+        k = train_cfg['k']
+        pretraining_epochs = train_cfg['pretraining_epochs']
+        training_epochs = train_cfg['training_epochs']
+        cost_method = train_cfg['cost_method']
         # PRETRAINING
 
         print >>sys.stderr, '... getting the pretraining functions'
         pretraining_fns = self.pretraining_functions(
                 batch_size       = batch_size,
                 method           = method,
+                pretrain_lr      = pretrain_lr,
                 k                = k)
 
         print >>sys.stderr, '... pre-training the model'
         start_time = time.clock()
-        
+
+        self.output_trace_info(testing_data[0],'epoch_init_',skip_trace_images)
         for (i, pretrain) in enumerate(pretraining_fns):
             def _pretrain(*args, **kw):
                 kw['lr'] = pretrain_lr
@@ -443,7 +463,9 @@ class SMH(object):
                     self.output_trace_info(testing_data[0],'epoch_%i_'%(epoch),skip_trace_images)
                     print 'Pre-training layer {0}, epoch {1:3}, cost {2}'.format(
                             i, epoch, numpy.mean(costs))
-    
+
+                    #self.matplotlib_debugging()
+                    
         end_time = time.clock()
         print 'The pretraining code for file '+os.path.split(__file__)[1]+' ran for %.2fm' % ((end_time-start_time)/60.)
     
@@ -461,7 +483,7 @@ class SMH(object):
     
         train_fn, validate_model_i, test_model_i = self.build_finetune_functions ( 
                     batch_size = batch_size, 
-                    learning_rate = finetune_lr) 
+                    learning_rate = finetune_lr)
     
         print >>sys.stderr, '... finetuning the model'
         
@@ -537,9 +559,9 @@ class SMH(object):
         image = tiled_array_image(data_x)
         image.save('trace/%s_input.png'%prefix)
     
-        output_y = self.output_given_x(data_x)
-        image = tiled_array_image(output_y)
-        image.save('trace/%s_reconstruction.png'%prefix)
+        #output_y = self.output_given_x(data_x)
+        #image = tiled_array_image(output_y)
+        #image.save('trace/%s_reconstruction.png'%prefix)
 
     def matplotlib_debugging(self):
         import matplotlib.pyplot as plt
@@ -591,8 +613,11 @@ def load_training_arrays(datadir, input_vector_length=None):
     return result
 
 
-def train_SMH(datadir, mid_layer_sizes, inner_code_length, first_layer_type, 
-        postpone=False, **kw):
+def train_SMH(datadir,
+        mid_layer_sizes,
+        inner_code_length,
+        first_layer_type,
+        postpone=False, **train_cfg):
     """Create a SMH and train it with the data in 'datadir'"""
         
     for (alternate_name, suggest) in [
@@ -600,19 +625,20 @@ def train_SMH(datadir, mid_layer_sizes, inner_code_length, first_layer_type,
             ('cost', 'cost_method'),
             ('train_batch_size', 'batch_size'),
             ('n_ins', 'input_vector_length'),]:
-        if alternate_name in kw:
-            value = kw.pop(alternate_name)
-            if suggest in kw:
+        if alternate_name in train_cfg:
+            value = train_cfg.pop(alternate_name)
+            if suggest in train_cfg:
                 print >>sys.stderr, "Config setting {0}={1} was ignored, but {2}={3}".format(
-                        alternate_name, value, suggest, kw[suggest])
+                        alternate_name, value, suggest, train_cfg[suggest])
             else:
-                kw[suggest] = value
-    
-    data = load_training_arrays(datadir, kw.pop('input_vector_length'))
+                train_cfg[suggest] = value
+
+    input_vector_length = train_cfg.pop('input_vector_length')
+    data = load_training_arrays(datadir, input_vector_length)
     data = [(a, a.sum(axis=1)[:, numpy.newaxis]) for a in data]
     (training_data, validation_data, test_data) = data
     (x, x_sums) = training_data
-    
+
     smh = SMH(
             numpy_rng = numpy.random.RandomState(123),
             mean_doc_size = x.sum(axis=1).mean(), 
@@ -621,9 +647,9 @@ def train_SMH(datadir, mid_layer_sizes, inner_code_length, first_layer_type,
             mid_layer_sizes = mid_layer_sizes,
             inner_code_length = inner_code_length,
             )
-    
+
     if postpone:
         return (smh, data)
     else:
-        smh.train(training_data, validation_data, training_data, **kw)
+        smh.train(training_data, validation_data, training_data, **train_cfg)
         return smh

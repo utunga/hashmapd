@@ -19,7 +19,7 @@ import rbm
 
 class RBM_Poisson(object):
     """Restricted Boltzmann Machine (RBM)  """
-    def __init__(self, input=None, input_sums=None, mean_doc_size=1, 
+    def __init__(self,  mean_doc_size, input, input_sums,
         n_visible=784, n_hidden=500, W = None, hbias = None, vbias = None, 
         numpy_rng = None, theano_rng = None):
         """ 

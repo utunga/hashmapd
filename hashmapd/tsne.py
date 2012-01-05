@@ -148,8 +148,7 @@ class TSNE(object):
             beta = beta*0.1
             P = numpy.exp(D * -beta);
             sumP = P.sum()
-            #raise RuntimeError("Cannot proceed during computation of Hbeta found a row with P all zero, need a smaller initial beta?")
-        P /= sumP
+            P /= sumP
         H = numpy.log(sumP) + beta * numpy.inner(D, P)
         return H, P;
         

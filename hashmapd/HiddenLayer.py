@@ -6,9 +6,8 @@ from utils import tiled_array_image
 from logistic_sgd import LogisticRegression
 
 class HiddenLayer(object):
-    def __init__(self,  rng, poisson_layer=False, mean_doc_size=1, input=None, 
-            n_in=784, n_out=500, init_W=None, init_b=None, activation = T.tanh,
-            mirroring=False):
+    def __init__(self, n_in, n_out, input, rng, poisson_layer=False, mean_doc_size=1,
+            init_W=None, init_b=None, activation = T.tanh, mirroring=False):
         """
         Typical hidden layer of a MLP: units are fully-connected and have
         sigmoidal activation function. Weight matrix W is of shape (n_in,n_out)
@@ -54,16 +53,17 @@ class HiddenLayer(object):
                W_values *= 1/mean_doc_size;
     
             #print 'using shared weights, randomized' #init case
-            self.W = theano.shared(value = W_values, name ='W')
+            self.W = theano.shared(value = W_values) #, name ='W')
+            
         else:
             #print 'using shared weights, as passed in' # unroll case
-            self.W = theano.shared(value = init_W, name ='W')
-        
+            self.W = theano.shared(value = init_W) #, name ='W')
+            
         if (init_b == None):
             b_values = numpy.zeros((n_out,), dtype= theano.config.floatX)
-            self.b = theano.shared(value= b_values, name ='b')
+            self.b = theano.shared(value= b_values) #, name ='b')
         else:
-            self.b = theano.shared(value= init_b, name ='b')
+            self.b = theano.shared(value= init_b) #, name ='b')
 
         self.output = activation(T.dot(self.input, self.W) + self.b)
         # parameters of the model

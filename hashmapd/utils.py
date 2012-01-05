@@ -13,7 +13,7 @@ import theano
 import PIL.Image
 
 
-def tiled_array_image(A):
+def tiled_array_image(A, transpose=False):
     """
     Transform an array with one flattened image per row, into an image in 
     which the rows are reshaped and layed out like tiles on a floor.
@@ -30,6 +30,8 @@ def tiled_array_image(A):
     # in an [X*x, Y*y] image, plus padding.
     
     (tiles, pixels) = A.shape
+    if transpose:
+        pixels, tiles = tiles, pixels
     x = int(numpy.sqrt(pixels))
     y = (pixels-1) // x + 1
     img_shape = (y, x)

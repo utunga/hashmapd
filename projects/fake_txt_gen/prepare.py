@@ -102,7 +102,7 @@ def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
             (VALIDATION_FILE, valid_set_x, None),
             (TESTING_FILE, test_set_x, None),
             (RENDER_FILE, train_set_x, user_labels)]:
-        if cfg.train.first_layer_type != 'poisson':  
+        if cfg.shape.first_layer_type != 'poisson':
             x = normalize_data_x(x, filename)
         data = (x, None, y)
         filename = os.path.join("data", filename+'_0.pkl.gz')

@@ -33,3 +33,5 @@ website/www/canvas/all-tokens*
 corpora/compiled/
 /hose-data/
 .idea/*
+compiled.c
+compiled.so

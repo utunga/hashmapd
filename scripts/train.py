@@ -20,7 +20,8 @@ if __name__ == '__main__':
     #actually run the train
     smh = train_SMH('data',
             mid_layer_sizes = list(cfg.shape.mid_layer_sizes), 
-            inner_code_length = cfg.shape.inner_code_length, 
+            inner_code_length = cfg.shape.inner_code_length,
+            first_layer_type = cfg.shape.first_layer_type,
             **cfg.train)
 
         

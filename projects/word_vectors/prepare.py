@@ -119,7 +119,7 @@ def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
     valid_file = gzip.open(get_filename(VALIDATION_FILE, 0),'wb')
     test_file = gzip.open(get_filename(TESTING_FILE, 0), 'wb')
     
-    if (cfg.train.first_layer_type=='poisson'):
+    if (cfg.shape.first_layer_type=='poisson'):
         cPickle.dump((train_set_x,train_sums,np.zeros(train_sums.shape,dtype=theano.config.floatX)), train_file, cPickle.HIGHEST_PROTOCOL)
         cPickle.dump((valid_set_x,valid_sums,np.zeros(valid_sums.shape,dtype=theano.config.floatX)), valid_file, cPickle.HIGHEST_PROTOCOL)
         cPickle.dump((test_set_x,test_sums,np.zeros(test_sums.shape,dtype=theano.config.floatX)), test_file, cPickle.HIGHEST_PROTOCOL)
@@ -131,21 +131,6 @@ def normalize_and_output_pickled_data(cfg, raw_counts, user_labels):
     train_file.close()
     valid_file.close()
     test_file.close() 
-        
-    data_info = {'training_prefix': os.path.join('data', TRAINING_FILE),
-        'n_training_files': 1,
-        'n_training_batches':train_cutoff/batch_size,
-        'validation_prefix':  os.path.join('data', VALIDATION_FILE),
-        'n_validation_files': 1,
-        'n_validation_batches': validate_cutoff/batch_size,
-        'testing_prefix':  os.path.join('data', TESTING_FILE),
-        'n_testing_files': 1,
-        'n_testing_batches': test_cutoff/batch_size,
-        'batches_per_file': (train_cutoff+validate_cutoff+test_cutoff)/batch_size,
-        'mean_doc_size': mean_doc_size,
-    }
-
-    dict_to_cfg(data_info, 'info', 'data.cfg')
 
     print '...  pickling and zipping render_data to '+ cfg.input.render_data
     render_data = normalize_data_x(train_set_x,train_sums,'training')[0:num_examples]

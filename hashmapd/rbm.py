@@ -47,7 +47,6 @@ class RBM(object):
         self.n_visible = n_visible
         self.n_hidden  = n_hidden
 
-
         if numpy_rng is None:    
             # create a number generator 
             numpy_rng = numpy.random.RandomState(1234)
@@ -162,27 +161,70 @@ class RBM(object):
         pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h1_sample)
         return [pre_sigmoid_h1, h1_mean, h1_sample, pre_sigmoid_v1, v1_mean, v1_sample]
  
-    def get_cost_updates(self, doc_size=1, lr = 0.1, persistent=None, k=1):
-        """ 
+    def get_cost_updates_cd(self, lr = 0.1):
+
+        # compute positive phase
+        pre_sigmoid_ph, ph_mean, ph_sample = self.sample_h_given_v(self.input)
+
+        # decide how to initialize persistent chain:
+        # for CD, we use the newly generate hidden sample
+        # for PCD, we initialize from the old state of the chain
+        chain_start = ph_sample
+
+        # perform actual negative phase
+        # in order to implement CD-k/PCD-k we need to scan over the
+        # function that implements one gibbs step k times.
+        # Read Theano tutorial on scan for more information :
+        # http://deeplearning.net/software/theano/library/scan.html
+        # the scan will return the entire Gibbs chain
+        [pre_sigmoid_nvs, nv_means, nv_samples, pre_sigmoid_nhs, nh_means, nh_samples], updates = \
+            theano.scan(self.gibbs_hvh,
+                    # the None are place holders, saying that
+                    # chain_start is the initial state corresponding to the
+                    # 6th output
+                    outputs_info = [None, None, None,None,None,chain_start],
+                    n_steps = 1)
+
+        # determine gradients on RBM parameters
+        # not that we only need the sample at the end of the chain
+        chain_end = nv_samples[-1]
+
+        cost = T.mean(self.free_energy(self.input)) - T.mean(self.free_energy(chain_end))
+        # We must not compute the gradient through the gibbs sampling
+        gparams = T.grad(cost, self.params,consider_constant = [chain_end])
+
+        # constructs the update dictionary
+        for gparam, param in zip(gparams, self.params):
+            # make sure that the learning rate is of the right dtype
+            updates[param] = param - gparam * T.cast(lr, dtype = theano.config.floatX)
+
+        # reconstruction cross-entropy is a better proxy for CD
+        monitoring_cost = self.get_reconstruction_cost(updates, pre_sigmoid_nvs[-1])
+
+        return monitoring_cost, updates
+
+#proper get_cost_updates function supports PCD version
+    def get_cost_updates(self, lr = 0.1, persistent=None, k=1):
+        """
         This functions implements one step of CD-k or PCD-k
-        
-        :param lr: learning rate used to train the RBM 
-        
+
+        :param lr: learning rate used to train the RBM
+
         :param persistent: None for CD. For PCD, shared variable containing old state
         of Gibbs chain. This must be a shared variable of size (batch size, number of
         hidden units).
-        
+
         :param k: number of Gibbs steps to do in CD-k/PCD-k
-        
-        Returns a proxy for the cost and the updates dictionary. The 
-        dictionary contains the update rules for weights and biases but 
+
+        Returns a proxy for the cost and the updates dictionary. The
+        dictionary contains the update rules for weights and biases but
         also an update of the shared variable used to store the persistent
         chain, if one is used.
         """
         
         # compute positive phase
         pre_sigmoid_ph, ph_mean, ph_sample = self.sample_h_given_v(self.input)
-        
+
         # decide how to initialize persistent chain:
         # for CD, we use the newly generate hidden sample
         # for PCD, we initialize from the old state of the chain
@@ -190,32 +232,32 @@ class RBM(object):
             chain_start = ph_sample
         else:
             chain_start = persistent
-        
+
         # perform actual negative phase
-        # in order to implement CD-k/PCD-k we need to scan over the 
-        # function that implements one gibbs step k times. 
+        # in order to implement CD-k/PCD-k we need to scan over the
+        # function that implements one gibbs step k times.
         # Read Theano tutorial on scan for more information :
         # http://deeplearning.net/software/theano/library/scan.html
         # the scan will return the entire Gibbs chain
         [pre_sigmoid_nvs, nv_means, nv_samples, pre_sigmoid_nhs, nh_means, nh_samples], updates = \
-            theano.scan(self.gibbs_hvh, 
+            theano.scan(self.gibbs_hvh,
                     # the None are place holders, saying that
-                    # chain_start is the initial state corresponding to the 
+                    # chain_start is the initial state corresponding to the
                     # 6th output
                     outputs_info = [None, None, None,None,None,chain_start],
                     n_steps = k)
-        
+
         # determine gradients on RBM parameters
         # not that we only need the sample at the end of the chain
         chain_end = nv_samples[-1]
-        
+
         cost = T.mean(self.free_energy(self.input)) - T.mean(self.free_energy(chain_end))
-        # We must not compute the gradient through the gibbs sampling 
+        # We must not compute the gradient through the gibbs sampling
         gparams = T.grad(cost, self.params,consider_constant = [chain_end])
-        
+
         # constructs the update dictionary
         for gparam, param in zip(gparams, self.params):
-            # make sure that the learning rate is of the right dtype 
+            # make sure that the learning rate is of the right dtype
             updates[param] = param - gparam * T.cast(lr, dtype = theano.config.floatX)
         if persistent:
             # Note that this works only if persistent is a shared variable
@@ -225,7 +267,7 @@ class RBM(object):
         else:
             # reconstruction cross-entropy is a better proxy for CD
             monitoring_cost = self.get_reconstruction_cost(updates, pre_sigmoid_nvs[-1])
-        
+
         return monitoring_cost, updates
 
     def get_pseudo_likelihood_cost(self, updates):
