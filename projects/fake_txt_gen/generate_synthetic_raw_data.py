@@ -7,7 +7,7 @@ def generate(USERS, WORDS):
     random = numpy.random.RandomState(seed=1)
     DISTINCT = True
     TOPICS = 4
-    SAMPLES = WORDS * 100
+    SAMPLES = WORDS * 500
 
     probabilities = random.uniform(size=[WORDS, TOPICS])
     
