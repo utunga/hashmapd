@@ -1,0 +1,11 @@
+#Virtaulenvwrapper, pip
+export WORKON_HOME=~/.virtualenv
+mkdir -p $WORKON_HOME
+source /usr/local/bin/virtualenvwrapper.sh
+export PIP_DOWNLOAD_CACHE=~/.pip/downloads
+mkdir -p $PIP_DOWNLOAD_CACHE
+export PIP_RESPECT_VIRTUALENV=true
+export PIP_VIRTUALENV_BASE=$WORKON_HOME
+eval "`pip completion --bash`"
+export PIP_USE_MIRRORS=true
+export VIRTUALENVWRAPPER_VIRTUALENV_ARGS='--no-site-packages'
