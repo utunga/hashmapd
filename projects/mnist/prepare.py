@@ -57,4 +57,4 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
     cfg = LoadConfig(options.config)
     
-    load_and_truncate_mnist('raw/mnist.pkl.gz', 'data')
+    load_and_truncate_mnist('raw/truncated_mnist.pkl.gz', 'data')
