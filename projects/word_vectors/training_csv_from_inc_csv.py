@@ -1,6 +1,5 @@
 from hashmapd.token_counts import TokenCounts
-data_dir = 'projects/word_vectors' #'amdata'
-data_dir = 'amdata'
+data_dir = 'projects/word_vectors/raw/amdata' #'amdata'
 truncate_at_num_users = 200
 truncate_at_num_tokens = 400
 
