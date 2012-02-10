@@ -8,7 +8,7 @@ from hashmapd.common import debug
 import numpy as np
 from common import find_git_root
 
-DEFAULT_DATA_DIR = "projects/word_vectors/tweets/"
+DEFAULT_DATA_DIR = "projects/word_vectors/raw/amdata"
 DEFAULT_PREFIX = 'all_'
 
 class TokenCounts:
@@ -72,7 +72,7 @@ class TokenCounts:
                 user_ids[user] = len(users)-1
             idx += 1
             if (idx % 10000==0):
-                debug('.. %i users'%idx)
+                debug('.. loaded %i users'%idx)
 
         debug('.. %i users'%idx)
         debug('..done')
@@ -95,13 +95,13 @@ class TokenCounts:
                     token_totals[token] = count
                     idx += 1
                     if (idx % 10000==0):
-                        debug('.. %i tokens'%idx)
+                        debug('.. loaded %i tokens'%idx)
                 else:
                     debug("skipping '%s' incorrect row format"%(token))
 
             cut_off = int(len(token_totals) * skip_common_tokens_cutoff)
             max_token_count = token_totals[sorted(token_totals, key=token_totals.get, reverse=True)[cut_off]]
-            max_token_count 
+            
             debug("max token count %s " %(max_token_count))
 
         debug("loading token totals from %s.."%(self.token_totals_file))
@@ -119,7 +119,7 @@ class TokenCounts:
                     continue
 
                 if (max_token_count and count>max_token_count):
-                    debug("skipping '%s': count above max count - %i"%(token, max_token_count))
+                    debug("skipping '%s': count (%i) above max count (%i)"%(token, count, max_token_count))
                     continue
 
                 token_totals[token] = count
@@ -128,12 +128,12 @@ class TokenCounts:
                     token_ids[token] = len(tokens)-1
                 idx += 1
                 if (idx % 10000==0):
-                    debug('.. %i tokens'%idx)
+                    debug('.. loaded %i tokens'%idx)
 
             else:
                 debug("skipping '%s' incorrect row format"%(token))
                 #raise Exception('unexpected input:',row)
-        debug('.. %i tokens'%idx)
+        debug('.. loaded %i tokens'%idx)
         debug('..done')
         self.tokens = tokens
         self.token_ids = token_ids
@@ -157,13 +157,13 @@ class TokenCounts:
                     distinct_users_per_token[token] += 1
                     idx += 1
                     if (idx % 100000==0):
-                        debug('.. %i user token counts'%idx)
+                        debug('.. loaded %i user token counts'%idx)
             #else:
                 #just skip this row, for now
 
         self.user_token_counts = np.array(user_token_counts, dtype=np.float32)
         self.distinct_users_per_token = distinct_users_per_token
-        debug('.. %i user token counts'%idx)
+        debug('.. loaded %i user token counts'%idx)
         debug('..done')
 
     def pass_anything_fun(self, user_or_token):
