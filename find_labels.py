@@ -22,7 +22,7 @@ def open_maybe_gzip(filename):
         return open(filename)
 
 def get_row_emitter(filename, has_token=True):
-    # let's NOT parse it properly, which would be slow and memory hungry.
+    # let's NOT parse it properly (as JSON), which would be slow and memory hungry.
     # (honestly, the 6 coordinate file is a 160MB file, and this already uses > 1 GB).
     # Rows look like:
     #
